@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RSICraft v0.1.0 — 9-Tab Interactive Help, Geopolitics &amp; Tsinghua OpenRSI Studio</title>
+  <style>
+    :root {
+      --bg: #090d16;
+      --panel: #111827;
+      --panel-alt: #1e293b;
+      --border: #334155;
+      --accent: #38bdf8;
+      --accent-soft: rgba(56, 189, 248, 0.14);
+      --emerald: #34d399;
+      --amber: #fbbf24;
+      --purple: #c084fc;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    header {
+      background: linear-gradient(135deg, #090d16 0%, #0f172a 60%, #0c4a6e 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 20px 32px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .brand-badge {
+      background: var(--accent-soft);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      font-weight: 700;
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .brand h1 {
+      margin: 0;
+      font-size: 21px;
+      letter-spacing: -0.02em;
+    }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .search-input {
+      background: #0f172a;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 14px;
+      border-radius: 8px;
+      min-width: 260px;
+      font-size: 14px;
+    }
+    .search-input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .btn-link {
+      background: var(--panel-alt);
+      border: 1px solid var(--border);
+      color: var(--text);
+      text-decoration: none;
+      padding: 7px 13px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      transition: all 0.15s;
+    }
+    .btn-link:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    nav.tab-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 12px 32px;
+      background: #0d1320;
+      border-bottom: 1px solid var(--border);
+    }
+    .tab-btn {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--muted);
+      padding: 8px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      transition: all 0.15s;
+    }
+    .tab-btn:hover {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.04);
+    }
+    .tab-btn.active {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .tab-pill {
+      font-size: 11px;
+      padding: 1px 7px;
+      border-radius: 999px;
+      background: rgba(148, 163, 184, 0.15);
+      color: var(--text);
+    }
+    main {
+      max-width: 1180px;
+      margin: 28px auto;
+      padding: 0 24px 64px 24px;
+    }
+    .tab-panel {
+      display: none;
+    }
+    .tab-panel.active {
+      display: block;
+    }
+    .section-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 18px;
+    }
+    .section-card h3 {
+      margin: 0 0 10px 0;
+      color: var(--accent);
+      font-size: 17px;
+    }
+    .section-card p {
+      margin: 0 0 12px 0;
+      color: #e2e8f0;
+    }
+    pre {
+      background: #060911;
+      border: 1px solid #1e293b;
+      color: #bae6fd;
+      padding: 14px 16px;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 13px;
+      margin: 10px 0 0 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 13.5px;
+    }
+    th {
+      background: #060911;
+      color: var(--accent);
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 2px solid var(--border);
+    }
+    td {
+      padding: 9px 12px;
+      border-bottom: 1px solid #1e293b;
+      vertical-align: top;
+    }
+    tr:hover td {
+      background: rgba(56, 189, 248, 0.04);
+    }
+    .kpi-strip {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+    .kpi-box {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 18px;
+    }
+    .kpi-box .val {
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--emerald);
+    }
+    .kpi-box .lbl {
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span class="brand-badge">ArtCraft 3-Crate + egui 0.37</span>
+      <h1>RSICraft v0.1.0 &mdash; 9-Tab Operator Manual, Skynet Myth &amp; Tsinghua OpenRSI Studio</h1>
+    </div>
+    <div class="header-actions">
+      <input type="search" id="helpSearch" class="search-input" placeholder="Search all 9 tabs (e.g. Bowen Zhou, Skynet, Kadane, BLAKE3)..." />
+      <a class="btn-link" href="../brochure/rsicraft-brochure.pdf">📖 PDF Brochure</a>
+      <a class="btn-link" href="../brochure/rsicraft-brochure.epub">📚 EPUB Handbook</a>
+      <a class="btn-link" href="../brochure/rsicraft-brochure.html">🌐 HTML Brochure</a>
+    </div>
+  </header>
+
+  <nav class="tab-bar" id="tabBar">
+    <button class="tab-btn active" data-tab="overview">📖 1. Overview <span class="tab-pill">3-Crate</span></button>
+    <button class="tab-btn" data-tab="rsi_landscape">🌍 2. Skynet vs Closed Labs <span class="tab-pill">Geopolitics</span></button>
+    <button class="tab-btn" data-tab="tsinghua_openrsi">🏛️ 3. Tsinghua &amp; OpenRSI <span class="tab-pill">arXiv:2607.28568</span></button>
+    <button class="tab-btn" data-tab="wrappee">⚡ 4. RTX 4090 &amp; Sandbox <span class="tab-pill">24 GB</span></button>
+    <button class="tab-btn" data-tab="operators">🧬 5. Operators &amp; Math <span class="tab-pill">4 Ops</span></button>
+    <button class="tab-btn" data-tab="compare">⚖️ 6. Competitive Matrix <span class="tab-pill">vs FunSearch</span></button>
+    <button class="tab-btn" data-tab="api">🔌 7. 14 MCP Tools &amp; CLI <span class="tab-pill">2024-11-05</span></button>
+    <button class="tab-btn" data-tab="troubleshoot">🩺 8. Troubleshooting <span class="tab-pill">5 Fixes</span></button>
+    <button class="tab-btn" data-tab="faq">❓ 9. FAQ &amp; Safety <span class="tab-pill">5 Guards</span></button>
+  </nav>
+
+  <main>
+    <div class="kpi-strip">
+      <div class="kpi-box"><div class="val">96.6028</div><div class="lbl">Live RTX 4090 CROSSOVER Score (1.359 ms)</div></div>
+      <div class="kpi-box"><div class="val">arXiv:2607.28568</div><div class="lbl">Tsinghua &amp; Frontis.AI OpenRSI Foundation</div></div>
+      <div class="kpi-box"><div class="val">egui 0.37 + MCP</div><div class="lbl">Native GPU Studio + 14 Stdio Tools</div></div>
+      <div class="kpi-box"><div class="val">0 Panics</div><div class="lbl">#![deny(unwrap, expect, panic, todo)]</div></div>
+    </div>
+
+    <!-- TAB 1: OVERVIEW -->
+    <section class="tab-panel active" id="tab-overview">
+      <div class="section-card">
+        <h3>Why RSICraft Exists</h3>
+        <p>Existing evolutionary code-search harnesses orchestrate LLM loops in stateful Python daemons that lose lineage on crash, scatter uncompressed duplicate files across disk, and select parents greedily by raw score alone. <strong>RSICraft</strong> compiles the entire evolutionary state machine, BLAKE3+Zstd Content-Addressable Store (CAS), composite utility parent selector, MCP <code>2024-11-05</code> stdio server, and native <code>eframe</code>/<code>egui 0.37</code> GPU Desktop Studio into a single zero-panic Rust workspace.</p>
+        <pre>cargo run -p rsicraft-app
+rsicraft status --json
+rsicraft hardware --json</pre>
+      </div>
+      <div class="section-card">
+        <h3>3-Crate Pure-Rust ArtCraft Architecture (L1 / L2 / L3)</h3>
+        <p><strong>1. <code>rsicraft-core</code> (L1 Core + Store):</strong> SQLite WAL database (<code>tasks</code>, <code>experience_cards</code>, <code>task_frontiers</code>), BLAKE3 content hashing, Zstd (level 3) source compression, composite utility calculation, 4-operator action space (<code>DRAFT</code>, <code>IMPROVE</code>, <code>DEBUG</code>, <code>CROSSOVER</code>), <code>llama-server</code> client, and isolated sandbox runner.<br/>
+        <strong>2. <code>rsicraft-mcp</code> (L2 CLI + MCP Binary):</strong> Single binary exposing 14 MCP tools over stdio and 1:1 matching CLI subcommands.<br/>
+        <strong>3. <code>rsicraft-app</code> (L3 Native GPU Desktop Studio):</strong> High-contrast <code>slate-950</code> <code>eframe</code>/<code>egui 0.37</code> workstation with Cubic Bezier Lineage DAG Canvas, Score Spark Chart, and 9-Tab Dossier.</p>
+      </div>
+    </section>
+
+    <!-- TAB 2: RSI LANDSCAPE -->
+    <section class="tab-panel" id="tab-rsi_landscape">
+      <div class="section-card">
+        <h3>What Recursive Self-Improvement (RSI) Actually Is</h3>
+        <p>Recursive Self-Improvement (RSI) is a closed-loop computational process in which an AI system generates, evaluates, debugs, and recombines candidate algorithms or training pipelines, using objective execution feedback from generation <em>N</em> to produce a stronger generation <em>N+1</em>. In concrete engineering terms, RSI is not magic sentient consciousness; it is evolutionary search coupled with execution-grounded verification over executable program spaces.</p>
+      </div>
+      <div class="section-card">
+        <h3>Ominous Undertones in Western Politics &amp; Media ("Will It Be Skynet?")</h3>
+        <p>Since I.J. Good's 1965 speculation on an "ultraintelligent machine" and Nick Bostrom's <em>Superintelligence</em> (2014), Western policy circles in Washington, London, Brussels, and Sacramento have treated the phrase "Recursive Self-Improvement" with apocalyptic dread ("Will it become Skynet?", "uncontrollable foom", "rogue takeoff"). That sci-fi framing served a convenient political purpose: convincing lawmakers that RSI research is too dangerous for open-weights academia or independent developers to possess.</p>
+      </div>
+      <div class="section-card">
+        <h3>OpenAI &amp; Anthropic's Closed-Door RSI Experiments</h3>
+        <p><strong>• OpenAI Preparedness Framework:</strong> Defines "AI Self-Improvement" (automated ML research and engineering) as a High/Critical risk category. OpenAI executives frequently reference internal <code>o1</code>/<code>o3</code>/<code>o4</code> reinforcement-learning self-play and automated research-engineer loops, yet publish zero reproducible code or operator weights.<br/>
+        <strong>• Anthropic Responsible Scaling Policy (RSP / ASL-4):</strong> Explicitly defines Autonomy &amp; Automated AI R&amp;D (Claude autonomously optimizing kernels, training loops, and post-training pipelines) as the trigger for ASL-4 containment—discussing internal evaluations in system cards while keeping the entire evolutionary harness locked behind closed cloud APIs.</p>
+      </div>
+    </section>
+
+    <!-- TAB 3: TSINGHUA & OPENRSI -->
+    <section class="tab-panel" id="tab-tsinghua_openrsi">
+      <div class="section-card">
+        <h3>The Total Expectation Flip: Tsinghua University &amp; Frontis.AI (arXiv:2607.28568)</h3>
+        <p>On July 30, 2026, a 24-researcher team from <strong>Tsinghua University</strong>, <strong>Frontis.AI</strong>, and <strong>Horizon Research</strong> published <em>"Frontis-MA1: Training an AI4AI Model towards Recursive Self-Improvement in Machine Learning Engineering"</em> (<code>arXiv:2607.28568</code>) and released the complete code stack and model weights on GitHub (<code>https://github.com/FrontisAI/OpenRSI</code>)—proving state-of-the-art RSI on a <strong>single consumer 24 GB NVIDIA RTX 4090</strong>.</p>
+      </div>
+      <div class="section-card">
+        <h3>Meet the Tsinghua University &amp; Frontis.AI Team</h3>
+        <p><strong>• Prof. Bowen Zhou (Tsinghua University / Shanghai AI Lab):</strong> Chair Professor in the Dept. of Electronic Engineering at Tsinghua University, Dean of Shanghai AI Lab, former Head of AI Foundations at IBM Research Watson and JD AI; co-author of the June 2026 survey <em>"Self-Improving Agents in the Era of Experience"</em>.<br/>
+        <strong>• Dr. Ning Ding (Tsinghua NLP / OpenBMB / Frontis.AI):</strong> Co-founder of OpenBMB, lead creator of UltraFeedback and MiniCPM.<br/>
+        <strong>• Kaiyan Zhang (Tsinghua University):</strong> Senior lead on execution-grounded RL and self-evolving agent harnesses.<br/>
+        <strong>• 24-Author Roster:</strong> Junlin Yang, Che Jiang, Yu Fu, Tianwei Luo, Can Ren, Weizhi Wang, Kaikai Zhao, Hongyi Liu, Yuxin Zuo, Yuru Wang, Yuchen Fan, Kai Tian, Zhenzhao Yuan, Xiaojian Lin, Li Sheng, Rushi Qiang, Guoli Jia, Xingtai Lv, Ermo Hua, Dianqiao Lei, Youbang Sun, Ning Ding, Bowen Zhou, and Kaiyan Zhang.</p>
+      </div>
+    </section>
+
+    <!-- TAB 4: WRAPPEE -->
+    <section class="tab-panel" id="tab-wrappee">
+      <div class="section-card">
+        <h3>Goliath RTX 4090 + Frontis-MA1 / Reasoning Model Inference</h3>
+        <p>RSICraft connects to any OpenAI-compatible <code>/v1/chat/completions</code> endpoint (default <code>http://127.0.0.1:8081</code> for <code>llama-server</code>, or custom port via <code>--llama-url</code>). On a 24 GB RTX 4090, Frontis-MA1 30B/35B MoE (~3B active parameters per token) in Q4_K_M / Q5_K_M with a 16,384-token context window and <code>q4_0</code> KV cache quantization occupies 18.0–19.5 GB VRAM at ~120 tok/s.</p>
+      </div>
+      <div class="section-card">
+        <h3>Three Sandbox Execution Modes (docker, local, demo)</h3>
+        <p><strong>• <code>docker</code>:</strong> Hardened rootless container (<code>--network none --memory 4g --cpus 4.0 --pids-limit 64 --security-opt no-new-privileges --cap-drop ALL --read-only</code>).<br/>
+        <strong>• <code>local</code>:</strong> Isolated temporary workspace directory evaluated via local Python 3.12 subprocess with strict wall-clock polling timeout.<br/>
+        <strong>• <code>demo</code>:</strong> Deterministic offline oracle for instant unit tests and CI gates.</p>
+      </div>
+    </section>
+
+    <!-- TAB 5: OPERATORS & MATH -->
+    <section class="tab-panel" id="tab-operators">
+      <div class="section-card">
+        <h3>Composite Utility Formula (U_i)</h3>
+        <pre>U_i = 0.50 * s_norm_i + 0.35 * delta_norm_i + 0.15 * (1.0 / (1.0 + children_count_i))</pre>
+      </div>
+      <div class="section-card">
+        <h3>4-Operator Evolutionary Action Space</h3>
+        <table>
+          <thead>
+            <tr><th>Operator</th><th>Temp</th><th>Parent Sampling</th><th>Prompt Objective</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>DRAFT</code></td><td><code>0.70</code></td><td>None (root node)</td><td>High-entropy architectural exploration from problem spec.</td></tr>
+            <tr><td><code>IMPROVE</code></td><td><code>0.40</code></td><td>1 functional parent (<code>SUCCESS</code>)</td><td>Algorithmic &amp; constant-factor optimization of working parent.</td></tr>
+            <tr><td><code>DEBUG</code></td><td><code>0.20</code></td><td>1 broken parent (<code>!= SUCCESS</code>)</td><td>Deterministic stack-trace repair of syntax/runtime/timeout failure.</td></tr>
+            <tr><td><code>CROSSOVER</code></td><td><code>0.50</code></td><td>2 distinct parents (<code>parent_a != parent_b</code>)</td><td>Hybrid recombination of two high-utility parent mechanisms.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 6: COMPARE -->
+    <section class="tab-panel" id="tab-compare">
+      <div class="section-card">
+        <h3>⚖️ Competitive Architecture Matrix</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Dimension</th>
+              <th>OpenAI / Anthropic RSI</th>
+              <th>DeepMind FunSearch</th>
+              <th>FrontisAI/OpenRSI (Python)</th>
+              <th>RSICraft (ArtCraft Rust)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>Openness</strong></td><td>100% Closed / Proprietary</td><td>Partial Python scripts</td><td>Open Weights + Python</td><td><strong>Pure Rust 3-Crate + GPU Studio</strong></td></tr>
+            <tr><td><strong>Code Deduplication</strong></td><td>Undisclosed</td><td>Raw strings</td><td>Files on disk</td><td><strong>BLAKE3 256-bit + Zstd L3 CAS</strong></td></tr>
+            <tr><td><strong>Parent Selection</strong></td><td>Undisclosed</td><td>Island Boltzmann score</td><td>Composite Utility $U_i$</td><td><strong>Score (0.50) + Delta (0.35) + Novelty (0.15)</strong></td></tr>
+            <tr><td><strong>Desktop Studio &amp; MCP</strong></td><td>None</td><td>None</td><td>None</td><td><strong>egui 0.37 Studio + 14 MCP Tools</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 7: API -->
+    <section class="tab-panel" id="tab-api">
+      <div class="section-card">
+        <h3>🔌 All 14 MCP Tools &amp; 1:1 CLI Subcommands</h3>
+        <table>
+          <thead>
+            <tr><th>MCP Tool</th><th>CLI Verb</th><th>Arguments</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>rsi_status</code></td><td><code>status</code></td><td><code>{}</code></td><td>SQLite WAL store stats, card counts, unique BLAKE3 hashes, RTX 4090 summary.</td></tr>
+            <tr><td><code>rsi_hardware_profile</code></td><td><code>hardware</code></td><td><code>{}</code></td><td>Goliath RTX 4090 (24 GB VRAM) + Frontis-MA1 MoE hardware profile.</td></tr>
+            <tr><td><code>rsi_help</code></td><td><code>help-tabs</code></td><td><code>tab, search</code></td><td>Query this 9-tab Operator Manual, Skynet Myth &amp; Tsinghua Dossier.</td></tr>
+            <tr><td><code>rsi_task_upsert</code></td><td><code>task upsert</code></td><td><code>task_id, name, description, evaluator_script</code></td><td>Create or update an evolutionary optimization task.</td></tr>
+            <tr><td><code>rsi_task_list</code></td><td><code>task list</code></td><td><code>{}</code></td><td>List all registered optimization tasks.</td></tr>
+            <tr><td><code>rsi_task_show</code></td><td><code>task show</code></td><td><code>task_id</code></td><td>Show task metadata, score bounds, and top frontier.</td></tr>
+            <tr><td><code>rsi_step</code></td><td><code>step</code></td><td><code>task_id, operator, provider, sandbox_mode, timeout_secs</code></td><td>Execute a single evolutionary step.</td></tr>
+            <tr><td><code>rsi_campaign</code></td><td><code>campaign</code></td><td><code>task_id, steps, provider, sandbox_mode, timeout_secs</code></td><td>Execute a multi-step autonomous evolutionary campaign.</td></tr>
+            <tr><td><code>rsi_get_frontier</code></td><td><code>frontier</code></td><td><code>task_id, limit</code></td><td>Get the materialized top-K Pareto frontier for a task.</td></tr>
+            <tr><td><code>rsi_card_list</code></td><td><code>cards</code></td><td><code>task_id, operator, status, limit</code></td><td>List experience cards ordered by composite utility.</td></tr>
+            <tr><td><code>rsi_card_show</code></td><td><code>card</code></td><td><code>card_id</code></td><td>Decompress and inspect full candidate code, BLAKE3 hash, and logs.</td></tr>
+            <tr><td><code>rsi_lineage</code></td><td><code>lineage</code></td><td><code>task_id</code></td><td>Export evolutionary lineage DAG (nodes and parent edges).</td></tr>
+            <tr><td><code>rsi_evaluate</code></td><td><code>evaluate</code></td><td><code>task_id, code, operator, sandbox_mode, record</code></td><td>Directly benchmark a Python candidate snippet in the sandbox.</td></tr>
+            <tr><td><code>rsi_demo_seed</code></td><td><code>demo-seed</code></td><td><code>{}</code></td><td>Seed an empty DB with the <code>opt-synth</code> benchmark and 4 cards.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 8: TROUBLESHOOT -->
+    <section class="tab-panel" id="tab-troubleshoot">
+      <div class="section-card">
+        <h3>Incident 1: Ollama (:11434) Model-Swap Timeout vs Direct llama-server</h3>
+        <p>Connect directly to the active <code>llama-server.exe</code> port via <code>--llama-url http://127.0.0.1:8081</code> (or dynamic runner port) to avoid background model reloads.</p>
+      </div>
+      <div class="section-card">
+        <h3>Incident 2: Reasoning Model &lt;|channel&gt;thought Prefix in Synthesized Code</h3>
+        <p>Built into <code>PromptBuilder::extract_code_block</code>, which strips all text through the last <code>&lt;channel|&gt;</code> or <code>&lt;/think&gt;</code> tag before extracting the Python fence.</p>
+      </div>
+    </section>
+
+    <!-- TAB 9: FAQ -->
+    <section class="tab-panel" id="tab-faq">
+      <div class="section-card">
+        <h3>Q1: Why is RSI in RSICraft safe against the "Skynet" runaway scenario?</h3>
+        <p>Candidate programs never execute with host privileges or network access, never modify the Rust supervisor binary (<code>#![deny(unwrap, panic)]</code>), and are scored strictly by a deterministic benchmark oracle inside an air-gapped sandbox (<code>--network none</code>, <code>--read-only</code>, 4 GB RAM cap, 30s wall-clock kill timer).</p>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const buttons = document.querySelectorAll('.tab-btn');
+    const panels = document.querySelectorAll('.tab-panel');
+    const searchInput = document.getElementById('helpSearch');
+
+    buttons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        searchInput.value = '';
+        buttons.forEach(b => b.classList.remove('active'));
+        panels.forEach(p => {
+          p.classList.remove('active');
+          p.querySelectorAll('.section-card').forEach(c => c.style.display = '');
+        });
+        btn.classList.add('active');
+        document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+      });
+    });
+
+    searchInput.addEventListener('input', () => {
+      const q = searchInput.value.trim().toLowerCase();
+      if (!q) {
+        const activeBtn = document.querySelector('.tab-btn.active') || buttons[0];
+        panels.forEach(p => {
+          p.classList.toggle('active', p.id === 'tab-' + activeBtn.dataset.tab);
+          p.querySelectorAll('.section-card').forEach(c => c.style.display = '');
+        });
+        return;
+      }
+      panels.forEach(p => {
+        let anyVisible = false;
+        p.querySelectorAll('.section-card').forEach(card => {
+          const match = card.textContent.toLowerCase().includes(q);
+          card.style.display = match ? '' : 'none';
+          if (match) anyVisible = true;
+        });
+        p.classList.toggle('active', anyVisible);
+      });
+    });
+  </script>
+</body>
+</html>
