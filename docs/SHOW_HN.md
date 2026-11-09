@@ -28,7 +28,7 @@ While their upstream research code is a multi-script Python stack, I wanted a ze
 2. **`rsicraft-app` (Native `eframe` / `egui 0.37` GPU Desktop Studio):**
    - Renders an interactive **Cubic Bézier Evolutionary Lineage DAG Canvas** with animated pulse particles, an **Evolutionary Score Trajectory Spark Chart**, a live 24 GB RTX 4090 VRAM gauge, a side-by-side decompressed BLAKE3/Zstd code inspector, and a built-in 9-tab dossier.
 3. **`rsicraft-mcp` (CLI & MCP `2024-11-05` Stdio Server):**
-   - Exposes 14 tools over stdio MCP and 1:1 CLI subcommands (`rsicraft campaign`, `rsicraft step`, `rsicraft frontier`, `rsicraft lineage`, `rsicraft help-tabs`).
+   - Exposes 22 tools over stdio MCP and 1:1 CLI subcommands (`rsicraft campaign`, `rsicraft step`, `rsicraft frontier`, `rsicraft diff`, `rsicraft probe`, `rsicraft prune`, `rsicraft export`, `rsicraft import`, `rsicraft hyperparams`, `rsicraft lineage`, `rsicraft help-tabs`).
 
 ### Live Trace on an RTX 4090 (25,000-element Subarray Benchmark)
 

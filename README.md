@@ -19,7 +19,7 @@
 
 ## Technical Brochure, EPUB Handbook, RSI Geopolitics & Tsinghua Dossier
 
-- 📖 **[Download / View PDF Brochure (`docs/brochure/rsicraft-brochure.pdf`)](docs/brochure/rsicraft-brochure.pdf)** — Print-ready A4 technical dossier with vector L3/L2/L1 architecture diagram, 4-operator action space, live RTX 4090 evolutionary trace, and 14-tool reference matrix.
+- 📖 **[Download / View PDF Brochure (`docs/brochure/rsicraft-brochure.pdf`)](docs/brochure/rsicraft-brochure.pdf)** — Print-ready A4 technical dossier with vector L3/L2/L1 architecture diagram, 4-operator action space, live RTX 4090 evolutionary trace, and 22-tool reference matrix.
 - 📚 **[Download EPUB eBook (`docs/brochure/rsicraft-brochure.epub`)](docs/brochure/rsicraft-brochure.epub)** — EPUB 3.0 operator handbook for Calibre, Apple Books, Kobo, and mobile e-readers.
 - 🌐 **[HTML Brochure Source (`docs/brochure/rsicraft-brochure.html`)](docs/brochure/rsicraft-brochure.html)** — Canonical HTML/CSS source compiled via `BookCraft`.
 - 🧭 **[Interactive 9-Tab Help Studio (`docs/help/index.html`)](docs/help/index.html)** | **[Markdown Manual (`HELP.md`)](HELP.md)** | **CLI/MCP (`rsicraft help-tabs` / `rsi_help`)**
@@ -37,7 +37,7 @@ For years, Western AI discourse framed **Recursive Self-Improvement (RSI)** with
 On **July 30, 2026**, a 24-researcher team from **Tsinghua University**, **Frontis.AI**, and **Horizon Research** led by **Junlin Yang, Che Jiang, Yu Fu, Tianwei Luo, Ning Ding, Bowen Zhou, and Kaiyan Zhang** flipped that expectation completely ([`arXiv:2607.28568`](https://arxiv.org/abs/2607.28568), [`FrontisAI/OpenRSI`](https://github.com/FrontisAI/OpenRSI)):
 1. **Open Science Over Secrecy:** They formulated RSI ("AI4AI") as an executable, falsifiable optimization loop governed by four explicit atomic program-evolution operators (`Draft`, `Improve`, `Debug`, `Crossover`) and a 3-term composite utility function that prevents population collapse.
 2. **Single RTX 4090 Over 10,000-H100 Bunkers:** They benchmarked `Frontis-MA1` + `OpenMLE-Evo` on *MLE-Bench Lite* under a strict consumer hardware cap: **a single NVIDIA RTX 4090 over a 12-hour budget**.
-3. **Pure-Rust ArtCraft Hardening (`RSICraft`):** While `FrontisAI/OpenRSI` is a Python research stack, **RSICraft** compiles their exact mathematical and evolutionary architecture into a **zero-panic 3-crate Rust binary + native GPU `egui 0.37` desktop studio + 14-tool MCP server**.
+3. **Pure-Rust ArtCraft Hardening (`RSICraft`):** While `FrontisAI/OpenRSI` is a Python research stack, **RSICraft** compiles their exact mathematical and evolutionary architecture into a **zero-panic 3-crate Rust binary + native GPU `egui 0.37` desktop studio + 22-tool MCP server**.
 
 ---
 
@@ -47,7 +47,7 @@ On **July 30, 2026**, a 24-researcher team from **Tsinghua University**, **Front
 rsicraft/
 ├── crates/
 │   ├── rsicraft-core/    # L1 Core & Store: SQLite WAL, BLAKE3+Zstd CAS, U_i Utility, 4-Op Engine, LlamaClient, SandboxRunner, 9-Tab Help
-│   ├── rsicraft-mcp/     # L2 Binary: Unified CLI (--json / table) + MCP 2024-11-05 stdio server (14 tools)
+│   ├── rsicraft-mcp/     # L2 Binary: Unified CLI (--json / table) + MCP 2024-11-05 stdio server (22 tools)
 │   └── rsicraft-app/     # L3 Desktop Studio: Native eframe/egui 0.37 GPU app (Bezier Lineage DAG, Spark Chart, RTX 4090 Gauge, 9-Tab Dossier)
 ├── sandboxes/
 │   └── Dockerfile.evaluator  # Air-gapped rootless Python 3.12 + NumPy/SciPy evaluator image

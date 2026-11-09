@@ -13,11 +13,11 @@
 | Path | Role |
 | :--- | :--- |
 | `crates/rsicraft-store/` | `L1 Store`: SQLite `WAL` schema (`schema.sql`), BLAKE3 + Zstd CAS (`cas.rs`), composite utility parent selector (`utility.rs`). |
-| `crates/rsicraft-core/` | `L1 Core`: 4-operator action space (`operators.rs`), `LlamaClient` (`llm.rs`), `SandboxRunner` (`sandbox.rs`), 7-tab help (`help.rs`), and 14-tool `Command::dispatch` bus (`lib.rs`). |
+| `crates/rsicraft-core/` | `L1 Core`: 4-operator action space (`operators.rs`), `LlamaClient` (`llm.rs`), `SandboxRunner` (`sandbox.rs`), 9-tab help (`help.rs`), and 22-tool `Command::dispatch` bus (`lib.rs`). |
 | `crates/rsicraft-mcp/` | `L2 CLI + MCP`: `clap` CLI (`--json` + table/help renderer) and pure-Rust MCP `2024-11-05` stdio loop (`mcp.rs`). |
 | `sandboxes/Dockerfile.evaluator` | Rootless air-gapped Python 3.12 + NumPy/SciPy evaluator image. |
 | `docs/brochure/` | `rsicraft-brochure.{html,epub,pdf}` compiled via `BookCraft`. |
-| `docs/help/index.html` | Interactive 7-tab HTML Help Studio. |
+| `docs/help/index.html` | Interactive 9-tab HTML Help Studio. |
 
 ## Hard Invariants
 

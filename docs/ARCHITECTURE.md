@@ -13,13 +13,13 @@ flowchart LR
     end
     subgraph L2["L2: crates/rsicraft-mcp (CLI + MCP 2024-11-05)"]
         CLI["clap CLI (--json / table)"]
-        MCP["Pure Stdio JSON-RPC 2.0\n14 Tools (rsi_* / rsi.*)"]
+        MCP["Pure Stdio JSON-RPC 2.0\n22 Tools (rsi_* / rsi.*)"]
     end
     subgraph L1["L1: crates/rsicraft-core (Evolutionary Engine & Store)"]
         BUS["Command::dispatch Bus"]
         OPS["4-Operator PromptBuilder\nDRAFT | IMPROVE | DEBUG | CROSSOVER"]
         LLM["LlamaClient\nRTX 4090 /v1/chat/completions"]
-        SBX["SandboxRunner\ndocker | local Python 3.12 | demo"]
+        SBX["SandboxRunner\ndocker | local Python/Rust | demo"]
         DB["Stigmergic SQLite WAL Store\nBLAKE3 + Zstd L3 CAS + U_i Utility"]
     end
     UI --> BUS
@@ -54,7 +54,7 @@ flowchart LR
 2. **Air-Gapped Rootless Container Sandbox (`sandboxes/Dockerfile.evaluator`):**
    When `sandbox_mode = "docker"`, candidate code runs inside an unprivileged container with `--network none`, `--read-only`, `--cap-drop ALL`, `--security-opt no-new-privileges`, `--pids-limit 64`, `--memory 4g`, and `--cpus 4.0`.
 3. **50 ms Polling Wall-Clock Timeout Reaper:**
-   Both `docker` and `local` Python 3.12 evaluators poll child processes on a 50 ms interval and kill any runaway loop exceeding `timeout_secs`.
+   Both `docker` and `local` (Python 3.12 & native Rust `rustc`) evaluators poll child processes on a 50 ms interval and kill any runaway loop exceeding `timeout_secs`.
 4. **Reasoning-Model Output Sanitization:**
    `PromptBuilder::extract_code_block` strips chain-of-thought blocks (`<|channel>thought...<channel|>`, `<think>...</think>`) before extracting the fenced Python module.
 5. **Tofu-Free GPU Desktop Rendering (`glyph_allowlist_no_tofu_chars`):**

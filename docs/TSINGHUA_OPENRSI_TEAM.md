@@ -68,4 +68,4 @@ To maintain long-horizon diversity, `OpenMLE-Evo` introduced:
 | **State & Artifact Store** | File-based / Python state dictionaries | **SQLite `WAL` + 256-bit `BLAKE3` + `Zstd` (L3) CAS (`rsicraft-core::store`)** |
 | **4-Operator Loop & Math** | `Draft`, `Improve`, `Debug`, `Crossover` + $U_i$ utility | **1:1 faithful implementation in `rsicraft_core::{operators, store::utility}`** |
 | **RTX 4090 Local Inference** | vLLM / Python HTTP clients | **Zero-dependency Rust `LlamaClient` (`/v1/chat/completions`, 16k `q4_0` KV)** |
-| **Desktop & Agent Surfaces** | CLI scripts | **Native GPU `eframe`/`egui 0.37` Studio (`rsicraft-app`) + 14-Tool MCP Server (`rsicraft-mcp`)** |
+| **Desktop & Agent Surfaces** | CLI scripts | **Native GPU `eframe`/`egui 0.37` Studio (`rsicraft-app`) + 22-Tool MCP Server (`rsicraft-mcp`)** |

@@ -1,8 +1,26 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 - 2026-11-09
 
-- README: four-panel cartoon (`docs/cartoon/rsi-cartoon.svg`): a tiny kitten-like LLM goes into the RSI loop on Goliath; at generation 4096 it is still tiny, its shadow is not.
+- **Expanded Tool Surface (14 to 22 Tools):** Complete 100% CLI and MCP parity closing all functional gaps:
+  - `rsi_diff` (`rsicraft diff --card-a <id> --card-b <id>`): Unified line-by-line diff comparing decompressed CAS source codes between two experience cards.
+  - `rsi_llm_probe` (`rsicraft probe [--url <url>]`): Active `/v1/models` reachability, latency in ms, and active model alias inspection.
+  - `rsi_hyperparams_get` / `rsi_hyperparams_set` (`rsicraft hyperparams`): Dynamic runtime inspection and adjustment of composite utility weights ($\lambda_s, \lambda_\delta, \lambda_\nu$) without restarts.
+  - `rsi_task_delete` (`rsicraft task delete <id>`): Clean cascading task deletion breaking self-referential foreign key cycles.
+  - `rsi_cards_prune` (`rsicraft prune --task-id <id> [--keep-frontier <k>]`): Prunes low-utility non-frontier cards while preserving top Pareto performers.
+  - `rsi_export` / `rsi_import` (`rsicraft export --task-id <id>`, `rsicraft import --file <path>`): Standalone JSON task bundle export and import with CAS preservation.
+  - Multi-language sandbox runner: Added native Rust compilation and evaluation (`rustc --crate-type=rlib candidate.rs` + `rustc evaluator.rs`) alongside Python 3.12.
+- **Desktop Studio Enhancements (`rsicraft-app`):**
+  - Interactive line-by-line `[Diff with Parent]` viewer embedded directly into the Artifact Inspector.
+  - Interactive 3D NVIDIA GeForce RTX 4090 GPU Studio with dual contra-rotating flow-through fans, 12x GDDR6X VRAM chips, AD102 die, and style toggles.
+  - 3D Evolutionary Fitness Manifold on the Lineage DAG page with streaming particles and Pareto hypercube wireframe.
+  - Updated tool count badges, help reader tables, and smoke check to 22 tools.
+- **Philosophical & Engineering Treatises:**
+  - `docs/BOSTROM_YUDKOWSKY_AND_RSI_REALITY.md`: Analysis of Bostrom, Yudkowsky, the Foom myth, and physical constraints refuting Skynet.
+  - `docs/RSI_ENGINEERING_LIMITS_AND_BENCHMARKING.md`: 5 hard ceilings, 4-stage future trajectory, model feeding matrix, and 4-step benchmarking protocol.
+- **Fleet Integration:**
+  - Added root `start.bat` and `start.ps1` launchers, mirrored to `mcp-central-docs/starts/rsicraft-start.bat`.
+  - Rebuilt complete technical brochure suite (`HTML`, `EPUB`, `PDF`) via `BookCraft`.
 
 ## 0.1.0 - 2026-11-09
 

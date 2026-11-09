@@ -9,7 +9,7 @@
 - **Rust Toolchain:** Rust `1.85+` (Edition 2021) via [rustup.rs](https://rustup.rs) for building from source.
 - **Optional (Live LLM Synthesis on RTX 4090):** `llama-server` ([llama.cpp](https://github.com/ggerganov/llama.cpp)) or Ollama serving an OpenAI-compatible `/v1/chat/completions` endpoint.
 - **Optional (Live Sandbox Evaluation):**
-  - **Local Mode (`--sandbox-mode local`):** Python `3.10+` (`python` or `uv` Python 3.12).
+  - **Local Mode (`--sandbox-mode local`):** Python `3.10+` (`python` or `uv` Python 3.12) and/or `rustc` for native Rust candidate compilation.
   - **Container Mode (`--sandbox-mode docker`):** Docker Desktop / rootless Docker Engine.
   - **Offline Mode (`--provider demo --sandbox-mode demo`):** Zero external dependencies.
 
@@ -106,11 +106,14 @@ Run these three commands to confirm your installation is healthy:
 # 1. Inspect hardware profile and VRAM budget
 rsicraft hardware
 
-# 2. Seed a temporary database and inspect the top-K Pareto frontier
+# 2. Probe the active llama-server endpoint
+rsicraft probe
+
+# 3. Seed a temporary database and inspect the top-K Pareto frontier
 rsicraft --db verify.db demo-seed
 rsicraft --db verify.db frontier --task-id opt-synth
 
-# 3. Query the 7-tab built-in Operator Manual
+# 4. Query the 9-tab built-in Operator Manual
 rsicraft help-tabs --tab overview
 ```
 
