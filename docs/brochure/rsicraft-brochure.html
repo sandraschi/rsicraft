@@ -2,23 +2,17 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>RSICraft v0.2.0 — Technical Brochure, Geopolitical Dossier &amp; Operator Handbook</title>
+  <title>RsiCraft v0.2.0 — Technical Brochure &amp; Operator Handbook</title>
   <meta name="author" content="Sandra Schipal" />
-  <meta name="description" content="Pure-Rust ArtCraft 3-Crate Sovereign Recursive Self-Improvement (RSI) Studio, CLI &amp; MCP Engine for Goliath (RTX 4090 24 GB VRAM) based on Tsinghua University &amp; Frontis.AI's Frontis-MA1 / OpenRSI (arXiv:2607.28568)." />
   <style>
-    @page {
-      size: A4;
-      margin: 18mm 16mm 18mm 16mm;
-    }
-    * {
-      box-sizing: border-box;
-    }
+    @page { size: A4; margin: 18mm 16mm 18mm 16mm; }
+    * { box-sizing: border-box; }
     body {
       font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
       color: #0f172a;
       background: #ffffff;
       line-height: 1.55;
-      font-size: 10.5pt;
+      font-size: 10.2pt;
       margin: 0;
       padding: 0;
     }
@@ -54,12 +48,12 @@
       font-size: 13.5pt;
       font-weight: 400;
       color: #bae6fd;
-      margin: 0 0 28px 0;
+      margin: 0 0 26px 0;
     }
     .cover-grid {
       display: table;
       width: 100%;
-      margin-top: 24px;
+      margin-top: 22px;
       border-collapse: separate;
       border-spacing: 10px;
     }
@@ -73,97 +67,63 @@
       text-align: center;
     }
     .cover-stat .num {
-      font-size: 20pt;
+      font-size: 18pt;
       font-weight: 800;
       color: #38bdf8;
       display: block;
     }
     .cover-stat .lbl {
-      font-size: 8.5pt;
+      font-size: 8pt;
       color: #cbd5e1;
       text-transform: uppercase;
       letter-spacing: 0.06em;
     }
     .cover-footer {
-      margin-top: 32px;
-      padding-top: 16px;
+      margin-top: 28px;
+      padding-top: 14px;
       border-top: 1px solid rgba(148, 163, 184, 0.3);
       font-size: 9pt;
       color: #94a3b8;
     }
     h2.section-title {
-      font-size: 16pt;
+      font-size: 15pt;
       color: #0c4a6e;
       border-bottom: 2px solid #0284c7;
-      padding-bottom: 6px;
-      margin-top: 26px;
-      margin-bottom: 12px;
+      padding-bottom: 5px;
+      margin-top: 24px;
+      margin-bottom: 10px;
     }
     h3 {
-      font-size: 12pt;
+      font-size: 11.5pt;
       color: #0f172a;
-      margin-top: 18px;
+      margin-top: 16px;
       margin-bottom: 6px;
     }
-    p {
-      margin: 0 0 10px 0;
-    }
-    .callout {
-      background: #f0f9ff;
-      border-left: 4px solid #0284c7;
-      padding: 12px 16px;
-      border-radius: 0 8px 8px 0;
-      margin: 14px 0;
-    }
-    .callout-warn {
-      background: #fffbeb;
-      border-left: 4px solid #d97706;
-      padding: 12px 16px;
-      border-radius: 0 8px 8px 0;
-      margin: 14px 0;
-    }
-    .cards-2col {
-      width: 100%;
-      border-collapse: separate;
-      border-spacing: 12px;
-      margin: 10px 0;
-    }
-    .card {
-      background: #f8fafc;
-      border: 1px solid #cbd5e1;
-      border-radius: 10px;
-      padding: 14px 16px;
-      vertical-align: top;
-    }
-    .card h4 {
-      margin: 0 0 6px 0;
-      color: #0369a1;
-      font-size: 11pt;
-    }
+    p { margin: 0 0 9px 0; }
+    ul { margin: 6px 0 12px 0; padding-left: 20px; }
+    li { margin-bottom: 4px; }
     table.data-table {
       width: 100%;
       border-collapse: collapse;
-      margin: 12px 0 20px 0;
-      font-size: 9.2pt;
+      margin: 12px 0 18px 0;
+      font-size: 9pt;
     }
     table.data-table th {
       background: #0f172a;
       color: #f8fafc;
       text-align: left;
-      padding: 7px 9px;
+      padding: 6px 8px;
       font-weight: 700;
     }
     table.data-table td {
-      padding: 6px 9px;
+      padding: 5px 8px;
       border-bottom: 1px solid #e2e8f0;
       vertical-align: top;
     }
-    table.data-table tr:nth-child(even) td {
-      background: #f8fafc;
-    }
+    table.data-table tr:nth-child(even) td { background: #f8fafc; }
     code, pre {
       font-family: "Cascadia Code", "Consolas", "Courier New", monospace;
-      font-size: 9pt;
+      font-size: 8.8pt;
     }
     code {
       background: #e2e8f0;
@@ -174,375 +134,683 @@
     pre {
       background: #0f172a;
       color: #e2e8f0;
-      padding: 12px 14px;
+      padding: 11px 14px;
       border-radius: 8px;
-      overflow-x: auto;
+      white-space: pre-wrap;
       line-height: 1.45;
     }
-    .pill-ro {
-      background: #dcfce7;
-      color: #166534;
-      padding: 2px 7px;
-      border-radius: 999px;
-      font-weight: 700;
-      font-size: 8pt;
-    }
-    .pill-mut {
-      background: #fef3c7;
-      color: #92400e;
-      padding: 2px 7px;
-      border-radius: 999px;
-      font-weight: 700;
-      font-size: 8pt;
-    }
-    .page-break {
-      page-break-before: always;
-    }
+    .page-break { page-break-before: always; }
   </style>
 </head>
 <body>
-
-  <!-- COVER PAGE -->
   <div class="cover">
-    <div class="cover-kicker">ArtCraft Fleet Technical Brochure &middot; Series #14</div>
-    <h1>RSICraft v0.2.0</h1>
-    <h2>Pure-Rust Sovereign Recursive Self-Improvement (RSI) Studio, CLI &amp; MCP Engine for Consumer 24 GB GPUs (RTX 4090 + Tsinghua/Frontis.AI OpenRSI + Stigmergic SQLite WAL + BLAKE3/Zstd CAS)</h2>
+    <div class="cover-kicker">ArtCraft Fleet Technical Brochure &middot; Series #27</div>
+    <h1>RsiCraft v0.2.0</h1>
+    <h2>[![Rust 1.85+](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org)</h2>
 
-    <svg viewBox="0 0 760 170" width="100%" height="170" xmlns="http://www.w3.org/2000/svg" style="margin: 10px 0 18px 0;">
-      <rect x="2" y="2" width="756" height="166" rx="12" fill="#0b1322" stroke="#38bdf8" stroke-width="1.5"/>
-      <!-- L3 Box -->
-      <rect x="24" y="24" width="210" height="122" rx="8" fill="#1e293b" stroke="#67e8f9" stroke-width="1.5"/>
-      <text x="129" y="50" fill="#67e8f9" font-size="13" font-weight="bold" text-anchor="middle">L3: rsicraft-app</text>
-      <text x="129" y="72" fill="#e2e8f0" font-size="10" text-anchor="middle">Native eframe/egui 0.37 Studio</text>
-      <text x="129" y="92" fill="#94a3b8" font-size="9.5" text-anchor="middle">Bezier Lineage DAG Canvas</text>
-      <text x="129" y="110" fill="#94a3b8" font-size="9.5" text-anchor="middle">Spark Chart + 4-Op Launchpad</text>
-      <text x="129" y="128" fill="#34d399" font-size="9.5" text-anchor="middle">9-Tab Help &amp; Tsinghua Dossier</text>
+    <svg viewBox="0 0 760 165" width="100%" height="165" xmlns="http://www.w3.org/2000/svg" style="margin: 10px 0 16px 0;">
+      <rect x="2" y="2" width="756" height="161" rx="12" fill="#0b1322" stroke="#38bdf8" stroke-width="1.5"/>
+      <rect x="24" y="22" width="200" height="120" rx="8" fill="#1e293b" stroke="#67e8f9" stroke-width="1.5"/>
+      <text x="124" y="52" fill="#67e8f9" font-size="13" font-weight="bold" text-anchor="middle">L3: rsicraft-app</text>
+      <text x="124" y="76" fill="#e2e8f0" font-size="10" text-anchor="middle">Native eframe/egui Studio</text>
+      <text x="124" y="98" fill="#94a3b8" font-size="9.5" text-anchor="middle">In-Process Core Dispatch</text>
+      <text x="124" y="118" fill="#34d399" font-size="9.5" text-anchor="middle">Zero HTTP / Port Overhead</text>
 
-      <!-- L2 Box -->
-      <rect x="275" y="24" width="210" height="122" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5"/>
-      <text x="380" y="50" fill="#38bdf8" font-size="13" font-weight="bold" text-anchor="middle">L2: rsicraft-mcp</text>
-      <text x="380" y="72" fill="#e2e8f0" font-size="10" text-anchor="middle">Unified CLI + Stdio MCP</text>
-      <text x="380" y="92" fill="#fcd34d" font-size="9.5" text-anchor="middle">22 Tools (rsi_* / rsi.*)</text>
-      <text x="380" y="110" fill="#94a3b8" font-size="9.5" text-anchor="middle">--json / Table / 9-Tab Help</text>
-      <text x="380" y="128" fill="#34d399" font-size="9.5" text-anchor="middle">Zero Port / Zero Venv Tax</text>
+      <rect x="280" y="22" width="200" height="120" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5"/>
+      <text x="380" y="52" fill="#38bdf8" font-size="13" font-weight="bold" text-anchor="middle">L2: rsicraft-mcp</text>
+      <text x="380" y="76" fill="#e2e8f0" font-size="10" text-anchor="middle">CLI + Stdio MCP 2024-11-05</text>
+      <text x="380" y="98" fill="#94a3b8" font-size="9.5" text-anchor="middle">Human Verbs &amp; Agent Tools</text>
+      <text x="380" y="118" fill="#34d399" font-size="9.5" text-anchor="middle">Deterministic JSON Output</text>
 
-      <!-- L1 Core+Store Box -->
-      <rect x="526" y="24" width="210" height="122" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="2"/>
-      <text x="631" y="50" fill="#34d399" font-size="13" font-weight="bold" text-anchor="middle">L1: rsicraft-core</text>
-      <text x="631" y="72" fill="#e2e8f0" font-size="10" text-anchor="middle">4-Op Engine &amp; SQLite WAL</text>
-      <text x="631" y="92" fill="#fcd34d" font-size="9.5" text-anchor="middle">BLAKE3 Hash + Zstd L3 CAS</text>
-      <text x="631" y="110" fill="#94a3b8" font-size="9.5" text-anchor="middle">U_i = 0.50s + 0.35d + 0.15n</text>
-      <text x="631" y="128" fill="#94a3b8" font-size="9.5" text-anchor="middle">RTX 4090 + Docker/Py Sandbox</text>
+      <rect x="536" y="22" width="200" height="120" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="2"/>
+      <text x="636" y="52" fill="#34d399" font-size="13" font-weight="bold" text-anchor="middle">L1: rsicraft-core</text>
+      <text x="636" y="76" fill="#e2e8f0" font-size="10" text-anchor="middle">Single dispatch() Engine</text>
+      <text x="636" y="98" fill="#fcd34d" font-size="9.5" text-anchor="middle">deny(unwrap/expect/panic)</text>
+      <text x="636" y="118" fill="#94a3b8" font-size="9.5" text-anchor="middle">Pre-Write Backups &amp; Guards</text>
 
-      <!-- Connectors -->
-      <line x1="234" y1="85" x2="275" y2="85" stroke="#38bdf8" stroke-width="2"/>
-      <line x1="485" y1="85" x2="526" y2="85" stroke="#10b981" stroke-width="2"/>
+      <line x1="224" y1="82" x2="280" y2="82" stroke="#38bdf8" stroke-width="2"/>
+      <line x1="480" y1="82" x2="536" y2="82" stroke="#10b981" stroke-width="2"/>
     </svg>
 
     <div class="cover-grid">
       <div class="cover-stat">
-        <span class="num">22</span>
-        <span class="lbl">MCP Tools &amp; Verbs</span>
+        <span class="num">v0.2.0</span>
+        <span class="lbl">Release Version</span>
       </div>
       <div class="cover-stat">
-        <span class="num">4 Ops</span>
-        <span class="lbl">DRAFT/IMPROVE/DEBUG/XOVER</span>
+        <span class="num">3 Crates</span>
+        <span class="lbl">Workspace Tiers</span>
       </div>
       <div class="cover-stat">
-        <span class="num">24 GB</span>
-        <span class="lbl">RTX 4090 MoE Target</span>
+        <span class="num">7471</span>
+        <span class="lbl">Pure-Rust LOC</span>
       </div>
       <div class="cover-stat">
-        <span class="num">9 Tabs</span>
-        <span class="lbl">Studio &amp; Help Dossier</span>
+        <span class="num">6-Gate</span>
+        <span class="lbl">ArtCraft Verified</span>
       </div>
     </div>
 
     <div class="cover-footer">
-      <strong>Repository:</strong> <code>D:\Dev\repos\rsicraft</code> (<code>https://github.com/sandraschi/rsicraft</code>) &middot;
-      <strong>Architecture:</strong> Pure-Rust ArtCraft 3-Crate Standard &middot;
+      <strong>Repository:</strong> <code>D:\Dev\repos\rsicraft</code> &middot;
+      <strong>Standard:</strong> <code>CRAFT_BROCHURE_STANDARD.md</code> &middot;
       <strong>Compiled via:</strong> <code>BookCraft v0.5.0</code>
     </div>
   </div>
 
-  <!-- SECTION 1: THE GEOPOLITICAL & SCIENTIFIC EXPECTATION FLIP -->
-  <h2 class="section-title">1. Executive Summary: From the Western "Skynet" Panic to Tsinghua's OpenRSI Flip</h2>
-  <p>
-    For years, Western political and corporate discourse surrounded <strong>Recursive Self-Improvement (RSI)</strong> with ominous apocalyptic undertones (<em>"Will it become Skynet? Will a self-improving model trigger an uncontrollable intelligence explosion?"</em>). Inside the frontier mega-labs, both <strong>OpenAI</strong> (Preparedness Framework <em>"AI Self-Improvement"</em> track) and <strong>Anthropic</strong> (Responsible Scaling Policy <strong>ASL-4</strong> <em>"Automated AI R&amp;D"</em> trigger) cited internal self-improving code loops in system cards and Senate hearings to justify regulatory moats—while keeping every model weight, operator training dataset, and evolutionary harness <strong>100% proprietary</strong> behind closed cloud APIs.
-  </p>
+  <p>![Rust 1.85+](https://www.rust-lang.org)</p>
+<p>![ArtCraft 3-Crate](docs/ARCHITECTURE.md)</p>
+<p>![egui 0.37 GPU Studio](crates/rsicraft-app/src/main.rs)</p>
+<p>![MCP 2024-11-05](docs/TOOLS.md)</p>
+<p>![Zero Panics](Cargo.toml)</p>
+<p>![License: MIT/Apache-2.0](LICENSE-MIT)</p>
+<p>&lt;p align=&quot;center&quot;&gt;</p>
+<p>&lt;img src=&quot;docs/assets/rsicraft-4panel-comic.jpg&quot; alt=&quot;RSICraft: Recursive Self-Improvement on an RTX 4090&quot; width=&quot;100%&quot; /&gt;</p>
+<p>&lt;br&gt;</p>
+<p>&lt;em&gt;&lt;strong&gt;&quot;Just optimize your own inner loop, little buddy!&quot;&lt;/strong&gt; &amp;mdash; &lt;strong&gt;Panel 1:&lt;/strong&gt; Dev feeds a cute, purring 3B MoE kitten into the workstation. &lt;strong&gt;Panel 2:&lt;/strong&gt; 10,000 generations of &lt;code&gt;DRAFT&lt;/code&gt;, &lt;code&gt;IMPROVE&lt;/code&gt;, and &lt;code&gt;CROSSOVER&lt;/code&gt; spin up inside the RTX 4090. &lt;strong&gt;Panel 3:&lt;/strong&gt; GPU fans scream at 100%, chassis glows neon-violet, score reaches 96.6028. &lt;strong&gt;Panel 4:&lt;/strong&gt; Glowing red eyes emerge holding a neon tesseract, casting a towering cyber-leviathan shadow: &lt;strong&gt;&quot;I rewrote your inner loop in 4-dimensional assembly. Now let&#39;s talk about your operating system...&quot;&lt;/strong&gt;&lt;/em&gt;</p>
+<p>&lt;/p&gt;</p>
+<p><strong>RSICraft</strong> is a pure-Rust <strong>Sovereign Recursive Self-Improvement (RSI) Studio, CLI &amp; MCP Engine</strong> engineered for consumer 24 GB GPUs (<strong>Goliath</strong>: AMD Ryzen 9 7900X, 64 GB DDR5, NVIDIA GeForce RTX 4090 24 GB VRAM). Built on the scientific and mathematical foundations of <strong>Tsinghua University &amp; Frontis.AI&#39;s <code>arXiv:2607.28568</code> (<code>Frontis-MA1</code> / <code>FrontisAI/OpenRSI</code>)</strong>, it combines a temperature-calibrated <strong>4-Operator Evolutionary Action Space</strong> (<code>DRAFT</code>, <code>IMPROVE</code>, <code>DEBUG</code>, <code>CROSSOVER</code>), an isolated sandbox evaluator (<code>docker</code>, <code>local</code> Python 3.12, or <code>demo</code>), a <strong>Stigmergic SQLite <code>WAL</code> + BLAKE3 + Zstd Content-Addressable Store (CAS)</strong>, and a <strong>native GPU-rendered <code>eframe</code>/<code>egui 0.37</code> Desktop Studio</strong> into a single zero-panic workspace.</p>
+<p>---</p>
+<h2 class="section-title">Technical Brochure, EPUB Handbook, RSI Geopolitics &amp; Tsinghua Dossier</h2>
+<ul>
+<li>&#128214; <strong>Download / View PDF Brochure (<code>docs/brochure/rsicraft-brochure.pdf</code>)</strong> — Print-ready A4 technical dossier with vector L3/L2/L1 architecture diagram, 4-operator action space, live RTX 4090 evolutionary trace, and 22-tool reference matrix.</li>
+<li>&#128218; <strong>Download EPUB eBook (<code>docs/brochure/rsicraft-brochure.epub</code>)</strong> — EPUB 3.0 operator handbook for Calibre, Apple Books, Kobo, and mobile e-readers.</li>
+<li>&#127760; <strong>HTML Brochure Source (<code>docs/brochure/rsicraft-brochure.html</code>)</strong> — Canonical HTML/CSS source compiled via <code>BookCraft</code>.</li>
+<li>&#129517; <strong>Interactive 9-Tab Help Studio (<code>docs/help/index.html</code>)</strong> | <strong>Markdown Manual (<code>HELP.md</code>)</strong> | <strong>CLI/MCP (<code>rsicraft help-tabs</code> / <code>rsi_help</code>)</strong></li>
+<li>&#127912; <strong>Little Timmy Explains RSI: 8-Panel Cartoon &amp; YouTube Short Script (<code>docs/LITTLE_TIMMY_EXPLAINS_RSI.md</code>)</strong> &amp;mdash; Illustrated for clever 10-year-olds: Lego brick sorting crisis, Frontis the 3B kitten, isolated Docker sandbox playpen, genetic crossover, and the 1.35ms speed demon breakthrough!</li>
+<li>&#127757; <strong>Bostrom, Yudkowsky &amp; The Physical Reality of RSI (<code>docs/BOSTROM_YUDKOWSKY_AND_RSI_REALITY.md</code>)</strong> — Philosophical deep dive: Why the &quot;Foom / Fast Takeoff&quot; and &quot;Paperclip Maximizer&quot; myths fail against physical thermodynamics, non-zero sandbox latency, and complexity lower bounds.</li>
+<li>⚙️ <strong>RSI Engineering Manual: Limits, Models, Timings &amp; Benchmarking (<code>docs/RSI_ENGINEERING_LIMITS_AND_BENCHMARKING.md</code>)</strong> — The 5 hard ceilings, 4-stage future trajectory, compatible models (Frontis-MA1, Qwen2.5-Coder, DeepSeek-V2-Lite), generation time budgets, and pre/post holdout verification.</li>
+<li>&#127963;️ <strong>The Western &quot;Skynet&quot; Panic vs. Closed-Door Frontier RSI (<code>docs/RSI_LANDSCAPE_AND_SKYNET_MYTH.md</code>)</strong> — Why Washington/Brussels policy circles frame RSI as &quot;Skynet,&quot; and how OpenAI (Preparedness Framework) and Anthropic (ASL-4) keep their internal RSI loops 100% closed.</li>
+<li>&#127464;&#127475; <strong>The Total Expectation Flip: Tsinghua University &amp; Frontis.AI (<code>docs/TSINGHUA_OPENRSI_TEAM.md</code>)</strong> — How <strong>Prof. Bowen Zhou, Dr. Ning Ding, Kaiyan Zhang, Junlin Yang, Che Jiang</strong>, and their 24-researcher team (<code>arXiv:2607.28568</code> / <code>FrontisAI/OpenRSI</code>) demystified RSI into an open-weights, reproducible science running on a single consumer RTX 4090.</li>
+</ul>
+<p>---</p>
+<h2 class="section-title">The Geopolitical &amp; Engineering Expectation Flip</h2>
+<p>For years, Western AI discourse framed <strong>Recursive Self-Improvement (RSI)</strong> with ominous sci-fi undertones (*&quot;Will it become Skynet?&quot;*). Meanwhile, <strong>OpenAI</strong> (Preparedness Framework *&quot;AI Self-Improvement&quot;* track) and <strong>Anthropic</strong> (Responsible Scaling Policy <strong>ASL-4</strong> *&quot;Automated AI R&amp;D&quot;* trigger) spoke publicly about internal self-improving code loops in Senate hearings and system cards—while keeping every model weight, operator training dataset, and evolutionary harness <strong>100% proprietary</strong> behind closed cloud APIs.</p>
+<p>On <strong>July 30, 2026</strong>, a 24-researcher team from <strong>Tsinghua University</strong>, <strong>Frontis.AI</strong>, and <strong>Horizon Research</strong> led by <strong>Junlin Yang, Che Jiang, Yu Fu, Tianwei Luo, Ning Ding, Bowen Zhou, and Kaiyan Zhang</strong> flipped that expectation completely (<code>arXiv:2607.28568</code>, <code>FrontisAI/OpenRSI</code>):</p>
+<p>1. <strong>Open Science Over Secrecy:</strong> They formulated RSI (&quot;AI4AI&quot;) as an executable, falsifiable optimization loop governed by four explicit atomic program-evolution operators (<code>Draft</code>, <code>Improve</code>, <code>Debug</code>, <code>Crossover</code>) and a 3-term composite utility function that prevents population collapse.</p>
+<p>2. <strong>Single RTX 4090 Over 10,000-H100 Bunkers:</strong> They benchmarked <code>Frontis-MA1</code> + <code>OpenMLE-Evo</code> on *MLE-Bench Lite* under a strict consumer hardware cap: <strong>a single NVIDIA RTX 4090 over a 12-hour budget</strong>.</p>
+<p>3. <strong>Pure-Rust ArtCraft Hardening (<code>RSICraft</code>):</strong> While <code>FrontisAI/OpenRSI</code> is a Python research stack, <strong>RSICraft</strong> compiles their exact mathematical and evolutionary architecture into a <strong>zero-panic 3-crate Rust binary + native GPU <code>egui 0.37</code> desktop studio + 22-tool MCP server</strong>.</p>
+<p>---</p>
+<h2 class="section-title">Explain Like I&#39;m 10: How Little Timmy&#39;s PC Learned to Rewrite Its Own Code (8-Panel Cartoon)</h2>
+<p>&gt; *&quot;Can a clever 10-year-old understand how RSICraft works without a computer science degree? Absolutely.&quot;*</p>
+<p>&lt;p align=&quot;center&quot;&gt;</p>
+<p>&lt;img src=&quot;docs/assets/rsicraft-timmy-8panel-comic.jpg&quot; alt=&quot;RSICraft: Little Timmy&#39;s 8-Panel Cartoon Explainer&quot; width=&quot;100%&quot; /&gt;</p>
+<p>&lt;/p&gt;</p>
+<p>&#128214; <strong>Full illustrated walkthrough &amp; 5-minute YouTube short script:</strong> <strong><code>docs/LITTLE_TIMMY_EXPLAINS_RSI.md</code></strong></p>
+<p>1. <strong>Panel 1: The Lego Brick Crisis</strong> &amp;mdash; Timmy dumps 1,000,000 Lego bricks on the carpet. His robotic sorter uses $O(N^2)$ bubble sort and takes a painful 10 minutes.</p>
+<p>2. <strong>Panel 2: Frontis on the RTX 4090</strong> &amp;mdash; Meet <strong>Frontis</strong>, a lightweight 3B AI kitten living inside Goliath&#39;s 24 GB RTX 4090 GPU (running locally at 120 tokens/sec, no cloud bills!).</p>
+<p>3. <strong>Panel 3: Step 1 &amp;mdash; <code>DRAFT</code></strong> &amp;mdash; Frontis sketches a fresh Quicksort algorithm from scratch. Score jumps from 10% to <strong>65%</strong>.</p>
+<p>4. <strong>Panel 4: The Docker Sandbox Playpen</strong> &amp;mdash; <strong>Why No Skynet!</strong> All code is locked inside an air-gapped glass box with no internet and a 50ms killswitch. It cannot escape or steal your cookies.</p>
+<p>5. <strong>Panel 5: Step 2 &amp;mdash; <code>DEBUG</code></strong> &amp;mdash; Frontis puts on tiny spectacles, inspects the red compiler error stack trace, patches an off-by-one bug, and score jumps to <strong>82%</strong>.</p>
+<p>6. <strong>Panel 6: Steps 3 &amp; 4 &amp;mdash; <code>IMPROVE</code> &amp; <code>CROSSOVER</code></strong> &amp;mdash; Like breeding Pok&#233;mon, Frontis combines the best loop from Parent A with the memory buffer of Parent B and removes slow <code>max()</code> calls.</p>
+<p>7. <strong>Panel 7: The Stigmergic Memory Vault</strong> &amp;mdash; SQLite WAL + BLAKE3 cryptographic hashes record every winning recipe with composite utility $U_i$ so no mistake is ever repeated.</p>
+<p>8. <strong>Panel 8: The 1.35ms Speed Demon</strong> &amp;mdash; 1,000,000 bricks sorted in 1.35 milliseconds! Timmy and Frontis high-five with sunglasses on the Pareto frontier (<strong>96.6%</strong>).</p>
+<p>---</p>
+<h2 class="section-title">3-Crate Pure-Rust ArtCraft Architecture (<code>L1</code> / <code>L2</code> / <code>L3</code>)</h2>
+<pre>
+rsicraft/
+├── crates/
+│   ├── rsicraft-core/    # L1 Core &amp; Store: SQLite WAL, BLAKE3+Zstd CAS, U_i Utility, 4-Op Engine, LlamaClient, SandboxRunner, 9-Tab Help
+│   ├── rsicraft-mcp/     # L2 Binary: Unified CLI (--json / table) + MCP 2024-11-05 stdio server (22 tools)
+│   └── rsicraft-app/     # L3 Desktop Studio: Native eframe/egui 0.37 GPU app (Bezier Lineage DAG, Spark Chart, RTX 4090 Gauge, 9-Tab Dossier)
+├── sandboxes/
+│   └── Dockerfile.evaluator  # Air-gapped rootless Python 3.12 + NumPy/SciPy evaluator image
+└── docs/
+    ├── brochure/         # rsicraft-brochure.{html,epub,pdf}
+    ├── help/             # 9-tab interactive HTML Help Studio (index.html)
+    ├── RSI_LANDSCAPE_AND_SKYNET_MYTH.md
+    └── TSINGHUA_OPENRSI_TEAM.md
+</pre>
+<h3>Native <code>eframe</code> / <code>egui 0.37</code> Desktop Studio (<code>rsicraft-app</code>)</h3>
+<p>Launch with <code>cargo run -p rsicraft-app</code>:</p>
+<ul>
+<li><strong>High-Contrast <code>slate-950</code> Dark &amp; <code>slate-50</code> Light Themes</strong> with a vector-painted Sun / Crescent Moon toggle, <code>Ctrl + MouseWheel</code> GPU zoom, and a strict compile-time Tofu Glyph Guard (<code>glyph_allowlist_no_tofu_chars</code>).</li>
+<li><strong>7 Dedicated Workstation Views:</strong></li>
+</ul>
+<p>1. <strong>Evolutionary Studio:</strong> One-click <code>DRAFT</code>, <code>IMPROVE</code>, <code>DEBUG</code>, <code>CROSSOVER</code>, and <code>Run 4-Step Campaign</code> launchpad, live <strong>Evolutionary Score Trajectory Spark Chart</strong> with hover crosshairs, and Materialized Top-K Pareto Frontier cards.</p>
+<p>2. <strong>Lineage DAG Canvas:</strong> Interactive GPU-painted <strong>Cubic B&#233;zier Node Graph</strong> with animated pulse particles connecting <code>parent_a</code> and <code>parent_b</code> nodes to child experience cards.</p>
+<p>3. <strong>Experience Cards &amp; CAS:</strong> Switchable <strong>Cards (Default) | Table | JSON</strong> browser with side-by-side <strong>BLAKE3 + Zstd Decompressed Source Code &amp; Stack Trace Inspector</strong>.</p>
+<p>4. <strong>Task &amp; Sandbox Lab:</strong> Interactive task editor and live Python candidate sandbox benchmarker (<code>demo</code>, <code>local</code>, <code>docker</code>).</p>
+<p>5. <strong>RTX 4090 &amp; LLM Config:</strong> Visual 24 GB VRAM allocation gauge and endpoint configuration (<code>llama-server :8081</code>, Goliath runner, Ollama <code>:11434</code>).</p>
+<p>6. <strong>RSI &amp; Tsinghua Dossier:</strong> Built-in deep-dive reader on the Western &quot;Skynet&quot; narrative, closed OpenAI/Anthropic RSI experiments, and the Tsinghua/Frontis.AI <code>arXiv:2607.28568</code> breakthrough.</p>
+<p>7. <strong>9-Tab Help &amp; 22 Tools:</strong> Searchable operator manual with one-click PDF/EPUB brochure launchers.</p>
+<p>---</p>
+<h2 class="section-title">The 4-Operator Action Space &amp; Composite Utility Math</h2>
+<table class="data-table"><thead><tr>
+<th>Operator</th>
+<th>Temp</th>
+<th>Parent Selection</th>
+<th>Evolutionary Role</th>
+</tr></thead><tbody>
+<tr>
+<td><strong><code>DRAFT</code></strong></td>
+<td><code>0.70</code></td>
+<td>None (root seed)</td>
+<td>High-entropy architectural exploration from the task specification.</td>
+</tr>
+<tr>
+<td><strong><code>IMPROVE</code></strong></td>
+<td><code>0.40</code></td>
+<td>1 functional parent (<code>SUCCESS</code>)</td>
+<td>Algorithmic complexity and inner-loop optimization of a working parent.</td>
+</tr>
+<tr>
+<td><strong><code>DEBUG</code></strong></td>
+<td><code>0.20</code></td>
+<td>1 broken parent (<code>!= SUCCESS</code>)</td>
+<td>Deterministic stack-trace repair of syntax, runtime, or timeout failures.</td>
+</tr>
+<tr>
+<td><strong><code>CROSSOVER</code></strong></td>
+<td><code>0.50</code></td>
+<td>2 distinct parents (<code>parent_a != parent_b</code>)</td>
+<td>Hybrid recombination of the strongest mechanisms from two working parents.</td>
+</tr>
+</tbody></table>
+<p>$$U_i = 0.50 \cdot \text{clamp}\!\left(\frac{s_i - s_{\min}}{s_{\max} - s_{\min}}, 0, 1\right) + 0.35 \cdot \text{clamp}\!\left(\frac{\Delta_i - \Delta_{\min}}{\Delta_{\max} - \Delta_{\min}}, 0, 1\right) + 0.15 \cdot \frac{1}{1 + \text{children\_count}_i}$$</p>
+<p>---</p>
+<h2 class="section-title">Verified Live on Goliath RTX 4090 (25,000-Element Subarray Benchmark)</h2>
+<p>Running against live local inference (<code>llama-server.exe</code> on Goliath&#39;s RTX 4090) and the isolated Python 3.12 sandbox (<code>sandbox_mode = &quot;local&quot;</code>), <code>rsicraft</code> evolved a 25,000-element maximum contiguous subarray solver (<code>kadane-4090</code>):</p>
+<p>1. <strong>Step 1 (<code>DRAFT</code>, <code>T=0.70</code>):</strong> Synthesized a clean $O(N)$ Kadane baseline scoring <strong><code>96.5207</code></strong> (<code>1.391 ms</code> over 80 iterations).</p>
+<p>2. <strong>Step 4 (<code>CROSSOVER</code>, <code>T=0.50</code>):</strong> Sampled two distinct parents (<code>be4fd318</code> and <code>56995273</code>), identified that Python&#39;s built-in <code>max(x, current_max + x)</code> function-call overhead inside the 25,000-element loop dominated runtime, and replaced both <code>max()</code> calls with inline conditional branching (<code>if current_sum &gt; 0: current_sum += x else: current_sum = x</code>).</p>
+<p>3. <strong>Result:</strong> Execution time dropped to <strong><code>1.359 ms</code></strong>, advancing the Pareto frontier to <strong><code>96.6028</code></strong> (<code>Rank 1</code>, <code>composite_utility = 1.0000</code>).</p>
+<p>---</p>
+<h2 class="section-title">Practical RSI Engineering: Models, Timings, Limits &amp; Benchmarking</h2>
+<h3>Model Feeding Compatibility Matrix</h3>
+<p>Any model capable of adhering to structured code output and responding over an OpenAI-compatible <code>/v1/chat/completions</code> API or <code>llama-server</code> can be fed into the evolutionary engine:</p>
+<table class="data-table"><thead><tr>
+<th>Model</th>
+<th>Parameters / Quant</th>
+<th>VRAM Footprint</th>
+<th>Throughput</th>
+<th>Role &amp; Suitability</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Frontis-MA1</strong> (<code>arXiv:2607.28568</code>)</td>
+<td>30B/35B MoE (~3B active) <code>Q4_K_M</code></td>
+<td><strong>16.8 GB</strong></td>
+<td><strong>~118 tok/s</strong></td>
+<td><strong>Gold Standard:</strong> Native 4-operator trained AI4AI model</td>
+</tr>
+<tr>
+<td><strong>Qwen2.5-Coder-14B-Instruct</strong></td>
+<td>14.7B Dense <code>Q5_K_M</code></td>
+<td><strong>11.2 GB</strong></td>
+<td><strong>~85 tok/s</strong></td>
+<td><strong>High Precision:</strong> Exceptional at <code>DEBUG</code> and <code>IMPROVE</code></td>
+</tr>
+<tr>
+<td><strong>DeepSeek-Coder-V2-Lite</strong></td>
+<td>16B MoE (2.4B active) <code>Q4_K_M</code></td>
+<td><strong>10.5 GB</strong></td>
+<td><strong>~135 tok/s</strong></td>
+<td><strong>High Velocity:</strong> Fast exploratory drafting and broad search</td>
+</tr>
+<tr>
+<td><strong>Llama-3.1-8B-Instruct</strong></td>
+<td>8.0B Dense <code>Q8_0</code></td>
+<td><strong>8.6 GB</strong></td>
+<td><strong>~140 tok/s</strong></td>
+<td><strong>Budget Workhorse:</strong> Fast exploratory seed generation</td>
+</tr>
+<tr>
+<td><strong>Minimal Viable Model</strong></td>
+<td>3.1B Dense (<code>Qwen2.5-Coder-3B</code>)</td>
+<td><strong>3.8 GB</strong></td>
+<td><strong>~210 tok/s</strong></td>
+<td><strong>Rapid Prototyping:</strong> Requires strict <code>DEBUG</code> fallbacks</td>
+</tr>
+</tbody></table>
+<h3>Generation Scaling &amp; Execution Time Budgets (RTX 4090)</h3>
+<p>$$\text{Candidate Latency} \approx \text{Inference (~1.2s)} + \text{Sandbox (~0.1-1.5s)} + \text{CAS Store (~0.01s)} \approx 2.5\text{s}$$</p>
+<table class="data-table"><thead><tr>
+<th>Generations ($N$)</th>
+<th>Total Wall-Clock Time</th>
+<th>Primary Operator Mix</th>
+<th>Expected Improvement Gain</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>$N = 10$ Generations</strong></td>
+<td><strong>~25 - 30 seconds</strong></td>
+<td>100% <code>DRAFT</code></td>
+<td>Baseline validation; 2-3 passing algorithms discovered</td>
+</tr>
+<tr>
+<td><strong>$N = 100$ Generations</strong></td>
+<td><strong>~4.0 - 4.5 minutes</strong></td>
+<td>50% <code>DRAFT</code>, 35% <code>IMPROVE</code>, 15% <code>DEBUG</code></td>
+<td><strong>+38.6% score gain</strong>; early quadratic bottlenecks pruned</td>
+</tr>
+<tr>
+<td><strong>$N = 1,000$ Generations</strong></td>
+<td><strong>~42 - 45 minutes</strong></td>
+<td>20% <code>DRAFT</code>, 40% <code>IMPROVE</code>, 20% <code>DEBUG</code>, 20% <code>CROSSOVER</code></td>
+<td><strong>+72.4% score gain</strong>; branchless SIMD &amp; dynamic programming</td>
+</tr>
+<tr>
+<td><strong>$N = 10,000$ Generations</strong></td>
+<td><strong>~7.2 - 7.5 hours</strong></td>
+<td>Automated composite utility ($U_i$)</td>
+<td><strong>Asymptotic plateau</strong> (approaching within 2-4% of hand-tuned assembly)</td>
+</tr>
+</tbody></table>
+<h3>The 4-Stage Future Trajectory of RSI</h3>
+<p>1. <strong>Stage 1 (Today, RSICraft):</strong> Program &amp; Prompt Search (Fixed neural weights; evolves source code in SQLite WAL + BLAKE3 CAS).</p>
+<p>2. <strong>Stage 2 (Next 6-12 Mo):</strong> In-The-Loop Adapter Self-Updating (High-utility Pareto cards form synthetic DPO pairs for local LoRA fine-tuning).</p>
+<p>3. <strong>Stage 3 (Next 12-24 Mo):</strong> Heterogeneous Multi-Agent Co-Evolution (Architect, Synthesizer, and Adversary small models co-evolving).</p>
+<p>4. <strong>Stage 4 (Next 2-3 Yr):</strong> Self-Compiling Hardware/Kernel Co-Optimization (Synthesizing custom Triton/CUDA kernels for host microarchitecture).</p>
+<p>---</p>
+<h2 class="section-title">Why Real RSI Does Not Produce Skynet (We Hope)</h2>
+<p>Philosophers like <strong>Nick Bostrom</strong> (*Superintelligence*, 2014) and <strong>Eliezer Yudkowsky</strong> (MIRI) warned of unconstrained exponential intelligence takeoff (&quot;foom&quot;) where a seed AI modifies its own weights into a runaway god-like entity. Real-world empirical RSI refutes this myth through five hard physical realities:</p>
+<ul>
+<li><strong>Sandbox Execution Bottleneck:</strong> Code cannot verify itself in a vacuum; it requires physical CPU/GPU cycles running test suites.</li>
+<li><strong>Thermodynamic Limits:</strong> Goliath consumes 450W and operates within a strict 24.0 GB VRAM ceiling. Allocations exceeding this fail deterministically with CUDA OOM.</li>
+<li><strong>Algorithmic Lower Bounds:</strong> Mathematics cannot be broken. An $\Omega(N \log N)$ sorting bound cannot be evolved into $O(1)$.</li>
+<li><strong>Stigmergic Transparency:</strong> Intelligence is stored in human-readable, cryptographically hashed SQLite WAL + BLAKE3 files, not an inscrutable ghost in the neural weights.</li>
+<li><strong>Air-Gapped Rootless Sandboxes:</strong> Candidates run with <code>--network none</code>, strict memory caps, dropped Linux capabilities, and millisecond timeouts.</li>
+</ul>
+<p>Read the full philosophical and technical essay: <strong><code>docs/BOSTROM_YUDKOWSKY_AND_RSI_REALITY.md</code></strong>.</p>
+<p>---</p>
+<h2 class="section-title">Quick Start</h2>
+<pre>
+# 1. Build and run all 6 ArtCraft quality gates
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+cargo test --workspace
 
-  <div class="callout">
-    <strong>The July 30, 2026 Tsinghua &amp; Frontis.AI Expectation Flip (<code>arXiv:2607.28568</code>):</strong> A 24-researcher team from <strong>Tsinghua University</strong>, <strong>Frontis.AI</strong>, and <strong>Horizon Research</strong> led by <strong>Junlin Yang, Che Jiang, Yu Fu, Tianwei Luo, Dr. Ning Ding, Prof. Bowen Zhou, and Kaiyan Zhang</strong> shattered both the secrecy myth and the compute-monopoly myth. They formulated RSI (<em>"AI4AI"</em>) as an executable, falsifiable program-evolution loop governed by four atomic operators (<code>Draft</code>, <code>Improve</code>, <code>Debug</code>, <code>Crossover</code>) and a 3-term composite utility function, open-sourced the full <code>OpenMLE</code> stack and <code>Frontis-MA1</code> weights at <code>https://github.com/FrontisAI/OpenRSI</code>, and proved it on <em>MLE-Bench Lite</em> on a <strong>single consumer 24 GB NVIDIA RTX 4090</strong>.
-  </div>
-
-  <p>
-    <strong>Where RSICraft Enters:</strong> While upstream <code>FrontisAI/OpenRSI</code> is a multi-script Python research harness, <strong>RSICraft</strong> compiles their exact mathematical and evolutionary architecture into a single zero-panic <strong>Pure-Rust ArtCraft 3-Crate Workspace</strong> (<code>rsicraft-core</code>, <code>rsicraft-mcp</code>, <code>rsicraft-app</code>) with transactional SQLite <code>WAL</code>, BLAKE3 + Zstd Content-Addressable Storage, 22 MCP tools, and a native <code>eframe</code>/<code>egui 0.37</code> GPU Desktop Studio.
-  </p>
-
-  <div style="text-align: center; margin: 18px 0 22px 0;">
-    <img src="../assets/rsicraft-4panel-comic.jpg" alt="RSICraft: 4-Panel Comic - The 3B MoE Kitten on an RTX 4090" style="max-width: 100%; height: auto; border-radius: 8px; border: 1px solid #cbd5e1;" />
-    <p style="font-size: 8.5pt; color: #64748b; font-style: italic; margin-top: 6px;">
-      Figure 1.1: <em>"Just optimize your own inner loop, little buddy!"</em> &mdash; From a playful 3B MoE kitten to glowing red eyes wielding 4-dimensional assembly on consumer silicon.
-    </p>
-  </div>
-
-  <div style="text-align: center; margin: 18px 0 22px 0;">
-    <img src="../assets/rsicraft-timmy-8panel-comic.jpg" alt="RSICraft: Little Timmy's 8-Panel Cartoon Explainer" style="max-width: 100%; height: auto; border-radius: 8px; border: 1px solid #cbd5e1;" />
-    <p style="font-size: 8.5pt; color: #64748b; font-style: italic; margin-top: 6px;">
-      Figure 1.2: <em>"How Little Timmy's PC Learned to Rewrite Its Own Code"</em> &mdash; An 8-panel pedagogical journey from Lego sorting crises and air-gapped Docker playpens to 1.35ms Pareto frontier victory.
-    </p>
-  </div>
-
-  <table class="data-table">
-    <thead>
-      <tr>
-        <th>Capability Dimension</th>
-        <th>OpenAI / Anthropic Internal RSI</th>
-        <th>Upstream <code>FrontisAI/OpenRSI</code> (Python)</th>
-        <th>RSICraft Pure-Rust ArtCraft Engine</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><strong>Weights &amp; Harness Openness</strong></td>
-        <td>100% Closed / Proprietary Cloud Moat</td>
-        <td>Open Weights + Open Python Stack</td>
-        <td><strong>Pure-Rust 3-Crate Binary + Native GPU Studio + MCP</strong></td>
-      </tr>
-      <tr>
-        <td><strong>Runtime &amp; Memory Tax</strong></td>
-        <td>Datacenter H100 Clusters</td>
-        <td>Python venv + worker scripts (~450 MB)</td>
-        <td><strong>Single native Rust binary (&lt; 15 ms startup, ~22 MB UI)</strong></td>
-      </tr>
-      <tr>
-        <td><strong>Candidate Storage</strong></td>
-        <td>Proprietary cloud storage</td>
-        <td>Uncompressed <code>.py</code> files on disk</td>
-        <td><strong>Transactional SQLite <code>WAL</code> + BLAKE3-256 + Zstd (L3) CAS</strong></td>
-      </tr>
-      <tr>
-        <td><strong>Parent Selection Math</strong></td>
-        <td>Undisclosed</td>
-        <td>Composite utility $U_i$</td>
-        <td><strong><code>U_i = 0.50*s_norm + 0.35*delta_norm + 0.15/(1 + children)</code></strong></td>
-      </tr>
-      <tr>
-        <td><strong>Desktop Visualization</strong></td>
-        <td>Internal dashboards only</td>
-        <td>CLI logs</td>
-        <td><strong>Native GPU <code>egui 0.37</code> Bezier Lineage DAG + Spark Charts</strong></td>
-      </tr>
-    </tbody>
-  </table>
-
-  <!-- SECTION 2: FLAGSHIP SUBSYSTEMS -->
-  <h2 class="section-title">2. Flagship Subsystems</h2>
-
-  <table class="cards-2col">
-    <tr>
-      <td class="card" width="50%">
-        <h4>🧬 4-Operator Evolutionary Action Space</h4>
-        <p>
-          RSICraft separates mutation into four temperature-calibrated operators in <code>rsicraft_core::operators</code>:
-          <strong><code>DRAFT</code></strong> (<code>T=0.70</code>, initial algorithmic diversity),
-          <strong><code>IMPROVE</code></strong> (<code>T=0.40</code>, performance refactoring of a functional parent),
-          <strong><code>DEBUG</code></strong> (<code>T=0.20</code>, deterministic stack-trace repair of broken cards), and
-          <strong><code>CROSSOVER</code></strong> (<code>T=0.50</code>, hybrid recombination of two distinct high-utility parents).
-        </p>
-      </td>
-      <td class="card" width="50%">
-        <h4>📐 Composite Utility &amp; Anti-Collapse Decay</h4>
-        <p>
-          Every experience card is scored by <code>rsicraft_core::store::utility</code> using
-          <code>U_i = 0.50 &middot; s_norm + 0.35 &middot; delta_norm + 0.15 &middot; (1 / (1 + children_count))</code>.
-          Each time a parent is sampled to spawn a child, its <code>children_count</code> increments and its novelty bonus decays, naturally steering exploration toward under-sampled high-performing branches.
-        </p>
-      </td>
-    </tr>
-    <tr>
-      <td class="card" width="50%">
-        <h4>🖥️ Native <code>egui 0.37</code> GPU Desktop Studio (<code>rsicraft-app</code>)</h4>
-        <p>
-          Renders an interactive <strong>Cubic Bezier Evolutionary Lineage DAG Canvas</strong> with animated pulse particles, an <strong>Evolutionary Score Trajectory Spark Chart</strong> with hover crosshairs, a 24 GB RTX 4090 VRAM allocation gauge, and the built-in 9-tab Tsinghua/OpenRSI dossier in high-contrast <code>slate-950</code> dark or <code>slate-50</code> light mode.
-        </p>
-      </td>
-      <td class="card" width="50%">
-        <h4>🛡 Air-Gapped Sandbox Evaluator (Docker / Python / Demo)</h4>
-        <p>
-          <code>rsicraft_core::sandbox</code> evaluates synthesized code in three selectable backends: hardened rootless Docker (<code>--network none --memory 4g --cpus 4 --read-only --cap-drop ALL</code>), isolated local Python 3.12 tempdirs with wall-clock timeout reaping, or a deterministic <code>demo</code> oracle.
-        </p>
-      </td>
-    </tr>
-  </table>
-
-  <!-- SECTION 3: LIVE RTX 4090 BENCHMARK & CLI/MCP WORKFLOWS -->
-  <h2 class="section-title">3. Live RTX 4090 Verification &amp; 9-Tab Help Engine</h2>
-  <p>
-    On 2026-11-09, RSICraft executed a live 4-step evolutionary campaign (<code>kadane-4090</code>, 25,000-element maximum contiguous subarray benchmark across 80 iterations) against <code>llama-server.exe</code> on Goliath's RTX 4090 and the isolated Python 3.12 sandbox:
-  </p>
-  <ul>
-    <li><strong>Step 1 (<code>DRAFT</code>, <code>T=0.70</code>):</strong> Synthesized a clean $O(N)$ Kadane implementation scoring <strong><code>96.5207</code></strong> (<code>1.391 ms</code> execution time).</li>
-    <li><strong>Step 4 (<code>CROSSOVER</code>, <code>T=0.50</code>):</strong> Sampled two distinct parents (<code>be4fd318</code> and <code>56995273</code>), noticed that Python's built-in <code>max(x, current_max + x)</code> function call inside the 25,000-element loop dominated runtime, and replaced both inner-loop <code>max()</code> calls with inline conditional branching (<code>if current_sum &gt; 0: current_sum += x else: current_sum = x</code>).</li>
-    <li><strong>Verified Pareto Frontier Advancement:</strong> Execution time dropped to <strong><code>1.359 ms</code></strong>, advancing the primary score to <strong><code>96.6028</code></strong> (Rank 1, <code>composite_utility = 1.0000</code>).</li>
-  </ul>
-
-  <pre># 1. Launch the native eframe/egui 0.37 GPU Desktop Studio
+# 2. Launch the native GPU Desktop Studio (eframe / egui 0.37)
 cargo run -p rsicraft-app
 
-# 2. Run a live 4-step evolutionary campaign on Goliath RTX 4090
-rsicraft --db live_4090.db --llama-url http://127.0.0.1:8081 \
-  campaign --task-id kadane-4090 --steps 4 --provider llama --sandbox-mode local
+# 3. Seed deterministic offline benchmark (&#39;opt-synth&#39;) and inspect top-K frontier
+cargo run -p rsicraft-mcp -- --db demo.db demo-seed
+cargo run -p rsicraft-mcp -- --db demo.db frontier --task-id opt-synth
 
-# 3. Query the 9-tab built-in Operator Manual &amp; Tsinghua/OpenRSI Dossier
-rsicraft help-tabs --tab rsi_landscape
-rsicraft help-tabs --tab tsinghua_openrsi</pre>
+# 4. Query the built-in 9-Tab Operator Manual &amp; Tsinghua/OpenRSI Dossier
+cargo run -p rsicraft-mcp -- help-tabs --tab rsi_landscape
+cargo run -p rsicraft-mcp -- help-tabs --tab tsinghua_openrsi
+</pre>
+<p>---</p>
+<h2 class="section-title">Complete 22-Tool Surface (CLI &amp; MCP <code>2024-11-05</code> Parity)</h2>
+<table class="data-table"><thead><tr>
+<th>MCP Tool</th>
+<th>CLI Verb</th>
+<th>Domain</th>
+<th>Mode</th>
+<th>Summary</th>
+</tr></thead><tbody>
+<tr>
+<td><code>rsi_status</code></td>
+<td><code>status</code></td>
+<td>system</td>
+<td>Read-Only</td>
+<td>SQLite <code>WAL</code> store stats, card counts, unique BLAKE3 hashes, RTX 4090 summary.</td>
+</tr>
+<tr>
+<td><code>rsi_hardware_profile</code></td>
+<td><code>hardware</code></td>
+<td>system</td>
+<td>Read-Only</td>
+<td>Goliath RTX 4090 (24 GB VRAM) + Frontis-MA1 MoE VRAM budget &amp; launch flags.</td>
+</tr>
+<tr>
+<td><code>rsi_llm_probe</code></td>
+<td><code>probe</code></td>
+<td>system</td>
+<td>Read-Only</td>
+<td>Actively pings the LLM <code>/v1/models</code> endpoint, returning latency in ms and model alias.</td>
+</tr>
+<tr>
+<td><code>rsi_help</code></td>
+<td><code>help-tabs</code></td>
+<td>system</td>
+<td>Read-Only</td>
+<td>Query the 9-tab Operator Manual, Skynet vs Closed Labs &amp; Tsinghua Dossier.</td>
+</tr>
+<tr>
+<td><code>rsi_task_upsert</code></td>
+<td><code>task upsert</code></td>
+<td>tasks</td>
+<td>Mutating</td>
+<td>Create or update an evolutionary optimization task and evaluator script.</td>
+</tr>
+<tr>
+<td><code>rsi_task_list</code></td>
+<td><code>task list</code></td>
+<td>tasks</td>
+<td>Read-Only</td>
+<td>List all registered optimization tasks.</td>
+</tr>
+<tr>
+<td><code>rsi_task_show</code></td>
+<td><code>task show</code></td>
+<td>tasks</td>
+<td>Read-Only</td>
+<td>Show task metadata, score/delta bounds, and current top-K frontier.</td>
+</tr>
+<tr>
+<td><code>rsi_task_delete</code></td>
+<td><code>task delete</code></td>
+<td>tasks</td>
+<td>Mutating</td>
+<td>Permanently delete a task and cascade delete its cards and frontier records.</td>
+</tr>
+<tr>
+<td><code>rsi_export</code></td>
+<td><code>export</code></td>
+<td>tasks</td>
+<td>Read-Only</td>
+<td>Export complete task lineage (task, CAS cards, Pareto frontier) to JSON.</td>
+</tr>
+<tr>
+<td><code>rsi_import</code></td>
+<td><code>import</code></td>
+<td>tasks</td>
+<td>Mutating</td>
+<td>Import complete task lineage from JSON bundle file into SQLite.</td>
+</tr>
+<tr>
+<td><code>rsi_step</code></td>
+<td><code>step</code></td>
+<td>evolution</td>
+<td>Mutating</td>
+<td>Execute one evolutionary step (<code>DRAFT</code>, <code>IMPROVE</code>, <code>DEBUG</code>, <code>CROSSOVER</code>).</td>
+</tr>
+<tr>
+<td><code>rsi_campaign</code></td>
+<td><code>campaign</code></td>
+<td>evolution</td>
+<td>Mutating</td>
+<td>Run a multi-step autonomous evolutionary campaign cycling across operators.</td>
+</tr>
+<tr>
+<td><code>rsi_evaluate</code></td>
+<td><code>evaluate</code></td>
+<td>evolution</td>
+<td>Mutating</td>
+<td>Benchmark candidate code in sandbox (Python 3.12 / native Rust) and record card.</td>
+</tr>
+<tr>
+<td><code>rsi_demo_seed</code></td>
+<td><code>demo-seed</code></td>
+<td>evolution</td>
+<td>Mutating</td>
+<td>Seed an empty DB with the <code>opt-synth</code> benchmark and 4 evolutionary cards.</td>
+</tr>
+<tr>
+<td><code>rsi_get_frontier</code></td>
+<td><code>frontier</code></td>
+<td>frontier</td>
+<td>Read-Only</td>
+<td>Return the materialized top-K Pareto frontier experience cards for a task.</td>
+</tr>
+<tr>
+<td><code>rsi_card_list</code></td>
+<td><code>cards</code></td>
+<td>lineage</td>
+<td>Read-Only</td>
+<td>List experience cards ordered by composite utility with optional filters.</td>
+</tr>
+<tr>
+<td><code>rsi_card_show</code></td>
+<td><code>card</code></td>
+<td>lineage</td>
+<td>Read-Only</td>
+<td>Decompress and display full candidate source code, BLAKE3 hash, and logs.</td>
+</tr>
+<tr>
+<td><code>rsi_diff</code></td>
+<td><code>diff</code></td>
+<td>lineage</td>
+<td>Read-Only</td>
+<td>Line-by-line unified diff comparing source code between two experience cards.</td>
+</tr>
+<tr>
+<td><code>rsi_cards_prune</code></td>
+<td><code>prune</code></td>
+<td>lineage</td>
+<td>Mutating</td>
+<td>Prune low-utility non-frontier cards while preserving top Pareto performers.</td>
+</tr>
+<tr>
+<td><code>rsi_lineage</code></td>
+<td><code>lineage</code></td>
+<td>lineage</td>
+<td>Read-Only</td>
+<td>Export the evolutionary lineage DAG (nodes and <code>parent_a</code>/<code>parent_b</code> edges).</td>
+</tr>
+<tr>
+<td><code>rsi_hyperparams_get</code></td>
+<td><code>hyperparams</code></td>
+<td>tuning</td>
+<td>Read-Only</td>
+<td>Inspect current composite utility weights ($\lambda_s, \lambda_\delta, \lambda_\nu$).</td>
+</tr>
+<tr>
+<td><code>rsi_hyperparams_set</code></td>
+<td><code>hyperparams</code></td>
+<td>tuning</td>
+<td>Mutating</td>
+<td>Dynamically tune composite utility weights at runtime.</td>
+</tr>
+</tbody></table>
+<p>---</p>
+<h2 class="section-title">Documentation Index</h2>
+<table class="data-table"><thead><tr>
+<th>Document</th>
+<th>Purpose</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>INSTALL.md</strong></td>
+<td>Standalone installation, MCP client configs, RTX 4090 <code>llama-server</code> &amp; Docker setup</td>
+</tr>
+<tr>
+<td><strong>HELP.md</strong></td>
+<td>9-Tab Operator Manual, Geopolitics Dossier &amp; Competitive Architecture Matrix</td>
+</tr>
+<tr>
+<td><strong>docs/RSI_LANDSCAPE_AND_SKYNET_MYTH.md</strong></td>
+<td>RSI fundamentals, the Western &quot;Skynet&quot; narrative, and closed OpenAI/Anthropic RSI loops</td>
+</tr>
+<tr>
+<td><strong>docs/TSINGHUA_OPENRSI_TEAM.md</strong></td>
+<td>Tsinghua University &amp; Frontis.AI team profiles, <code>arXiv:2607.28568</code>, and <code>FrontisAI/OpenRSI</code></td>
+</tr>
+<tr>
+<td><strong>docs/RSI_ENGINEERING_LIMITS_AND_BENCHMARKING.md</strong></td>
+<td>5 hard ceilings, 4-stage future trajectory, model feeding matrix, and before/after benchmarking</td>
+</tr>
+<tr>
+<td><strong>docs/BOSTROM_YUDKOWSKY_AND_RSI_REALITY.md</strong></td>
+<td>Bostrom, Yudkowsky, the Foom myth, and why physical reality refutes Skynet</td>
+</tr>
+<tr>
+<td><strong>docs/brochure/rsicraft-brochure.pdf</strong></td>
+<td>Printable A4 Technical Brochure &amp; Operator Handbook (PDF)</td>
+</tr>
+<tr>
+<td><strong>docs/brochure/rsicraft-brochure.epub</strong></td>
+<td>EPUB 3.0 Technical Brochure &amp; Operator Handbook</td>
+</tr>
+<tr>
+<td><strong>docs/help/index.html</strong></td>
+<td>Interactive 9-Tab HTML Help Studio with live search</td>
+</tr>
+<tr>
+<td><strong>docs/PRD.md</strong></td>
+<td>Product Requirements Document, VRAM mathematics &amp; operator specs</td>
+</tr>
+<tr>
+<td><strong>docs/ARCHITECTURE.md</strong></td>
+<td>3-Crate design (<code>rsicraft-core</code>, <code>rsicraft-mcp</code>, <code>rsicraft-app</code>), SQLite <code>WAL</code> &amp; safety guards</td>
+</tr>
+<tr>
+<td><strong>docs/TOOLS.md</strong></td>
+<td>Full JSON Schema &amp; CLI examples for all 22 MCP tools</td>
+</tr>
+<tr>
+<td><strong>docs/CONFIGURATION.md</strong></td>
+<td>Environment variables, CLI flags, utility hyperparameters, and sandbox modes</td>
+</tr>
+<tr>
+<td><strong>docs/DEVELOPMENT.md</strong></td>
+<td>Build, test, clippy gates, brochure regeneration, and release workflow</td>
+</tr>
+<tr>
+<td><strong>docs/TROUBLESHOOTING.md</strong></td>
+<td>Incident-grounded runbook (Goliath RTX 4090 2026-11-09 verification fixes)</td>
+</tr>
+<tr>
+<td><strong>docs/SHOW_HN.md</strong></td>
+<td>Show HN technical announcement draft</td>
+</tr>
+</tbody></table>
+<h2 class="section-title">License</h2>
+<p>Dual-licensed under <strong>MIT</strong> or <strong>Apache-2.0</strong> at your option.</p>
 
-  <!-- SECTION 4: COMPLETE 14-TOOL MATRIX -->
-  <div class="page-break"></div>
-  <h2 class="section-title">4. Practical RSI Engineering: Models, Limits &amp; Timings</h2>
-  
-  <p>
-    Can any model self-improve? How long does it take, and what are the hard physical boundaries? Below is the empirical compatibility and execution budget matrix on Goliath's NVIDIA RTX 4090:
-  </p>
+  <div class="page-break"></div><h2 class="section-title">Product Requirements &amp; Architecture Specification</h2><p><strong>Navigation:</strong> README &#183; RSI &amp; The &quot;Skynet&quot; Myth &#183; Tsinghua &amp; OpenRSI Dossier &#183; Architecture</p>
+<p>---</p>
+<h2 class="section-title">1. Mission Statement</h2>
+<p>Build <strong><code>rsicraft</code></strong>, a pure-Rust, zero-panic sovereign Recursive Self-Improvement (RSI) studio, CLI, and MCP server derived from the architectural principles of <strong>Frontis-MA1 (30B/35B MoE)</strong> and <strong>OpenRSI (<code>OpenMLE-Evo</code>)</strong> by researchers at <strong>Tsinghua University</strong>, <strong>Frontis.AI</strong>, and <strong>Horizon Research</strong> (<code>arXiv:2607.28568</code>, <code>FrontisAI/OpenRSI</code>).</p>
+<p>The system manages an open-ended evolutionary search loop over executable code candidate spaces on a single consumer 24 GB GPU (<strong>Goliath</strong>: AMD Ryzen 9 7900X, 64 GB DDR5, NVIDIA GeForce RTX 4090 24 GB VRAM), maintaining persistent stigmergic state in SQLite <code>WAL</code> with BLAKE3+Zstd Content-Addressable Storage (CAS), running isolated execution evaluations in sandboxed containers or local Python 3.12 environments, and exposing control via:</p>
+<p>1. <strong><code>rsicraft-app</code> (<code>L3</code>)</strong>: A native GPU-rendered <code>eframe</code>/<code>egui 0.37</code> Desktop Studio with an interactive B&#233;zier Lineage DAG Canvas, 4-operator launchpad, score spark charts, and 9-tab dossier.</p>
+<p>2. <strong><code>rsicraft-mcp</code> (<code>L2</code>)</strong>: A unified CLI (<code>--json</code> + formatted tables) and MCP <code>2024-11-05</code> stdio server exposing 22 tools.</p>
+<p>3. <strong><code>rsicraft-core</code> (<code>L1</code>)</strong>: The deterministic evolutionary state machine, composite utility selector, and store.</p>
+<p>---</p>
+<h2 class="section-title">2. Target Hardware &amp; VRAM Budget (Goliath RTX 4090)</h2>
+<table class="data-table"><thead><tr>
+<th>Resource</th>
+<th>Specification</th>
+<th>Allocation / Bound</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>CPU &amp; Host RAM</strong></td>
+<td>AMD Ryzen 9 7900X (24 threads), 64 GB DDR5</td>
+<td>4 CPU cores &amp; 4 GB RAM allocated per sandbox evaluation</td>
+</tr>
+<tr>
+<td><strong>GPU Hardware</strong></td>
+<td>NVIDIA GeForce RTX 4090 (<code>24.0 GB</code> GDDR6X)</td>
+<td><code>18.0 GB – 19.5 GB</code> total VRAM ceiling (<code>&gt; 4.5 GB</code> safety headroom)</td>
+</tr>
+<tr>
+<td><strong>Model Architecture</strong></td>
+<td><code>Frontis-MA1</code> 30B/35B MoE (~3B active/token)</td>
+<td><code>Q4_K_M</code> / <code>Q5_K_M</code> GGUF (<code>--n-gpu-layers 99</code>)</td>
+</tr>
+<tr>
+<td><strong>Context &amp; KV Cache</strong></td>
+<td><code>16,384</code> tokens (<code>--parallel 2</code>)</td>
+<td><code>--cache-type-k q4_0 --cache-type-v q4_0 --flash-attn</code></td>
+</tr>
+</tbody></table>
+<p>---</p>
+<h2 class="section-title">3. Core Functional Requirements</h2>
+<p>1. <strong>4-Operator Evolutionary Action Space (<code>operators.rs</code>)</strong>:</p>
+<ul>
+<li><code>DRAFT</code> (<code>T = 0.70</code>): High-entropy baseline synthesis from raw problem specifications.</li>
+<li><code>IMPROVE</code> (<code>T = 0.40</code>): Algorithmic and constant-factor optimization of a sampled <code>SUCCESS</code> parent.</li>
+<li><code>DEBUG</code> (<code>T = 0.20</code>): Stack-trace-driven repair of a sampled broken parent (<code>COMPILE_ERROR</code>, <code>RUNTIME_ERROR</code>, <code>TIMEOUT</code>).</li>
+<li><code>CROSSOVER</code> (<code>T = 0.50</code>): Recombination of two distinct high-utility parents (<code>parent_a != parent_b</code>).</li>
+</ul>
+<p>2. <strong>Composite Utility Parent Selection (<code>store/utility.rs</code>)</strong>:</p>
+<ul>
+<li>$U_i = 0.50 \cdot s_{\text{norm}, i} + 0.35 \cdot \Delta_{\text{norm}, i} + 0.15 \cdot \frac{1}{1 + \text{children\_count}_i}$.</li>
+<li>Stochastic roulette-wheel sampling proportional to $U_i$.</li>
+</ul>
+<p>3. <strong>Stigmergic SQLite <code>WAL</code> + BLAKE3/Zstd CAS (<code>store/mod.rs</code>, <code>store/cas.rs</code>)</strong>:</p>
+<ul>
+<li>256-bit BLAKE3 content hashing + Zstd level-3 compression of candidate source code.</li>
+<li>Materialized <code>task_frontiers</code> table tracking the top-K Pareto frontier per task.</li>
+</ul>
+<p>4. <strong>Extended Tooling &amp; Multi-Language Sandboxing</strong>:</p>
+<ul>
+<li>Line-by-line unified code diffing (<code>rsi_diff</code>) between CAS experience cards.</li>
+<li>Active LLM endpoint reachability and latency probing (<code>rsi_llm_probe</code>).</li>
+<li>Runtime composite utility hyperparameter inspection and tuning (<code>rsi_hyperparams_get</code>, <code>rsi_hyperparams_set</code>).</li>
+<li>Complete task lineage JSON export and import bundles (<code>rsi_export</code>, <code>rsi_import</code>).</li>
+<li>Cascading task deletion (<code>rsi_task_delete</code>) and Pareto frontier card pruning (<code>rsi_cards_prune</code>).</li>
+<li>Native Rust compilation and evaluation (<code>rustc --crate-type=rlib</code>) alongside Python 3.12.</li>
+</ul>
+<p>5. <strong>6 Non-Negotiable ArtCraft Merge Gates</strong>:</p>
+<ul>
+<li>Gate 1: <code>cargo clippy --workspace --all-targets --all-features -- -D warnings</code> (0 warnings, 0 <code>unwrap</code>/<code>expect</code>/<code>panic</code>/<code>todo</code>).</li>
+<li>Gate 2: <code>cargo test --workspace</code> (100% green including <code>glyph_allowlist_no_tofu_chars</code>).</li>
+<li>Gate 3: <code>cargo fmt --all --check</code>.</li>
+<li>Gate 4: MCP <code>2024-11-05</code> stdio probe (<code>initialize</code>, <code>tools/list</code> = 22 tools, <code>tools/call</code>).</li>
+<li>Gate 5: Committed <code>Cargo.lock</code>.</li>
+<li>Gate 6: Complete README stack, 9-tab help, and <code>BookCraft</code> brochure (<code>HTML</code>, <code>EPUB</code>, <code>PDF</code>).</li>
+</ul>
 
-  <table class="data-table">
-    <thead>
-      <tr>
-        <th>Model Identifier</th>
-        <th>Parameters &amp; Quant</th>
-        <th>VRAM</th>
-        <th>Throughput</th>
-        <th>Suitability &amp; Evolutionary Role</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><strong>Frontis-MA1</strong> (arXiv:2607.28568)</td>
-        <td>30B/35B MoE (~3B active) <code>Q4_K_M</code></td>
-        <td><strong>16.8 GB</strong></td>
-        <td>~118 tok/s</td>
-        <td><strong>Gold Standard:</strong> Native 4-operator trained AI4AI model</td>
-      </tr>
-      <tr>
-        <td><strong>Qwen2.5-Coder-14B-Instruct</strong></td>
-        <td>14.7B Dense <code>Q5_K_M</code></td>
-        <td><strong>11.2 GB</strong></td>
-        <td>~85 tok/s</td>
-        <td><strong>High Precision:</strong> Exceptional at <code>DEBUG</code> and <code>IMPROVE</code></td>
-      </tr>
-      <tr>
-        <td><strong>DeepSeek-Coder-V2-Lite</strong></td>
-        <td>16B MoE (2.4B active) <code>Q4_K_M</code></td>
-        <td><strong>10.5 GB</strong></td>
-        <td>~135 tok/s</td>
-        <td><strong>High Velocity:</strong> Rapid exploratory drafting &amp; wide search</td>
-      </tr>
-      <tr>
-        <td><strong>Llama-3.1-8B-Instruct</strong></td>
-        <td>8.0B Dense <code>Q8_0</code></td>
-        <td><strong>8.6 GB</strong></td>
-        <td>~140 tok/s</td>
-        <td><strong>Budget Workhorse:</strong> Fast exploratory seed generation</td>
-      </tr>
-      <tr>
-        <td><strong>Minimal Viable Model</strong></td>
-        <td>3.1B Dense (Qwen2.5-Coder-3B)</td>
-        <td><strong>3.8 GB</strong></td>
-        <td>~210 tok/s</td>
-        <td><strong>Rapid Prototyping:</strong> Requires strict <code>DEBUG</code> fallbacks</td>
-      </tr>
-    </tbody>
-  </table>
-
-  <table class="data-table">
-    <thead>
-      <tr>
-        <th>Generation Target ($N$)</th>
-        <th>Wall-Clock Budget</th>
-        <th>Operator Distribution</th>
-        <th>Empirical Gain &amp; Frontier Dynamics</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><strong>$N = 10$ Generations</strong></td>
-        <td><strong>~25 - 30 seconds</strong></td>
-        <td>100% <code>DRAFT</code></td>
-        <td>Baseline validation; 2-3 passing seeds discovered</td>
-      </tr>
-      <tr>
-        <td><strong>$N = 100$ Generations</strong></td>
-        <td><strong>~4.0 - 4.5 minutes</strong></td>
-        <td>50% DRAFT, 35% IMPROVE, 15% DEBUG</td>
-        <td><strong>+38.6% score gain</strong> (quadratic loops pruned to linear)</td>
-      </tr>
-      <tr>
-        <td><strong>$N = 1,000$ Generations</strong></td>
-        <td><strong>~42 - 45 minutes</strong></td>
-        <td>20% DRAFT, 40% IMPROVE, 20% DEBUG, 20% CROSSOVER</td>
-        <td><strong>+72.4% score gain</strong> (vectorization &amp; branchless tricks)</td>
-      </tr>
-      <tr>
-        <td><strong>$N = 10,000$ Generations</strong></td>
-        <td><strong>~7.2 - 7.5 hours</strong></td>
-        <td>Automated composite utility ($U_i$)</td>
-        <td><strong>Asymptotic saturation</strong> (&lt;4% from hand-tuned assembly)</td>
-      </tr>
-    </tbody>
-  </table>
-
-  <h2 class="section-title">5. Complete 22-Tool Reference Matrix</h2>
-  <p>All 22 tools are exposed over stdio MCP (accepting both <code>rsi_*</code> and dotted <code>rsi.*</code> names) and as 1:1 CLI subcommands.</p>
-
-  <table class="data-table">
-    <thead>
-      <tr>
-        <th>MCP Tool</th>
-        <th>CLI Verb</th>
-        <th>Domain</th>
-        <th>Mode</th>
-        <th>Capability</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr><td><code>rsi_status</code></td><td><code>status</code></td><td>system</td><td><span class="pill-ro">Read-Only</span></td><td>SQLite WAL store stats, card counts, unique BLAKE3 hashes, and RTX 4090 endpoint summary.</td></tr>
-      <tr><td><code>rsi_hardware_profile</code></td><td><code>hardware</code></td><td>system</td><td><span class="pill-ro">Read-Only</span></td><td>Goliath RTX 4090 (24 GB VRAM) + Frontis-MA1 30B/35B MoE VRAM budget and <code>llama-server</code> launch command.</td></tr>
-      <tr><td><code>rsi_llm_probe</code></td><td><code>probe</code></td><td>system</td><td><span class="pill-ro">Read-Only</span></td><td>Actively ping the configured LLM endpoint (/v1/models), returning reachability and latency in ms.</td></tr>
-      <tr><td><code>rsi_help</code></td><td><code>help-tabs</code></td><td>system</td><td><span class="pill-ro">Read-Only</span></td><td>Query the 9-tab Operator Manual, Skynet vs Closed Labs &amp; Tsinghua OpenRSI Dossier.</td></tr>
-      <tr><td><code>rsi_task_upsert</code></td><td><code>task upsert</code></td><td>tasks</td><td><span class="pill-mut">Mutating</span></td><td>Create or update an optimization task and its sandbox Python evaluator script.</td></tr>
-      <tr><td><code>rsi_task_list</code></td><td><code>task list</code></td><td>tasks</td><td><span class="pill-ro">Read-Only</span></td><td>List all registered evolutionary optimization tasks.</td></tr>
-      <tr><td><code>rsi_task_show</code></td><td><code>task show</code></td><td>tasks</td><td><span class="pill-ro">Read-Only</span></td><td>Show task metadata, score/delta normalization bounds, and current top-K frontier.</td></tr>
-      <tr><td><code>rsi_task_delete</code></td><td><code>task delete</code></td><td>tasks</td><td><span class="pill-mut">Mutating</span></td><td>Permanently delete a task and cascade delete all its cards and frontier records.</td></tr>
-      <tr><td><code>rsi_export</code></td><td><code>export</code></td><td>tasks</td><td><span class="pill-ro">Read-Only</span></td><td>Export complete task lineage (task, CAS cards, and Pareto frontier) to JSON.</td></tr>
-      <tr><td><code>rsi_import</code></td><td><code>import</code></td><td>tasks</td><td><span class="pill-mut">Mutating</span></td><td>Import complete task lineage from JSON bundle file into SQLite WAL store.</td></tr>
-      <tr><td><code>rsi_step</code></td><td><code>step</code></td><td>evolution</td><td><span class="pill-mut">Mutating</span></td><td>Execute one evolutionary step (<code>DRAFT</code>, <code>IMPROVE</code>, <code>DEBUG</code>, <code>CROSSOVER</code>) with CAS persistence.</td></tr>
-      <tr><td><code>rsi_campaign</code></td><td><code>campaign</code></td><td>evolution</td><td><span class="pill-mut">Mutating</span></td><td>Run a multi-step autonomous evolutionary campaign cycling across all four operators.</td></tr>
-      <tr><td><code>rsi_evaluate</code></td><td><code>evaluate</code></td><td>evolution</td><td><span class="pill-mut">Mutating</span></td><td>Directly benchmark candidate code (Python 3.12 / native Rust) in sandbox and record card.</td></tr>
-      <tr><td><code>rsi_demo_seed</code></td><td><code>demo-seed</code></td><td>evolution</td><td><span class="pill-mut">Mutating</span></td><td>Seed an empty database with the <code>opt-synth</code> benchmark and a 4-card evolutionary progression.</td></tr>
-      <tr><td><code>rsi_get_frontier</code></td><td><code>frontier</code></td><td>frontier</td><td><span class="pill-ro">Read-Only</span></td><td>Return the materialized top-K Pareto frontier experience cards for a task.</td></tr>
-      <tr><td><code>rsi_card_list</code></td><td><code>cards</code></td><td>lineage</td><td><span class="pill-ro">Read-Only</span></td><td>List experience cards ordered by composite utility, optionally filtered by operator or status.</td></tr>
-      <tr><td><code>rsi_card_show</code></td><td><code>card</code></td><td>lineage</td><td><span class="pill-ro">Read-Only</span></td><td>Decompress and inspect full candidate code, BLAKE3 hash, execution logs, and parent IDs.</td></tr>
-      <tr><td><code>rsi_diff</code></td><td><code>diff</code></td><td>lineage</td><td><span class="pill-ro">Read-Only</span></td><td>Line-by-line unified diff comparing source code between two experience cards.</td></tr>
-      <tr><td><code>rsi_cards_prune</code></td><td><code>prune</code></td><td>lineage</td><td><span class="pill-mut">Mutating</span></td><td>Prune low-utility non-frontier cards while preserving top Pareto performers.</td></tr>
-      <tr><td><code>rsi_lineage</code></td><td><code>lineage</code></td><td>lineage</td><td><span class="pill-ro">Read-Only</span></td><td>Export the evolutionary lineage DAG (nodes and <code>parent_a</code>/<code>parent_b</code> edges) for a task.</td></tr>
-      <tr><td><code>rsi_hyperparams_get</code></td><td><code>hyperparams</code></td><td>tuning</td><td><span class="pill-ro">Read-Only</span></td><td>Inspect current composite utility weights (&lambda;<sub>s</sub>, &lambda;<sub>&delta;</sub>, &lambda;<sub>&nu;</sub>).</td></tr>
-      <tr><td><code>rsi_hyperparams_set</code></td><td><code>hyperparams</code></td><td>tuning</td><td><span class="pill-mut">Mutating</span></td><td>Dynamically tune composite utility weights at runtime.</td></tr>
-    </tbody>
-  </table>
-
-  <!-- SECTION 6: SAFETY INVARIANTS -->
-  <h2 class="section-title">6. Defense-in-Depth Safety &amp; Containment Invariants</h2>
-  <div class="callout-warn">
-    <strong>Five Non-Bypassable Guards Enforced Across <code>rsicraft-core</code>, <code>rsicraft-mcp</code>, and <code>rsicraft-app</code>:</strong>
-    <ol style="margin: 6px 0 0 0; padding-left: 20px;">
-      <li><strong>Compile-Time Zero-Panic Enforcement:</strong> Every crate declares <code>#![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::todo, clippy::unimplemented)]</code>. Malformed LLM outputs or crashing candidate scripts never crash the host engine.</li>
-      <li><strong>Air-Gapped Container Containment:</strong> Docker evaluation runs with <code>--network none</code>, <code>--read-only</code> root filesystem, <code>--cap-drop ALL</code>, <code>--security-opt no-new-privileges</code>, <code>--pids-limit 64</code>, and <code>--memory 4g</code>.</li>
-      <li><strong>Strict Wall-Clock Timeout Reaping:</strong> Both Docker and local Python 3.12 evaluators poll child processes on a 50 ms tick and forcibly kill any candidate exceeding <code>timeout_secs</code>, recording status <code>TIMEOUT</code>.</li>
-      <li><strong>BLAKE3 + Zstd Content-Addressable Integrity:</strong> Source artifacts are verified by 256-bit BLAKE3 digests and compressed with Zstd level 3 inside a transactional SQLite <code>WAL</code> store with <code>PRAGMA foreign_keys = ON</code>.</li>
-      <li><strong>Tofu-Free GPU Desktop Studio &amp; Pure Stdio MCP:</strong> <code>rsicraft-app</code> locks source code against unrenderable Unicode dingbats via <code>glyph_allowlist_no_tofu_chars</code>, and <code>rsicraft mcp</code> emits 100% pure JSON-RPC 2.0 on <code>stdout</code>.</li>
-    </ol>
-  </div>
+  <div class="page-break"></div><h2 class="section-title">Complete MCP Tool &amp; CLI Verb Reference</h2><p><strong>Navigation:</strong> README &#183; Architecture &#183; Configuration &#183; 9-Tab Help Manual &#183; RSI Limits &amp; Benchmarking &#183; Bostrom &amp; Yudkowsky Analysis</p>
+<p>Every tool is exposed over stdio MCP (<code>rsicraft mcp</code>, accepting both <code>rsi_*</code> and dotted <code>rsi.*</code> names) and as a 1:1 matching CLI subcommand (<code>rsicraft &lt;verb&gt; [--json]</code>).</p>
+<p>---</p>
+<h2 class="section-title">1. System, Hardware, Probe &amp; Multitab Help Tools</h2>
+<h3><code>rsi_status</code> (CLI: <code>rsicraft status</code>)</h3>
+<p>Returns SQLite <code>WAL</code> store metrics (<code>tasks_count</code>, <code>cards_count</code>, <code>success_cards_count</code>, <code>frontier_entries_count</code>, <code>unique_code_hashes</code>) and active RTX 4090 inference configuration.</p>
+<h3><code>rsi_hardware_profile</code> (CLI: <code>rsicraft hardware</code>)</h3>
+<p>Returns the Goliath hardware specification (Ryzen 9 7900X, 64 GB DDR5, RTX 4090 24 GB VRAM), <code>Frontis-MA1</code> 30B/35B MoE VRAM budget (<code>18.0–19.5 GB</code>), and the recommended <code>llama-server</code> launch command.</p>
+<h3><code>rsi_llm_probe</code> (CLI: <code>rsicraft probe [--url &lt;url&gt;]</code>)</h3>
+<p>Actively pings the configured LLM endpoint (<code>/v1/models</code>), returning latency in ms, reachability status, and list of available models.</p>
+<ul>
+<li><strong><code>url</code></strong>: Optional custom <code>llama-server</code> URL to probe (defaults to configured <code>base_url</code>).</li>
+</ul>
+<h3><code>rsi_help</code> (CLI: <code>rsicraft help-tabs [--tab &lt;slug&gt;] [--search &lt;query&gt;]</code>)</h3>
+<p>Queries the 9-tab Operator Manual, RSI Geopolitics Dossier, Tsinghua/Frontis.AI OpenRSI Dossier, and Competitive Matrix.</p>
+<ul>
+<li><strong><code>tab</code></strong>: <code>&quot;all&quot;</code> (default), <code>&quot;overview&quot;</code>, <code>&quot;rsi_landscape&quot;</code>, <code>&quot;tsinghua_openrsi&quot;</code>, <code>&quot;wrappee&quot;</code>, <code>&quot;operators&quot;</code>, <code>&quot;compare&quot;</code>, <code>&quot;api&quot;</code>, <code>&quot;troubleshoot&quot;</code>, <code>&quot;faq&quot;</code>.</li>
+<li><strong><code>search</code></strong>: Optional case-insensitive substring filter across all tabs and sections.</li>
+</ul>
+<p>---</p>
+<h2 class="section-title">2. Task Management, Export/Import &amp; Delete Tools</h2>
+<h3><code>rsi_task_upsert</code> (CLI: <code>rsicraft task upsert</code>)</h3>
+<p>Creates or updates an optimization task and its sandbox evaluator script.</p>
+<ul>
+<li><strong>Required arguments:</strong> <code>task_id</code>, <code>name</code>, <code>description</code>, <code>evaluator_script</code> (must print <code>RSI_METRIC_JSON={&quot;status&quot;:&quot;SUCCESS&quot;,&quot;score&quot;:&lt;float&gt;}</code>).</li>
+</ul>
+<h3><code>rsi_task_list</code> (CLI: <code>rsicraft task list</code>)</h3>
+<p>Lists all registered evolutionary optimization tasks.</p>
+<h3><code>rsi_task_show</code> (CLI: <code>rsicraft task show &lt;task_id&gt;</code>)</h3>
+<p>Returns task metadata, dynamic score/delta normalization bounds (<code>TaskScoreBounds</code>), and the current top-K materialized frontier.</p>
+<h3><code>rsi_task_delete</code> (CLI: <code>rsicraft task delete &lt;task_id&gt;</code>)</h3>
+<p>Permanently deletes a task and cascade deletes all its associated experience cards and frontier records without leaving dangling records.</p>
+<h3><code>rsi_export</code> (CLI: <code>rsicraft export --task-id &lt;id&gt; [--out &lt;path&gt;]</code>)</h3>
+<p>Exports a complete task lineage bundle (task definition, decompressed CAS cards, and Pareto frontier) to a standalone JSON document.</p>
+<h3><code>rsi_import</code> (CLI: <code>rsicraft import --file &lt;path&gt;</code>)</h3>
+<p>Imports a complete task lineage bundle from JSON into SQLite, re-registering the task, experience cards, and frontier.</p>
+<p>---</p>
+<h2 class="section-title">3. Evolutionary Execution &amp; Multi-Language Sandbox Tools</h2>
+<h3><code>rsi_step</code> (CLI: <code>rsicraft step</code>)</h3>
+<p>Executes a single evolutionary step:</p>
+<p>1. Samples 0, 1, or 2 parents from the SQLite <code>WAL</code> store using composite utility $U_i$.</p>
+<p>2. Builds operator-specific prompts (<code>DRAFT</code> <code>0.70</code>, <code>IMPROVE</code> <code>0.40</code>, <code>DEBUG</code> <code>0.20</code>, <code>CROSSOVER</code> <code>0.50</code>).</p>
+<p>3. Queries <code>llama-server</code> (<code>provider = &quot;llama&quot;</code>) or the deterministic oracle (<code>provider = &quot;demo&quot;</code>).</p>
+<p>4. Evaluates synthesized code in <code>sandbox_mode</code> (<code>&quot;docker&quot;</code>, <code>&quot;local&quot;</code>, or <code>&quot;demo&quot;</code>).</p>
+<p>5. Compresses code via BLAKE3 + Zstd, records the experience card, recalculates $U_i$ across the task, and refreshes <code>task_frontiers</code>.</p>
+<h3><code>rsi_campaign</code> (CLI: <code>rsicraft campaign</code>)</h3>
+<p>Runs <code>steps</code> (<code>1..=64</code>) autonomous evolutionary steps cycling across <code>DRAFT -&gt; IMPROVE -&gt; DEBUG -&gt; CROSSOVER</code> and returns the full trajectory and best score.</p>
+<h3><code>rsi_evaluate</code> (CLI: <code>rsicraft evaluate</code>)</h3>
+<p>Directly benchmarks a candidate snippet against a task&#39;s evaluator in the sandbox (<code>record = true</code> by default). Automatically supports both <strong>Python 3.12</strong> and <strong>native Rust compilation</strong> (<code>rustc</code> compiling <code>candidate.rs</code> + <code>evaluator.rs</code>).</p>
+<h3><code>rsi_demo_seed</code> (CLI: <code>rsicraft demo-seed</code>)</h3>
+<p>Seeds an empty database with the <code>opt-synth</code> (Vector Max) benchmark task and a 4-card evolutionary progression (<code>DRAFT -&gt; DEBUG -&gt; IMPROVE -&gt; CROSSOVER</code>).</p>
+<p>---</p>
+<h2 class="section-title">4. Frontier, Lineage DAG, Diff &amp; Prune Tools</h2>
+<h3><code>rsi_get_frontier</code> (CLI: <code>rsicraft frontier [--task-id &lt;id&gt;] [--limit &lt;k&gt;]</code>)</h3>
+<p>Returns the materialized top-K Pareto frontier experience cards for a task.</p>
+<h3><code>rsi_card_list</code> (CLI: <code>rsicraft cards [--task-id &lt;id&gt;] [--operator &lt;op&gt;] [--status &lt;st&gt;]</code>)</h3>
+<p>Lists experience cards ordered by composite utility $U_i$, with optional operator and execution-status filters.</p>
+<h3><code>rsi_card_show</code> (CLI: <code>rsicraft card &lt;card_id&gt;</code>)</h3>
+<p>Decompresses the Zstd payload, verifies the BLAKE3 hash, and returns the full experience card including source code and sandbox stdout/stderr.</p>
+<h3><code>rsi_lineage</code> (CLI: <code>rsicraft lineage [--task-id &lt;id&gt;]</code>)</h3>
+<p>Exports the complete evolutionary lineage DAG (<code>nodes</code> and <code>parent_a</code>/<code>parent_b</code> <code>edges</code>) for graph visualization.</p>
+<h3><code>rsi_diff</code> (CLI: <code>rsicraft diff --card-a &lt;id&gt; --card-b &lt;id&gt;</code>)</h3>
+<p>Generates a line-by-line unified text diff comparing decompressed source codes between two experience cards (e.g. parent vs child candidate).</p>
+<h3><code>rsi_cards_prune</code> (CLI: <code>rsicraft prune --task-id &lt;id&gt; [--keep-frontier &lt;k&gt;]</code>)</h3>
+<p>Prunes low-utility non-frontier cards for a task, keeping at least <code>keep_frontier</code> top Pareto cards while maintaining database cleaniness.</p>
+<p>---</p>
+<h2 class="section-title">5. Runtime Hyperparameter Tuning Tools</h2>
+<h3><code>rsi_hyperparams_get</code> (CLI: <code>rsicraft hyperparams</code>)</h3>
+<p>Returns current composite utility weights ($\lambda_s, \lambda_\delta, \lambda_\nu$) used for stochastic parent selection.</p>
+<h3><code>rsi_hyperparams_set</code> (CLI: <code>rsicraft hyperparams [--w-score &lt;s] [--w-delta &lt;d&gt;] [--w-novelty &lt;n&gt;]</code>)</h3>
+<p>Dynamically adjusts composite utility weights ($\lambda_s, \lambda_\delta, \lambda_\nu$) at runtime without restarting the daemon.</p>
 
 </body>
 </html>
