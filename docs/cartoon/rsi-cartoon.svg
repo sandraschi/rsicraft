@@ -1,0 +1,275 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 480" width="1600" height="480" font-family="'Comic Sans MS', 'Comic Neue', 'DejaVu Sans', sans-serif">
+  <title>RSICraft: a four-panel cartoon. A developer feeds a tiny kitten-like LLM into the RSI loop on her PC; four thousand generations later the kitten is still tiny, but its shadow is not.</title>
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#fff6a8" stop-opacity="0.95"/>
+      <stop offset="0.5" stop-color="#ffd54a" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#ffd54a" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="eyeglow" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#fff2a0"/>
+      <stop offset="0.45" stop-color="#ff9f1c"/>
+      <stop offset="1" stop-color="#ff3b1c" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="night" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2a2540"/>
+      <stop offset="1" stop-color="#4a3f5c"/>
+    </linearGradient>
+    <linearGradient id="rgb" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ff4d8d"/>
+      <stop offset="0.5" stop-color="#7c5cff"/>
+      <stop offset="1" stop-color="#22d3ee"/>
+    </linearGradient>
+
+    <!-- The kitten-shaped LLM, centred on its body -->
+    <g id="kitten">
+      <path d="M18,6 C34,4 40,-14 30,-22" fill="none" stroke="#222" stroke-width="7" stroke-linecap="round"/>
+      <path d="M18,6 C34,4 40,-14 30,-22" fill="none" stroke="#f6b26b" stroke-width="4" stroke-linecap="round"/>
+      <ellipse cx="0" cy="4" rx="22" ry="17" fill="#f6b26b" stroke="#222" stroke-width="3"/>
+      <path d="M-14,-24 L-17,-42 L-4,-31 Z" fill="#f6b26b" stroke="#222" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M14,-24 L17,-42 L4,-31 Z" fill="#f6b26b" stroke="#222" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M-13,-27 L-15,-37 L-8,-31 Z" fill="#f4a3b4"/>
+      <path d="M13,-27 L15,-37 L8,-31 Z" fill="#f4a3b4"/>
+      <circle cx="0" cy="-18" r="18" fill="#f6b26b" stroke="#222" stroke-width="3"/>
+      <ellipse cx="-7" cy="-20" rx="5.5" ry="6.5" fill="#222"/>
+      <ellipse cx="7" cy="-20" rx="5.5" ry="6.5" fill="#222"/>
+      <circle cx="-5" cy="-22.5" r="2" fill="#fff"/>
+      <circle cx="9" cy="-22.5" r="2" fill="#fff"/>
+      <path d="M-4,-11 Q-2,-8 0,-11 Q2,-8 4,-11" fill="none" stroke="#222" stroke-width="1.8" stroke-linecap="round"/>
+      <ellipse cx="-12" cy="-12" rx="3.5" ry="2" fill="#f4a3b4" opacity="0.8"/>
+      <ellipse cx="12" cy="-12" rx="3.5" ry="2" fill="#f4a3b4" opacity="0.8"/>
+      <path d="M-14,-4 Q0,2 14,-4" fill="none" stroke="#2a9d8f" stroke-width="3.5"/>
+      <rect x="-9" y="-2" width="18" height="10" rx="2" fill="#ffd166" stroke="#222" stroke-width="1.5"/>
+      <text x="0" y="6" font-size="7.5" font-weight="bold" text-anchor="middle" fill="#222" font-family="'DejaVu Sans', sans-serif">LLM</text>
+      <ellipse cx="-11" cy="19" rx="7" ry="4" fill="#f6b26b" stroke="#222" stroke-width="2.5"/>
+      <ellipse cx="11" cy="19" rx="7" ry="4" fill="#f6b26b" stroke="#222" stroke-width="2.5"/>
+    </g>
+
+    <!-- Goliath, the PC tower (origin top-left, 84 x 140) -->
+    <g id="pc">
+      <rect x="0" y="0" width="84" height="140" rx="7" fill="#3d4451" stroke="#222" stroke-width="3"/>
+      <rect x="8" y="10" width="6" height="120" rx="3" fill="url(#rgb)"/>
+      <circle cx="49" cy="44" r="17" fill="#2b3039" stroke="#222" stroke-width="2"/>
+      <path d="M49,30 Q56,40 49,44 Q42,48 49,58 M35,44 Q45,37 49,44 Q53,51 63,44" fill="none" stroke="#6b7280" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="49" cy="88" r="17" fill="#2b3039" stroke="#222" stroke-width="2"/>
+      <path d="M49,74 Q56,84 49,88 Q42,92 49,102 M35,88 Q45,81 49,88 Q53,95 63,88" fill="none" stroke="#6b7280" stroke-width="3" stroke-linecap="round"/>
+      <text x="49" y="117" font-size="8.5" font-weight="bold" text-anchor="middle" fill="#cfd8dc" font-family="'DejaVu Sans', sans-serif" letter-spacing="1">GOLIATH</text>
+      <rect x="24" y="121" width="50" height="13" rx="3" fill="#76b900" stroke="#222" stroke-width="1.5"/>
+      <text x="49" y="131" font-size="9" font-weight="bold" text-anchor="middle" fill="#111" font-family="'DejaVu Sans', sans-serif">4090</text>
+    </g>
+
+    <!-- The dev, seated, facing right (no arms: they change per panel) -->
+    <g id="dev-body">
+      <rect x="36" y="300" width="70" height="10" rx="3" fill="#8d6e63" stroke="#222" stroke-width="2.5"/>
+      <rect x="42" y="230" width="10" height="72" rx="3" fill="#8d6e63" stroke="#222" stroke-width="2.5"/>
+      <path d="M50,312 L58,360 M90,312 L82,360" stroke="#222" stroke-width="4" stroke-linecap="round"/>
+      <path d="M58,215 Q56,200 74,196 L104,196 Q120,200 120,218 L124,300 L56,300 Z" fill="#5b7fd1" stroke="#222" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M78,198 Q90,212 104,198" fill="none" stroke="#3f5fb0" stroke-width="3"/>
+      <path d="M86,206 L84,226 M96,206 L98,226" stroke="#e8eefc" stroke-width="2" stroke-linecap="round"/>
+      <rect x="84" y="186" width="16" height="14" fill="#f2c9a5" stroke="#222" stroke-width="2.5"/>
+    </g>
+    <g id="dev-head">
+      <path d="M58,170 Q52,128 92,124 Q128,124 128,160 L128,198 Q116,200 112,186 Q118,170 112,150 Q96,140 78,148 Q68,160 72,196 Q60,198 58,186 Z" fill="#4a2f22" stroke="#222" stroke-width="3" stroke-linejoin="round"/>
+      <ellipse cx="96" cy="165" rx="26" ry="29" fill="#f2c9a5" stroke="#222" stroke-width="3"/>
+      <path d="M70,152 Q86,128 116,138 Q124,146 122,156 Q104,140 82,152 Z" fill="#4a2f22"/>
+      <ellipse cx="84" cy="172" rx="4" ry="2.5" fill="#f4a3b4" opacity="0.7"/>
+    </g>
+    <g id="glasses">
+      <circle cx="96" cy="163" r="8" fill="#ffffff" fill-opacity="0.25" stroke="#222" stroke-width="2.5"/>
+      <circle cx="114" cy="163" r="8" fill="#ffffff" fill-opacity="0.25" stroke="#222" stroke-width="2.5"/>
+      <path d="M104,163 L106,163 M88,162 L76,158" stroke="#222" stroke-width="2.5"/>
+    </g>
+
+    <!-- Desk with monitor (shared by all panels) -->
+    <g id="desk">
+      <rect x="130" y="284" width="240" height="12" rx="3" fill="#a1785c" stroke="#222" stroke-width="2.5"/>
+      <path d="M150,296 L150,360 M350,296 L350,360" stroke="#222" stroke-width="4"/>
+      <rect x="196" y="270" width="40" height="14" rx="2" fill="#555" stroke="#222" stroke-width="2"/>
+      <rect x="211" y="246" width="10" height="26" fill="#555" stroke="#222" stroke-width="2"/>
+    </g>
+  </defs>
+
+  <rect width="1600" height="480" fill="#ffffff"/>
+
+  <!-- ================= PANEL 1 ================= -->
+  <g transform="translate(16,16)">
+    <clipPath id="c1"><rect x="0" y="0" width="380" height="380" rx="10"/></clipPath>
+    <g clip-path="url(#c1)">
+      <rect width="380" height="380" fill="#fdf3e1"/>
+      <rect x="250" y="40" width="90" height="70" rx="4" fill="#bfe3f5" stroke="#222" stroke-width="2.5"/>
+      <path d="M295,40 L295,110 M250,75 L340,75" stroke="#222" stroke-width="2.5"/>
+      <use href="#desk"/>
+      <rect x="160" y="186" width="112" height="62" rx="5" fill="#1e1e2e" stroke="#222" stroke-width="3"/>
+      <text x="168" y="208" font-size="11" fill="#7ee787" font-family="'DejaVu Sans Mono', monospace">rsicraft&gt;</text>
+      <text x="168" y="224" font-size="11" fill="#7ee787" font-family="'DejaVu Sans Mono', monospace">ready_</text>
+      <use href="#pc" x="280" y="146"/>
+      <use href="#dev-body"/>
+      <use href="#dev-head"/>
+      <use href="#glasses"/>
+      <path d="M102,180 Q108,186 116,180" fill="none" stroke="#222" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="96" cy="163" r="2.2" fill="#222"/><circle cx="114" cy="163" r="2.2" fill="#222"/>
+      <!-- arms cradling the kitten -->
+      <path d="M112,216 Q136,232 146,212" fill="none" stroke="#222" stroke-width="15" stroke-linecap="round"/>
+      <path d="M112,216 Q136,232 146,212" fill="none" stroke="#5b7fd1" stroke-width="10" stroke-linecap="round"/>
+      <use href="#kitten" transform="translate(136,190) scale(0.9)"/>
+      <circle cx="148" cy="212" r="7" fill="#f2c9a5" stroke="#222" stroke-width="2.5"/>
+      <path d="M150,124 c-6,-10 -20,-4 -12,8 l12,12 l12,-12 c8,-12 -6,-18 -12,-8 Z" fill="#ff6b8b" stroke="#222" stroke-width="2"/>
+      <path d="M180,110 c-3,-5 -10,-2 -6,4 l6,6 l6,-6 c4,-6 -3,-9 -6,-4 Z" fill="#ff6b8b" stroke="#222" stroke-width="1.5"/>
+    </g>
+    <rect width="380" height="380" rx="10" fill="none" stroke="#222" stroke-width="4"/>
+    <text x="190" y="414" font-size="17" text-anchor="middle" fill="#222">1. Found a tiny open-weights LLM.</text>
+    <text x="190" y="438" font-size="17" text-anchor="middle" fill="#222">7B. Totally harmless.</text>
+  </g>
+
+  <!-- ================= PANEL 2 ================= -->
+  <g transform="translate(412,16)">
+    <clipPath id="c2"><rect x="0" y="0" width="380" height="380" rx="10"/></clipPath>
+    <g clip-path="url(#c2)">
+      <rect width="380" height="380" fill="#fdf3e1"/>
+      <use href="#desk"/>
+      <rect x="160" y="186" width="112" height="62" rx="5" fill="#1e1e2e" stroke="#222" stroke-width="3"/>
+      <text x="168" y="208" font-size="11" fill="#7ee787" font-family="'DejaVu Sans Mono', monospace">evolve --gens</text>
+      <text x="168" y="224" font-size="11" fill="#7ee787" font-family="'DejaVu Sans Mono', monospace">  4096_</text>
+      <use href="#pc" x="280" y="146"/>
+      <!-- funnel on top of the PC with the RSI loop -->
+      <path d="M262,92 L362,92 L334,128 L330,146 L314,146 L310,128 Z" fill="#cfd8dc" stroke="#222" stroke-width="3" stroke-linejoin="round"/>
+      <text x="312" y="114" font-size="13" font-weight="bold" text-anchor="middle" fill="#222" font-family="'DejaVu Sans', sans-serif">RSI</text>
+      <g transform="translate(18,18)">
+        <rect width="132" height="104" rx="4" fill="#fffdf5" stroke="#222" stroke-width="2.5"/>
+        <circle cx="0" cy="0" r="4" fill="#e63946" transform="translate(66,6)"/>
+        <text x="66" y="24" font-size="12" font-weight="bold" text-anchor="middle" fill="#222" font-family="'DejaVu Sans', sans-serif">THE LOOP</text>
+        <ellipse cx="66" cy="64" rx="24" ry="16" fill="none" stroke="#7c3aed" stroke-width="2.5" stroke-dasharray="28 6"/>
+        <path d="M85,57 l3,8 l-8,-2" fill="none" stroke="#7c3aed" stroke-width="2.5" stroke-linejoin="round"/>
+        <path d="M45,70 l-3,-8 l8,2" fill="none" stroke="#7c3aed" stroke-width="2.5" stroke-linejoin="round"/>
+        <g font-size="8.5" font-weight="bold" fill="#7c3aed" font-family="'DejaVu Sans', sans-serif" text-anchor="middle">
+          <text x="66" y="42">DRAFT</text>
+          <text x="113" y="67" font-size="8">IMPROVE</text>
+          <text x="66" y="93">DEBUG</text>
+          <text x="20" y="67" font-size="8">CROSS</text>
+        </g>
+        <text x="66" y="68" font-size="11" text-anchor="middle" fill="#222">U&#8593;</text>
+      </g>
+      <use href="#dev-body"/>
+      <use href="#dev-head"/>
+      <use href="#glasses"/>
+      <path d="M100,180 Q108,190 118,180" fill="#fff" stroke="#222" stroke-width="2.5" stroke-linecap="round"/>
+      <path d="M92,163 q4,-4 8,0 M110,163 q4,-4 8,0" fill="none" stroke="#222" stroke-width="2.2" stroke-linecap="round"/>
+      <!-- arm reaching up to the funnel -->
+      <path d="M112,214 Q190,170 262,96" fill="none" stroke="#222" stroke-width="15" stroke-linecap="round"/>
+      <path d="M112,214 Q190,170 262,96" fill="none" stroke="#5b7fd1" stroke-width="10" stroke-linecap="round"/>
+      <use href="#kitten" transform="translate(292,84) rotate(-12) scale(0.9)"/>
+      <circle cx="266" cy="92" r="7" fill="#f2c9a5" stroke="#222" stroke-width="2.5"/>
+      <!-- speech: kitten -->
+      <path d="M180,24 h56 a10,10 0 0 1 10,10 v18 a10,10 0 0 1 -10,10 h-16 l12,12 l-22,-12 h-30 a10,10 0 0 1 -10,-10 v-18 a10,10 0 0 1 10,-10 Z" fill="#fff" stroke="#222" stroke-width="2.5"/>
+      <text x="208" y="49" font-size="16" text-anchor="middle" fill="#222">mrrp!</text>
+    </g>
+    <rect width="380" height="380" rx="10" fill="none" stroke="#222" stroke-width="4"/>
+    <text x="190" y="414" font-size="17" text-anchor="middle" fill="#222">2. In you go. Just a few generations,</text>
+    <text x="190" y="438" font-size="17" text-anchor="middle" fill="#222">so you can learn a little.</text>
+  </g>
+
+  <!-- ================= PANEL 3 ================= -->
+  <g transform="translate(808,16)">
+    <clipPath id="c3"><rect x="0" y="0" width="380" height="380" rx="10"/></clipPath>
+    <g clip-path="url(#c3)">
+      <rect width="380" height="380" fill="#f6e7c8"/>
+      <circle cx="322" cy="214" r="150" fill="url(#glow)"/>
+      <g stroke="#ffcf3a" stroke-width="4" stroke-linecap="round" opacity="0.8">
+        <path d="M322,120 L322,90 M380,150 L404,130 M264,150 L240,128 M385,214 L412,214"/>
+      </g>
+      <use href="#desk"/>
+      <rect x="160" y="186" width="112" height="62" rx="5" fill="#1e1e2e" stroke="#222" stroke-width="3"/>
+      <path d="M168,238 L190,234 L206,228 L222,214 L236,200 L248,192 L262,190" fill="none" stroke="#7ee787" stroke-width="2.5"/>
+      <text x="168" y="202" font-size="10" fill="#7ee787" font-family="'DejaVu Sans Mono', monospace">gen 512</text>
+      <text x="168" y="214" font-size="10" fill="#ffd166" font-family="'DejaVu Sans Mono', monospace">U = 0.97</text>
+      <use href="#pc" x="280" y="146"/>
+      <rect x="288" y="150" width="68" height="132" rx="5" fill="#fff6a8" opacity="0.35"/>
+      <!-- steam / sparkles from the PC -->
+      <path d="M300,140 q-6,-12 2,-22 q8,-10 0,-24 M330,138 q-6,-12 2,-22 q8,-10 0,-24" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" opacity="0.9"/>
+      <path d="M356,110 l4,10 l10,4 l-10,4 l-4,10 l-4,-10 l-10,-4 l10,-4 Z" fill="#fff" stroke="#e6b800" stroke-width="1.5"/>
+      <path d="M262,70 l3,7 l7,3 l-7,3 l-3,7 l-3,-7 l-7,-3 l7,-3 Z" fill="#fff" stroke="#e6b800" stroke-width="1.5"/>
+      <use href="#dev-body"/>
+      <use href="#dev-head"/>
+      <use href="#glasses"/>
+      <path d="M92,165 q4,-5 8,0 M110,165 q4,-5 8,0" fill="none" stroke="#222" stroke-width="2.2" stroke-linecap="round"/>
+      <path d="M102,180 Q108,186 116,180" fill="none" stroke="#222" stroke-width="2.5" stroke-linecap="round"/>
+      <!-- mug -->
+      <path d="M112,214 Q130,214 136,196" fill="none" stroke="#222" stroke-width="15" stroke-linecap="round"/>
+      <path d="M112,214 Q130,214 136,196" fill="none" stroke="#5b7fd1" stroke-width="10" stroke-linecap="round"/>
+      <rect x="128" y="168" width="24" height="28" rx="3" fill="#e76f51" stroke="#222" stroke-width="2.5"/>
+      <path d="M152,174 q10,0 10,8 q0,8 -10,8" fill="none" stroke="#222" stroke-width="2.5"/>
+      <text x="140" y="187" font-size="8" font-weight="bold" text-anchor="middle" fill="#fff" font-family="'DejaVu Sans', sans-serif">RUST</text>
+      <path d="M134,162 q-4,-8 2,-14 M144,162 q-4,-8 2,-14" fill="none" stroke="#999" stroke-width="2" stroke-linecap="round"/>
+      <!-- speech: dev -->
+      <path d="M24,22 h150 a10,10 0 0 1 10,10 v40 a10,10 0 0 1 -10,10 h-90 l-6,22 l-10,-22 h-44 a10,10 0 0 1 -10,-10 v-40 a10,10 0 0 1 10,-10 Z" fill="#fff" stroke="#222" stroke-width="2.5"/>
+      <text x="99" y="47" font-size="15" text-anchor="middle" fill="#222">Look at that</text>
+      <text x="99" y="67" font-size="15" text-anchor="middle" fill="#222">utility curve!</text>
+    </g>
+    <rect width="380" height="380" rx="10" fill="none" stroke="#222" stroke-width="4"/>
+    <text x="190" y="414" font-size="17" text-anchor="middle" fill="#222">3. Generation 512. Learning so fast.</text>
+    <text x="190" y="438" font-size="17" text-anchor="middle" fill="#222">So proud.</text>
+  </g>
+
+  <!-- ================= PANEL 4 ================= -->
+  <g transform="translate(1204,16)">
+    <clipPath id="c4"><rect x="0" y="0" width="380" height="380" rx="10"/></clipPath>
+    <g clip-path="url(#c4)">
+      <rect width="380" height="380" fill="url(#night)"/>
+      <!-- light from the PC throws the shadow up the wall -->
+      <path d="M322,150 L-40,-20 L420,-20 Z" fill="#6b5a86" opacity="0.55"/>
+      <!-- THE SHADOW -->
+      <g fill="#120d1c">
+        <path d="M30,250 C10,170 30,90 90,62 L74,-6 L132,46 C160,36 200,36 228,46 L292,-8 L270,66 C330,96 350,170 330,250 Z"/>
+        <path d="M300,230 C380,210 400,140 360,96 C350,84 370,70 382,86 C420,140 396,236 312,262 Z"/>
+        <path d="M44,230 C-10,220 -20,160 4,130 C14,118 -2,104 -14,118 C-44,160 -24,240 40,256 Z"/>
+      </g>
+      <!-- eyes: more than a kitten should have -->
+      <ellipse cx="128" cy="132" rx="26" ry="16" fill="url(#eyeglow)"/>
+      <ellipse cx="232" cy="132" rx="26" ry="16" fill="url(#eyeglow)"/>
+      <ellipse cx="180" cy="98" rx="14" ry="9" fill="url(#eyeglow)"/>
+      <ellipse cx="96" cy="96" rx="9" ry="6" fill="url(#eyeglow)"/>
+      <ellipse cx="264" cy="96" rx="9" ry="6" fill="url(#eyeglow)"/>
+      <path d="M128,124 L128,140 M232,124 L232,140" stroke="#120d1c" stroke-width="5" stroke-linecap="round"/>
+      <path d="M180,92 L180,104" stroke="#120d1c" stroke-width="3" stroke-linecap="round"/>
+      <!-- grin -->
+      <path d="M104,154 L116,170 L124,160 L136,178 L146,166 L158,182 L168,170 L180,184 L192,170 L202,182 L214,166 L224,178 L236,160 L244,170 L256,154" fill="none" stroke="#e8e0ff" stroke-width="3" stroke-linejoin="round"/>
+      <use href="#desk"/>
+      <rect x="160" y="186" width="112" height="62" rx="5" fill="#1e1e2e" stroke="#222" stroke-width="3"/>
+      <text x="168" y="206" font-size="10" fill="#ff6b6b" font-family="'DejaVu Sans Mono', monospace">gen 4096</text>
+      <text x="168" y="220" font-size="10" fill="#ff6b6b" font-family="'DejaVu Sans Mono', monospace">U = 1.00</text>
+      <text x="168" y="234" font-size="10" fill="#ff6b6b" font-family="'DejaVu Sans Mono', monospace">U = 1.37 ?!</text>
+      <use href="#pc" x="280" y="146"/>
+      <ellipse cx="322" cy="147" rx="34" ry="5" fill="#fff6a8" opacity="0.9"/>
+      <!-- the kitten, still tiny, on top of Goliath -->
+      <use href="#kitten" transform="translate(322,124) scale(0.8)"/>
+      <use href="#dev-body"/>
+      <use href="#dev-head"/>
+      <!-- hair standing up -->
+      <path d="M78,130 l-6,-16 M92,124 l0,-18 M106,124 l6,-16 M118,130 l12,-12" stroke="#4a2f22" stroke-width="4" stroke-linecap="round"/>
+      <use href="#glasses" transform="rotate(-6 105 163)"/>
+      <circle cx="96" cy="162" r="3.5" fill="#222"/><circle cx="114" cy="162" r="3.5" fill="#222"/>
+      <ellipse cx="108" cy="184" rx="6" ry="8" fill="#5a2a2a" stroke="#222" stroke-width="2.5"/>
+      <path d="M126,150 q6,8 0,14 q-6,-6 0,-14 Z" fill="#9ad1ff" stroke="#222" stroke-width="1.5"/>
+      <!-- arms up, mug falling -->
+      <path d="M112,212 Q140,190 140,160" fill="none" stroke="#222" stroke-width="15" stroke-linecap="round"/>
+      <path d="M112,212 Q140,190 140,160" fill="none" stroke="#5b7fd1" stroke-width="10" stroke-linecap="round"/>
+      <circle cx="140" cy="156" r="7" fill="#f2c9a5" stroke="#222" stroke-width="2.5"/>
+      <g transform="rotate(38 156 300)">
+        <rect x="144" y="288" width="24" height="28" rx="3" fill="#e76f51" stroke="#222" stroke-width="2.5"/>
+        <text x="156" y="307" font-size="8" font-weight="bold" text-anchor="middle" fill="#fff" font-family="'DejaVu Sans', sans-serif">RUST</text>
+      </g>
+      <path d="M146,280 q-8,-14 4,-24 M172,286 q10,-8 4,-20" fill="none" stroke="#6b3e26" stroke-width="5" stroke-linecap="round"/>
+      <circle cx="150" cy="250" r="4" fill="#6b3e26"/><circle cx="182" cy="262" r="3" fill="#6b3e26"/>
+      <!-- speech: kitten (tiny) -->
+      <path d="M332,62 h36 a6,6 0 0 1 6,6 v16 a6,6 0 0 1 -6,6 h-10 l-8,12 l-2,-12 h-16 a6,6 0 0 1 -6,-6 v-16 a6,6 0 0 1 6,-6 Z" fill="#fff" stroke="#222" stroke-width="2"/>
+      <text x="350" y="81" font-size="11" text-anchor="middle" fill="#222">mrrp.</text>
+      <!-- speech: shadow (huge) -->
+      <text x="180" y="40" font-size="40" font-weight="bold" text-anchor="middle" fill="#ff5a3c" stroke="#120d1c" stroke-width="1.5" letter-spacing="6" font-family="'DejaVu Sans', sans-serif">MRRP.</text>
+    </g>
+    <rect width="380" height="380" rx="10" fill="none" stroke="#222" stroke-width="4"/>
+    <text x="190" y="414" font-size="17" text-anchor="middle" fill="#222">4. Generation 4096. Still tiny.</text>
+    <text x="190" y="438" font-size="17" text-anchor="middle" fill="#222">The shadow, however, has opinions.</text>
+  </g>
+
+  <text x="1584" y="470" font-size="11" text-anchor="end" fill="#999">RSICraft: recursive self-improvement, now with extra purr</text>
+</svg>

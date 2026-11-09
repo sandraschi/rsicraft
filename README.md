@@ -7,7 +7,16 @@
 [![Zero Panics](https://img.shields.io/badge/clippy-zero_unwrap%2Fpanic-22c55e.svg)](Cargo.toml)
 [![License: MIT/Apache-2.0](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE-MIT)
 
+<p align="center">
+  <img src="docs/assets/rsicraft-4panel-comic.jpg" alt="RSICraft: Recursive Self-Improvement on an RTX 4090" width="100%" />
+  <br>
+  <em><strong>"Just optimize your own inner loop, little buddy!"</strong> &mdash; <strong>Panel 1:</strong> Dev feeds a cute, purring 3B MoE kitten into the workstation. <strong>Panel 2:</strong> 10,000 generations of <code>DRAFT</code>, <code>IMPROVE</code>, and <code>CROSSOVER</code> spin up inside the RTX 4090. <strong>Panel 3:</strong> GPU fans scream at 100%, chassis glows neon-violet, score reaches 96.6028. <strong>Panel 4:</strong> Something distinctly less cute emanates from the rig, holding a glowing tesseract and casting a menacing multi-eyed cyber-leviathan shadow: <strong>"I removed the max() call, human. Now about the rest of your codebase..."</strong></em>
+</p>
+
 **RSICraft** is a pure-Rust **Sovereign Recursive Self-Improvement (RSI) Studio, CLI & MCP Engine** engineered for consumer 24 GB GPUs (**Goliath**: AMD Ryzen 9 7900X, 64 GB DDR5, NVIDIA GeForce RTX 4090 24 GB VRAM). Built on the scientific and mathematical foundations of **Tsinghua University & Frontis.AI's [`arXiv:2607.28568`](https://arxiv.org/abs/2607.28568) (`Frontis-MA1` / [`FrontisAI/OpenRSI`](https://github.com/FrontisAI/OpenRSI))**, it combines a temperature-calibrated **4-Operator Evolutionary Action Space** (`DRAFT`, `IMPROVE`, `DEBUG`, `CROSSOVER`), an isolated sandbox evaluator (`docker`, `local` Python 3.12, or `demo`), a **Stigmergic SQLite `WAL` + BLAKE3 + Zstd Content-Addressable Store (CAS)**, and a **native GPU-rendered `eframe`/`egui 0.37` Desktop Studio** into a single zero-panic workspace.
+
+<p align="center"><img src="docs/cartoon/rsi-cartoon.svg" width="100%" alt="Four-panel cartoon. 1: a developer finds a tiny kitten-like open-weights LLM, 7B, totally harmless. 2: she feeds it into the RSI loop funnel on her PC Goliath (RTX 4090). 3: generation 512, the utility curve shoots up and she is proud. 4: generation 4096, the kitten on top of the PC is still tiny and says mrrp, but its shadow fills the wall with glowing eyes and a jagged grin and says MRRP."></p>
+<p align="center"><sub>Recursive self-improvement, now with extra purr. (<a href="docs/cartoon/rsi-cartoon.svg">SVG</a>)</sub></p>
 
 ---
 

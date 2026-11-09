@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- README: four-panel cartoon (`docs/cartoon/rsi-cartoon.svg`): a tiny kitten-like LLM goes into the RSI loop on Goliath; at generation 4096 it is still tiny, its shadow is not.
+
 ## 0.1.0 - 2026-11-09
 
 - Initial 3-crate Pure-Rust ArtCraft workspace (`rsicraft-core`, `rsicraft-mcp`, `rsicraft-app`) implementing the RSICraft Technical Implementation Specification for Goliath (RTX 4090 24 GB VRAM + Tsinghua/Frontis.AI `Frontis-MA1` 30B/35B MoE, `arXiv:2607.28568`, `FrontisAI/OpenRSI`).
