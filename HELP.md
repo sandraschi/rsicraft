@@ -96,7 +96,7 @@ $$U_i = 0.50 \cdot s_{\text{norm}, i} + 0.35 \cdot \Delta_{\text{norm}, i} + 0.1
 
 ## Tab 6: Competitive Architecture Matrix (`compare`)
 
-| Feature / Metric | OpenAI / Anthropic RSI | DeepMind FunSearch | `FrontisAI/OpenRSI` (Python) | **RSICraft (`0.1.0` Rust)** |
+| Feature / Metric | OpenAI / Anthropic RSI | DeepMind FunSearch | `FrontisAI/OpenRSI` (Python) | **RSICraft (`0.2.0` Rust)** |
 | :--- | :--- | :--- | :--- | :--- |
 | **Weights & Harness** | 100% Closed / Proprietary | Partial Python scripts | Open Weights + Python Stack | **Pure Rust 3-Crate + Native GPU Studio** |
 | **Hardware Target** | Datacenter H100 clusters | Cloud TPUs / containers | Single RTX 4090 (Python) | **Single RTX 4090 (<15 ms Rust startup)** |

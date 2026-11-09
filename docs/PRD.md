@@ -1,4 +1,4 @@
-# Product Requirements Document (PRD): RSICraft (`v0.1.0`)
+# Product Requirements Document (PRD): RSICraft (`v0.2.0`)
 
 **Navigation:** [README](../README.md) · [RSI & The "Skynet" Myth](RSI_LANDSCAPE_AND_SKYNET_MYTH.md) · [Tsinghua & OpenRSI Dossier](TSINGHUA_OPENRSI_TEAM.md) · [Architecture](ARCHITECTURE.md)
 

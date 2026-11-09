@@ -1,6 +1,6 @@
 # RSI Engineering Manual: Limits, Models, Timings, Trajectory & Benchmarking
 
-> Technical specification, execution budgets, model feeding compatibility matrix, and before/after verification methodology for **RSICraft v0.1.0** on consumer 24 GB hardware (**Goliath**: RTX 4090 24GB + Frontis-MA1 / OpenRSI).
+> Technical specification, execution budgets, model feeding compatibility matrix, and before/after verification methodology for **RSICraft v0.2.0** on consumer 24 GB hardware (**Goliath**: RTX 4090 24GB + Frontis-MA1 / OpenRSI).
 
 ---
 
