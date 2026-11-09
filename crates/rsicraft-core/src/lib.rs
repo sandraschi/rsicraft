@@ -116,6 +116,32 @@ pub enum Command {
         tab: Option<String>,
         search: Option<String>,
     },
+    Diff {
+        card_a_id: String,
+        card_b_id: String,
+    },
+    LlmProbe {
+        url: Option<String>,
+    },
+    HyperparamsGet,
+    HyperparamsSet {
+        w_score: Option<f64>,
+        w_delta: Option<f64>,
+        w_novelty: Option<f64>,
+    },
+    TaskDelete {
+        task_id: String,
+    },
+    CardsPrune {
+        task_id: String,
+        keep_frontier: usize,
+    },
+    Export {
+        task_id: String,
+    },
+    Import {
+        bundle: Value,
+    },
 }
 
 fn req_str(args: &Value, key: &str) -> Result<String, String> {
@@ -135,6 +161,10 @@ fn opt_str(args: &Value, key: &str) -> Option<String> {
         .map(str::to_string)
 }
 
+fn opt_f64(args: &Value, key: &str) -> Option<f64> {
+    args.get(key).and_then(Value::as_f64)
+}
+
 fn opt_u64(args: &Value, key: &str, default: u64) -> u64 {
     args.get(key).and_then(Value::as_u64).unwrap_or(default)
 }
@@ -144,6 +174,88 @@ fn opt_usize(args: &Value, key: &str, default: usize) -> usize {
         .and_then(Value::as_u64)
         .and_then(|v| usize::try_from(v).ok())
         .unwrap_or(default)
+}
+
+/// Unified line-by-line diff comparing two code snippets.
+/// Returns `(diff_text, lines_added, lines_removed)`.
+#[must_use]
+pub fn generate_unified_diff(
+    a_name: &str,
+    a_code: &str,
+    b_name: &str,
+    b_code: &str,
+) -> (String, usize, usize) {
+    let a_lines: Vec<&str> = a_code.lines().collect();
+    let b_lines: Vec<&str> = b_code.lines().collect();
+
+    let n = a_lines.len();
+    let m = b_lines.len();
+
+    if a_code == b_code {
+        return (
+            format!("--- {a_name}\n+++ {b_name}\n(identical content)\n"),
+            0,
+            0,
+        );
+    }
+
+    let mut dp = vec![vec![0u32; m + 1]; n + 1];
+    for i in 0..n {
+        for j in 0..m {
+            if a_lines[i] == b_lines[j] {
+                dp[i + 1][j + 1] = dp[i][j].saturating_add(1);
+            } else {
+                dp[i + 1][j + 1] = dp[i + 1][j].max(dp[i][j + 1]);
+            }
+        }
+    }
+
+    let mut i = n;
+    let mut j = m;
+    let mut edits: Vec<(char, &str)> = Vec::new();
+    while i > 0 || j > 0 {
+        if i > 0 && j > 0 && a_lines[i - 1] == b_lines[j - 1] {
+            edits.push((' ', a_lines[i - 1]));
+            i -= 1;
+            j -= 1;
+        } else if j > 0 && (i == 0 || dp[i][j - 1] >= dp[i - 1][j]) {
+            edits.push(('+', b_lines[j - 1]));
+            j -= 1;
+        } else if i > 0 {
+            edits.push(('-', a_lines[i - 1]));
+            i -= 1;
+        }
+    }
+    edits.reverse();
+
+    let mut out = String::new();
+    out.push_str(&format!("--- {a_name}\n"));
+    out.push_str(&format!("+++ {b_name}\n"));
+    let mut added = 0;
+    let mut removed = 0;
+    for (op, line) in edits {
+        match op {
+            '+' => {
+                added += 1;
+                out.push('+');
+                out.push_str(line);
+                out.push('\n');
+            }
+            '-' => {
+                removed += 1;
+                out.push('-');
+                out.push_str(line);
+                out.push('\n');
+            }
+            ' ' => {
+                out.push(' ');
+                out.push_str(line);
+                out.push('\n');
+            }
+            _ => {}
+        }
+    }
+    (out, added, removed)
 }
 
 impl Command {
@@ -217,6 +329,42 @@ impl Command {
                 tab: opt_str(args, "tab"),
                 search: opt_str(args, "search"),
             }),
+            "rsi_diff" => Ok(Self::Diff {
+                card_a_id: req_str(args, "card_a_id")?,
+                card_b_id: req_str(args, "card_b_id")?,
+            }),
+            "rsi_llm_probe" => Ok(Self::LlmProbe {
+                url: opt_str(args, "url"),
+            }),
+            "rsi_hyperparams_get" => Ok(Self::HyperparamsGet),
+            "rsi_hyperparams_set" => Ok(Self::HyperparamsSet {
+                w_score: opt_f64(args, "w_score"),
+                w_delta: opt_f64(args, "w_delta"),
+                w_novelty: opt_f64(args, "w_novelty"),
+            }),
+            "rsi_task_delete" => Ok(Self::TaskDelete {
+                task_id: req_str(args, "task_id")?,
+            }),
+            "rsi_cards_prune" => Ok(Self::CardsPrune {
+                task_id: opt_str(args, "task_id").unwrap_or_else(|| "opt-synth".into()),
+                keep_frontier: opt_usize(args, "keep_frontier", 10).clamp(1, 100),
+            }),
+            "rsi_export" => Ok(Self::Export {
+                task_id: opt_str(args, "task_id").unwrap_or_else(|| "opt-synth".into()),
+            }),
+            "rsi_import" => {
+                let bundle = if let Some(obj) = args.get("bundle") {
+                    obj.clone()
+                } else if let Some(s) = args.get("bundle_json").and_then(Value::as_str) {
+                    serde_json::from_str(s)
+                        .map_err(|e| format!("invalid JSON in bundle_json: {e}"))?
+                } else {
+                    return Err(
+                        "missing 'bundle' (object) or 'bundle_json' (string) argument".into(),
+                    );
+                };
+                Ok(Self::Import { bundle })
+            }
             other => Err(format!("unknown tool '{other}'")),
         }
     }
@@ -368,6 +516,73 @@ pub fn tools() -> Vec<Value> {
                     "type": "string",
                     "description": "Optional case-insensitive substring query across all help tabs and sections."
                 }
+            }),
+            &[],
+        ),
+        tool_def(
+            "rsi_diff",
+            "Generate a unified text diff comparing decompressed source codes between two experience cards (e.g. parent vs child).",
+            json!({
+                "card_a_id": { "type": "string", "description": "Base/parent card ID." },
+                "card_b_id": { "type": "string", "description": "Candidate/child card ID to compare against card A." }
+            }),
+            &["card_a_id", "card_b_id"],
+        ),
+        tool_def(
+            "rsi_llm_probe",
+            "Actively ping the configured LLM endpoint (/v1/models), returning reachability status, latency in ms, and active model alias.",
+            json!({
+                "url": { "type": "string", "description": "Optional custom llama-server URL to probe (defaults to configured base_url)." }
+            }),
+            &[],
+        ),
+        tool_def(
+            "rsi_hyperparams_get",
+            "Get current composite utility weights (w_score, w_delta, w_novelty) used for stochastic parent selection.",
+            json!({}),
+            &[],
+        ),
+        tool_def(
+            "rsi_hyperparams_set",
+            "Dynamically set composite utility weights (w_score, w_delta, w_novelty) at runtime.",
+            json!({
+                "w_score": { "type": "number", "description": "Weight for normalized primary task score." },
+                "w_delta": { "type": "number", "description": "Weight for delta improvement over parent score." },
+                "w_novelty": { "type": "number", "description": "Weight for exploration novelty (reciprocal of child count)." }
+            }),
+            &[],
+        ),
+        tool_def(
+            "rsi_task_delete",
+            "Delete a task and cascade delete all its associated experience cards and frontier records.",
+            json!({
+                "task_id": { "type": "string", "description": "ID of task to permanently delete." }
+            }),
+            &["task_id"],
+        ),
+        tool_def(
+            "rsi_cards_prune",
+            "Prune low-utility non-frontier experience cards for a task, keeping at least keep_frontier top cards.",
+            json!({
+                "task_id": { "type": "string", "description": "Task ID whose non-frontier cards should be pruned." },
+                "keep_frontier": { "type": "integer", "description": "Minimum top cards to retain in frontier (default 10)." }
+            }),
+            &["task_id"],
+        ),
+        tool_def(
+            "rsi_export",
+            "Export a complete task lineage bundle (task definition, decompressed CAS cards, and Pareto frontier) to JSON.",
+            json!({
+                "task_id": { "type": "string", "description": "Task ID to export." }
+            }),
+            &["task_id"],
+        ),
+        tool_def(
+            "rsi_import",
+            "Import a complete task lineage bundle from JSON into the stigmergic SQLite store.",
+            json!({
+                "bundle": { "type": "object", "description": "Parsed task bundle JSON object." },
+                "bundle_json": { "type": "string", "description": "Stringified task bundle JSON." }
             }),
             &[],
         ),
@@ -847,5 +1062,115 @@ pub fn dispatch(ctx: &mut Ctx, cmd: Command) -> Result<Value, String> {
             }))
         }
         Command::Help { tab, search } => help::query_help(tab.as_deref(), search.as_deref()),
+        Command::Diff {
+            card_a_id,
+            card_b_id,
+        } => {
+            let card_a = ctx
+                .reg
+                .get_card(&card_a_id)
+                .map_err(|e| e.to_string())?
+                .ok_or_else(|| format!("card_a '{card_a_id}' not found"))?;
+            let card_b = ctx
+                .reg
+                .get_card(&card_b_id)
+                .map_err(|e| e.to_string())?
+                .ok_or_else(|| format!("card_b '{card_b_id}' not found"))?;
+            let (diff_text, added, removed) = generate_unified_diff(
+                &format!("card_{card_a_id}.py"),
+                &card_a.code,
+                &format!("card_{card_b_id}.py"),
+                &card_b.code,
+            );
+            Ok(json!({
+                "card_a_id": card_a_id,
+                "card_b_id": card_b_id,
+                "card_a_operator": card_a.operator_used,
+                "card_b_operator": card_b.operator_used,
+                "card_a_score": card_a.primary_score,
+                "card_b_score": card_b.primary_score,
+                "diff_text": diff_text,
+                "added_lines": added,
+                "removed_lines": removed,
+                "identical": added == 0 && removed == 0,
+            }))
+        }
+        Command::LlmProbe { url } => {
+            let client = match url {
+                Some(u) => LlamaClient::new(u, &ctx.llm.model_alias),
+                None => ctx.llm.clone(),
+            };
+            client.probe()
+        }
+        Command::HyperparamsGet => serde_json::to_value(ctx.hyperparams).map_err(|e| e.to_string()),
+        Command::HyperparamsSet {
+            w_score,
+            w_delta,
+            w_novelty,
+        } => {
+            if let Some(s) = w_score {
+                if s < 0.0 {
+                    return Err("w_score must be non-negative".into());
+                }
+                ctx.hyperparams.lambda_s = s;
+            }
+            if let Some(d) = w_delta {
+                if d < 0.0 {
+                    return Err("w_delta must be non-negative".into());
+                }
+                ctx.hyperparams.lambda_delta = d;
+            }
+            if let Some(n) = w_novelty {
+                if n < 0.0 {
+                    return Err("w_novelty must be non-negative".into());
+                }
+                ctx.hyperparams.lambda_nu = n;
+            }
+            let sum =
+                ctx.hyperparams.lambda_s + ctx.hyperparams.lambda_delta + ctx.hyperparams.lambda_nu;
+            if sum <= 0.0 {
+                return Err("sum of hyperparameter weights must be strictly positive".into());
+            }
+            serde_json::to_value(ctx.hyperparams).map_err(|e| e.to_string())
+        }
+        Command::TaskDelete { task_id } => {
+            let deleted = ctx.reg.delete_task(&task_id).map_err(|e| e.to_string())?;
+            Ok(json!({
+                "task_id": task_id,
+                "deleted": deleted,
+            }))
+        }
+        Command::CardsPrune {
+            task_id,
+            keep_frontier,
+        } => {
+            let pruned = ctx
+                .reg
+                .prune_cards(&task_id, keep_frontier)
+                .map_err(|e| e.to_string())?;
+            let remaining = ctx
+                .reg
+                .list_cards(&task_id, None, None, 10_000)
+                .map_err(|e| e.to_string())?
+                .len();
+            Ok(json!({
+                "task_id": task_id,
+                "cards_pruned": pruned,
+                "cards_remaining": remaining,
+            }))
+        }
+        Command::Export { task_id } => ctx
+            .reg
+            .export_task_bundle(&task_id)
+            .map_err(|e| e.to_string()),
+        Command::Import { bundle } => {
+            let count = ctx
+                .reg
+                .import_task_bundle(&bundle)
+                .map_err(|e| e.to_string())?;
+            Ok(json!({
+                "imported_cards": count,
+            }))
+        }
     }
 }

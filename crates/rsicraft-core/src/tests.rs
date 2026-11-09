@@ -155,3 +155,147 @@ fn multitab_help_supports_all_tabs_and_substring_search() {
     );
     assert!(bad.is_err());
 }
+
+#[test]
+fn unified_diff_and_command_diff() {
+    let mut ctx = test_ctx();
+    dispatch(&mut ctx, Command::DemoSeed).unwrap();
+
+    let cards_val = dispatch(
+        &mut ctx,
+        Command::CardList {
+            task_id: "opt-synth".into(),
+            operator: None,
+            status: None,
+            limit: 10,
+        },
+    )
+    .unwrap();
+    let cards = cards_val["cards"].as_array().unwrap();
+    assert!(cards.len() >= 2);
+    let c1 = cards[0]["card_id"].as_str().unwrap();
+    let c2 = cards[1]["card_id"].as_str().unwrap();
+
+    let diff = dispatch(
+        &mut ctx,
+        Command::Diff {
+            card_a_id: c1.into(),
+            card_b_id: c2.into(),
+        },
+    )
+    .unwrap();
+    assert_eq!(diff["card_a_id"], c1);
+    assert_eq!(diff["card_b_id"], c2);
+    let diff_text = diff["diff_text"].as_str().unwrap();
+    assert!(diff_text.contains("---"));
+    assert!(diff_text.contains("+++"));
+}
+
+#[test]
+fn hyperparams_get_and_set() {
+    let mut ctx = test_ctx();
+    let hp = dispatch(&mut ctx, Command::HyperparamsGet).unwrap();
+    assert!((hp["lambda_s"].as_f64().unwrap() - 0.50).abs() < 1e-6);
+
+    let updated = dispatch(
+        &mut ctx,
+        Command::HyperparamsSet {
+            w_score: Some(0.60),
+            w_delta: Some(0.30),
+            w_novelty: Some(0.10),
+        },
+    )
+    .unwrap();
+    assert!((updated["lambda_s"].as_f64().unwrap() - 0.60).abs() < 1e-6);
+    assert!((updated["lambda_delta"].as_f64().unwrap() - 0.30).abs() < 1e-6);
+    assert!((updated["lambda_nu"].as_f64().unwrap() - 0.10).abs() < 1e-6);
+
+    // Negative weights rejected
+    let bad = dispatch(
+        &mut ctx,
+        Command::HyperparamsSet {
+            w_score: Some(-0.1),
+            w_delta: None,
+            w_novelty: None,
+        },
+    );
+    assert!(bad.is_err());
+}
+
+#[test]
+fn task_export_and_import_and_delete_prune() {
+    let mut ctx = test_ctx();
+    dispatch(&mut ctx, Command::DemoSeed).unwrap();
+
+    // Export bundle
+    let bundle = dispatch(
+        &mut ctx,
+        Command::Export {
+            task_id: "opt-synth".into(),
+        },
+    )
+    .unwrap();
+    assert_eq!(bundle["version"], 1);
+    assert_eq!(bundle["task"]["task_id"], "opt-synth");
+    assert_eq!(bundle["cards"].as_array().unwrap().len(), 4);
+
+    // Prune cards keeping 2
+    let prune_res = dispatch(
+        &mut ctx,
+        Command::CardsPrune {
+            task_id: "opt-synth".into(),
+            keep_frontier: 2,
+        },
+    )
+    .unwrap();
+    assert_eq!(prune_res["cards_remaining"], 2);
+
+    // Delete task
+    let del = dispatch(
+        &mut ctx,
+        Command::TaskDelete {
+            task_id: "opt-synth".into(),
+        },
+    )
+    .unwrap();
+    assert_eq!(del["deleted"], true);
+
+    let list = dispatch(&mut ctx, Command::TaskList).unwrap();
+    assert_eq!(list["count"], 0);
+
+    // Import bundle back
+    let imp = dispatch(&mut ctx, Command::Import { bundle }).unwrap();
+    assert_eq!(imp["imported_cards"], 4);
+
+    let list2 = dispatch(&mut ctx, Command::TaskList).unwrap();
+    assert_eq!(list2["count"], 1);
+}
+
+#[test]
+fn multi_language_rust_candidate_detection_and_evaluation() {
+    assert!(SandboxRunner::is_rust_candidate(
+        "pub fn solve(x: i32) -> i32 { x * 2 }",
+        "extern crate candidate; fn main() {}"
+    ));
+    assert!(!SandboxRunner::is_rust_candidate(
+        "def solve(x):\n    return x * 2",
+        "import json, candidate"
+    ));
+
+    // Demo evaluation on Rust candidate
+    let res = SandboxRunner::run_demo_evaluation(
+        "pub fn solve(x: i32) -> i32 { x * 2 }",
+        SearchOperator::Draft,
+        None,
+    );
+    assert_eq!(res.status, "SUCCESS");
+    assert!(res.primary_score > 70.0);
+
+    // Demo panic detection
+    let panic_res = SandboxRunner::run_demo_evaluation(
+        "pub fn solve() { panic!(\"boom\"); }",
+        SearchOperator::Draft,
+        None,
+    );
+    assert_eq!(panic_res.status, "RUNTIME_ERROR");
+}

@@ -125,6 +125,46 @@ enum Cmd {
     },
     /// Seed an empty database with the 'opt-synth' (Vector Max) demo benchmark and 4 evolutionary cards.
     DemoSeed,
+    /// Compare source codes of two experience cards as a unified diff.
+    Diff {
+        #[arg(long)]
+        card_a: String,
+        #[arg(long)]
+        card_b: String,
+    },
+    /// Actively probe the LLM endpoint (/v1/models) for reachability and latency.
+    Probe {
+        #[arg(long)]
+        url: Option<String>,
+    },
+    /// Inspect or update composite utility weights (w_score, w_delta, w_novelty).
+    Hyperparams {
+        #[arg(long)]
+        w_score: Option<f64>,
+        #[arg(long)]
+        w_delta: Option<f64>,
+        #[arg(long)]
+        w_novelty: Option<f64>,
+    },
+    /// Prune low-utility non-frontier cards for a task.
+    Prune {
+        #[arg(long, default_value = "opt-synth")]
+        task_id: String,
+        #[arg(long, default_value_t = 10)]
+        keep_frontier: usize,
+    },
+    /// Export complete task lineage (task, CAS cards, Pareto frontier) to JSON.
+    Export {
+        #[arg(long, default_value = "opt-synth")]
+        task_id: String,
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
+    /// Import complete task lineage from JSON bundle file into SQLite.
+    Import {
+        #[arg(long)]
+        file: PathBuf,
+    },
     /// Query the 7-tab Operator Manual & Competitive Architecture Matrix (overview, wrappee, operators, compare, api, troubleshoot, faq, all).
     HelpTabs {
         #[arg(long, default_value = "all")]
@@ -155,6 +195,8 @@ enum TaskOp {
         #[arg(long)]
         evaluator_script: String,
     },
+    /// Delete a task and cascade delete its experience cards and frontier.
+    Delete { task_id: String },
 }
 
 fn default_db() -> PathBuf {
@@ -187,6 +229,9 @@ fn to_tool(cmd: Cmd) -> Result<(&'static str, Value), String> {
         Cmd::Task {
             op: TaskOp::Show { task_id },
         } => ("rsi_task_show", json!({ "task_id": task_id })),
+        Cmd::Task {
+            op: TaskOp::Delete { task_id },
+        } => ("rsi_task_delete", json!({ "task_id": task_id })),
         Cmd::Task {
             op:
                 TaskOp::Upsert {
@@ -275,6 +320,55 @@ fn to_tool(cmd: Cmd) -> Result<(&'static str, Value), String> {
             }),
         ),
         Cmd::DemoSeed => ("rsi_demo_seed", json!({})),
+        Cmd::Diff { card_a, card_b } => (
+            "rsi_diff",
+            json!({
+                "card_a_id": card_a,
+                "card_b_id": card_b,
+            }),
+        ),
+        Cmd::Probe { url } => ("rsi_llm_probe", obj(vec![("url", url.map(Value::String))])),
+        Cmd::Hyperparams {
+            w_score,
+            w_delta,
+            w_novelty,
+        } => {
+            if w_score.is_none() && w_delta.is_none() && w_novelty.is_none() {
+                ("rsi_hyperparams_get", json!({}))
+            } else {
+                (
+                    "rsi_hyperparams_set",
+                    obj(vec![
+                        ("w_score", w_score.map(|v| json!(v))),
+                        ("w_delta", w_delta.map(|v| json!(v))),
+                        ("w_novelty", w_novelty.map(|v| json!(v))),
+                    ]),
+                )
+            }
+        }
+        Cmd::Prune {
+            task_id,
+            keep_frontier,
+        } => (
+            "rsi_cards_prune",
+            json!({
+                "task_id": task_id,
+                "keep_frontier": keep_frontier,
+            }),
+        ),
+        Cmd::Export { task_id, .. } => (
+            "rsi_export",
+            json!({
+                "task_id": task_id,
+            }),
+        ),
+        Cmd::Import { file } => {
+            let content = std::fs::read_to_string(&file)
+                .map_err(|e| format!("failed to read bundle file '{}': {e}", file.display()))?;
+            let val: Value = serde_json::from_str(&content)
+                .map_err(|e| format!("invalid JSON in bundle file '{}': {e}", file.display()))?;
+            ("rsi_import", json!({ "bundle": val }))
+        }
         Cmd::HelpTabs { tab, search } => (
             "rsi_help",
             obj(vec![
@@ -371,6 +465,9 @@ fn render(v: &Value) -> String {
     let Some(obj) = v.as_object() else {
         return scalar(v);
     };
+    if let Some(diff) = obj.get("diff_text").and_then(Value::as_str) {
+        return diff.to_string();
+    }
     if let Some(tabs) = obj.get("tabs").and_then(Value::as_array) {
         let mut out = String::new();
         out.push_str("=== RSICraft 7-Tab Operator Manual & Architecture Guide ===\n");
@@ -495,6 +592,14 @@ fn main() -> ExitCode {
         };
     }
 
+    let export_path = if let Cmd::Export {
+        out: Some(ref p), ..
+    } = cli.cmd
+    {
+        Some(p.clone())
+    } else {
+        None
+    };
     let json_out = cli.json;
     let res = to_tool(cli.cmd)
         .and_then(|(name, args)| Command::from_tool(name, &args))
@@ -502,7 +607,14 @@ fn main() -> ExitCode {
 
     match res {
         Ok(v) => {
-            if json_out {
+            if let Some(p) = export_path {
+                let s = serde_json::to_string_pretty(&v).unwrap_or_default();
+                if let Err(e) = std::fs::write(&p, s) {
+                    eprintln!("rsicraft export: failed to write to {}: {e}", p.display());
+                    return ExitCode::FAILURE;
+                }
+                println!("Exported task bundle to {}", p.display());
+            } else if json_out {
                 println!("{}", serde_json::to_string_pretty(&v).unwrap_or_default());
             } else {
                 print!("{}", render(&v));
@@ -550,7 +662,7 @@ mod tests {
 
         let list =
             handle_line(&mut h, r#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#).unwrap();
-        assert_eq!(list["result"]["tools"].as_array().map(Vec::len), Some(14));
+        assert_eq!(list["result"]["tools"].as_array().map(Vec::len), Some(22));
 
         let seed = handle_line(
             &mut h,
@@ -603,6 +715,29 @@ mod tests {
                 task_id: "opt-synth".into(),
             },
             Cmd::DemoSeed,
+            Cmd::Diff {
+                card_a: "c-1".into(),
+                card_b: "c-2".into(),
+            },
+            Cmd::Probe { url: None },
+            Cmd::Hyperparams {
+                w_score: None,
+                w_delta: None,
+                w_novelty: None,
+            },
+            Cmd::Task {
+                op: TaskOp::Delete {
+                    task_id: "test".into(),
+                },
+            },
+            Cmd::Prune {
+                task_id: "opt-synth".into(),
+                keep_frontier: 10,
+            },
+            Cmd::Export {
+                task_id: "opt-synth".into(),
+                out: None,
+            },
             Cmd::HelpTabs {
                 tab: "all".into(),
                 search: None,

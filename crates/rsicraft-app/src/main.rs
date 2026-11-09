@@ -62,7 +62,7 @@ impl StudioPage {
             Self::TaskAndSandboxLab => "4. Task & Sandbox Lab",
             Self::Goliath4090AndLlm => "5. RTX 4090 & LLM Config",
             Self::RsiAndTsinghuaDossier => "6. RSI & Tsinghua Dossier",
-            Self::MultitabHelpAndTools => "7. 9-Tab Help & 14 Tools",
+            Self::MultitabHelpAndTools => "7. 9-Tab Help & 22 Tools",
         }
     }
 }
@@ -116,6 +116,7 @@ pub struct RsiCraftApp {
     pub edit_evaluator: String,
     pub lab_candidate_code: String,
     pub lab_last_eval: Option<Value>,
+    pub card_diff_output: Option<String>,
 
     pub status_banner: String,
     pub repo_root: PathBuf,
@@ -196,6 +197,7 @@ impl RsiCraftApp {
             edit_evaluator: "import json, candidate\ns = float(candidate.solve([-2, 1, -3, 4, -1, 2, 1, -5, 4]))\nprint(f'RSI_METRIC_JSON={json.dumps({\"status\": \"SUCCESS\", \"score\": s * 16.0})}')".to_string(),
             lab_candidate_code: "def solve(arr):\n    if not arr:\n        return 0.0\n    best = cur = arr[0]\n    for x in arr[1:]:\n        cur = cur + x if cur > 0 else x\n        if cur > best:\n            best = cur\n    return float(best)\n".to_string(),
             lab_last_eval: None,
+            card_diff_output: None,
             status_banner: format!(
                 "RSICraft v{VERSION} Sovereign Studio Online (Goliath RTX 4090 Profile Ready)"
             ),
@@ -2080,19 +2082,36 @@ impl RsiCraftApp {
         self.render_selected_card_inspector(ui);
     }
 
-    fn render_selected_card_inspector(&self, ui: &mut egui::Ui) {
-        let Some(card) = &self.selected_card_json else {
+    fn render_selected_card_inspector(&mut self, ui: &mut egui::Ui) {
+        let Some(card) = self.selected_card_json.clone() else {
             ui.label("Click any card or DAG node to inspect decompressed BLAKE3+Zstd source code.");
             return;
         };
-        let cid = card.get("card_id").and_then(Value::as_str).unwrap_or("?");
+        let cid = card
+            .get("card_id")
+            .and_then(Value::as_str)
+            .unwrap_or("?")
+            .to_string();
         let op = card
             .get("operator_used")
             .and_then(Value::as_str)
-            .unwrap_or("?");
-        let hash = card.get("code_hash").and_then(Value::as_str).unwrap_or("?");
-        let code = card.get("code").and_then(Value::as_str).unwrap_or("");
-        let out = card.get("raw_output").and_then(Value::as_str).unwrap_or("");
+            .unwrap_or("?")
+            .to_string();
+        let hash = card
+            .get("code_hash")
+            .and_then(Value::as_str)
+            .unwrap_or("?")
+            .to_string();
+        let code = card
+            .get("code")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
+        let out = card
+            .get("raw_output")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
         let sc = card
             .get("primary_score")
             .and_then(Value::as_f64)
@@ -2101,29 +2120,74 @@ impl RsiCraftApp {
             .get("composite_utility")
             .and_then(Value::as_f64)
             .unwrap_or(0.0);
+        let parent_a = card
+            .get("parent_a_id")
+            .and_then(Value::as_str)
+            .map(str::to_string);
 
-        accent_card(ui, operator_color(op), |ui| {
+        let mut trigger_diff = None;
+
+        accent_card(ui, operator_color(&op), |ui| {
             ui.horizontal_wrapped(|ui| {
                 ui.label(
                     RichText::new(format!("Decompressed Artifact Inspector: Card {cid}"))
-                        .color(operator_color(op))
+                        .color(operator_color(&op))
                         .strong(),
                 );
                 ui.separator();
                 ui.label(format!("Operator: {op} | Score: {sc:.4} | U_i: {ut:.4}"));
+                if let Some(pa) = &parent_a {
+                    ui.separator();
+                    let pa_short = &pa[..pa.len().min(8)];
+                    if ui
+                        .small_button(format!("[Diff with Parent A: {pa_short}...]"))
+                        .clicked()
+                    {
+                        trigger_diff = Some((pa.clone(), cid.clone()));
+                    }
+                }
             });
             ui.label(
                 RichText::new(format!("BLAKE3-256 Digest (Zstd L3 CAS): {hash}"))
                     .monospace()
                     .size(12.0),
             );
+            if self.card_diff_output.is_some() {
+                ui.add_space(4.0);
+                ui.horizontal(|ui| {
+                    ui.label(
+                        RichText::new("Line-by-Line Unified Diff (Parent -> Candidate):")
+                            .color(ACCENT_AMBER)
+                            .strong(),
+                    );
+                    if ui.small_button("[Close Diff]").clicked() {
+                        self.card_diff_output = None;
+                    }
+                });
+                if let Some(diff) = &self.card_diff_output {
+                    ui.code(diff);
+                }
+            }
             ui.columns(2, |cols| {
-                cols[0].label(RichText::new("Synthesized Python Source Code:").strong());
-                cols[0].code(code);
+                cols[0].label(RichText::new("Synthesized Source Code:").strong());
+                cols[0].code(&code);
                 cols[1].label(RichText::new("Sandbox Evaluator Output / Stack Trace:").strong());
-                cols[1].code(out);
+                cols[1].code(&out);
             });
         });
+
+        if let Some((pa, cb)) = trigger_diff {
+            let cmd = Command::Diff {
+                card_a_id: pa,
+                card_b_id: cb,
+            };
+            if let Ok(v) = self.exec(cmd) {
+                self.card_diff_output = v
+                    .get("diff_text")
+                    .and_then(Value::as_str)
+                    .map(str::to_string);
+            }
+        }
     }
 
     fn render_experience_cards_page(&mut self, ui: &mut egui::Ui) {
@@ -2480,7 +2544,7 @@ impl RsiCraftApp {
 
     fn render_multitab_help_and_tools(&mut self, ui: &mut egui::Ui) {
         ui.horizontal_wrapped(|ui| {
-            ui.heading("9-Tab Operator Manual, Geopolitical Dossier & 14 MCP Tools");
+            ui.heading("9-Tab Operator Manual, Geopolitical Dossier & 22 MCP Tools");
             ui.separator();
             if ui.button("[Open PDF Brochure]").clicked() {
                 self.open_external("docs/brochure/rsicraft-brochure.pdf");
@@ -2502,7 +2566,7 @@ impl RsiCraftApp {
                 ("wrappee", "4. RTX 4090 & Sandbox"),
                 ("operators", "5. Operators & Math"),
                 ("compare", "6. Competitive Matrix"),
-                ("api", "7. 14 MCP Tools"),
+                ("api", "7. 22 MCP Tools"),
                 ("troubleshoot", "8. Troubleshooting"),
                 ("faq", "9. FAQ & Safety"),
             ] {
@@ -2664,9 +2728,9 @@ fn main() {
                 })
                 .is_ok()
             && app.view_mode == ViewMode::Cards
-            && tools().len() == 14;
+            && tools().len() == 22;
         if ok {
-            println!("smoke: ok (rsicraft-app {VERSION}, default_view=cards, tools=14, tabs=9)");
+            println!("smoke: ok (rsicraft-app {VERSION}, default_view=cards, tools=22, tabs=9)");
             std::process::exit(0);
         }
         eprintln!("smoke: failed");
@@ -2702,7 +2766,7 @@ mod tests {
         assert_eq!(app.view_mode, ViewMode::Cards);
         let st = app.exec(Command::Status).unwrap();
         assert_eq!(st["cards_count"], 4);
-        assert_eq!(tools().len(), 14);
+        assert_eq!(tools().len(), 22);
     }
 
     #[test]

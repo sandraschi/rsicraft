@@ -126,6 +126,55 @@ impl LlamaClient {
             .ok_or_else(|| "missing choices[0].message.content in llama-server response".into())
     }
 
+    /// Actively probe `llama-server` `/v1/models` endpoint, returning latency in ms,
+    /// reachability status, and list of available models.
+    pub fn probe(&self) -> Result<Value, String> {
+        let base = self.base_url.trim_end_matches('/');
+        if base.is_empty() || base.len() > 253 {
+            return Err("invalid llama_url length".into());
+        }
+        let endpoint = format!("{base}/v1/models");
+        let start = std::time::Instant::now();
+        let agent = ureq::AgentBuilder::new()
+            .timeout_connect(Duration::from_millis(1500))
+            .timeout(Duration::from_secs(3))
+            .build();
+
+        match agent.get(&endpoint).call() {
+            Ok(resp) => {
+                #[allow(clippy::cast_precision_loss)]
+                let latency_ms = start.elapsed().as_millis() as u64;
+                let body: Value = match resp.into_json() {
+                    Ok(v) => v,
+                    Err(_) => json!({}),
+                };
+                let models: Vec<Value> = body
+                    .get("data")
+                    .and_then(Value::as_array)
+                    .cloned()
+                    .unwrap_or_default();
+                Ok(json!({
+                    "status": "reachable",
+                    "base_url": self.base_url,
+                    "latency_ms": latency_ms,
+                    "configured_model": self.model_alias,
+                    "available_models": models,
+                }))
+            }
+            Err(e) => {
+                #[allow(clippy::cast_precision_loss)]
+                let latency_ms = start.elapsed().as_millis() as u64;
+                Ok(json!({
+                    "status": "unreachable",
+                    "base_url": self.base_url,
+                    "latency_ms": latency_ms,
+                    "configured_model": self.model_alias,
+                    "error": format!("{e}"),
+                }))
+            }
+        }
+    }
+
     /// Deterministic offline synthesis oracle (`provider = "demo"`).
     /// Produces realistic evolutionary progressions across `DRAFT`, `DEBUG`,
     /// `IMPROVE`, and `CROSSOVER` without requiring live GPU weights.

@@ -42,7 +42,7 @@ pub fn all_help_tabs() -> Vec<HelpTab> {
                 },
                 HelpSection {
                     heading: "3-Crate Pure-Rust ArtCraft Architecture (L1 / L2 / L3)".into(),
-                    body: "1. rsicraft-core (L1 Core + Store): SQLite WAL database (tasks, experience_cards, task_frontiers), BLAKE3 content hashing, Zstd (level 3) source compression, composite utility calculator, 4-operator action space (DRAFT, IMPROVE, DEBUG, CROSSOVER), llama-server inference client, and isolated Docker / Python 3.12 / demo sandbox runner.\n2. rsicraft-mcp (L2 CLI + MCP Binary): Single binary exposing 14 MCP tools over stdio and 1:1 matching CLI subcommands.\n3. rsicraft-app (L3 Desktop Studio): Native GPU-rendered eframe/egui 0.37 workstation with interactive Bezier lineage DAG canvas, 4-operator launchpad, score spark charts, RTX 4090 VRAM gauge, and 9-tab documentation reader.".into(),
+                    body: "1. rsicraft-core (L1 Core + Store): SQLite WAL database (tasks, experience_cards, task_frontiers), BLAKE3 content hashing, Zstd (level 3) source compression, composite utility calculator, 4-operator action space (DRAFT, IMPROVE, DEBUG, CROSSOVER), llama-server inference client, and isolated Docker / Python 3.12 / demo sandbox runner.\n2. rsicraft-mcp (L2 CLI + MCP Binary): Single binary exposing 22 MCP tools over stdio and 1:1 matching CLI subcommands.\n3. rsicraft-app (L3 Desktop Studio): Native GPU-rendered eframe/egui 0.37 workstation with interactive Bezier lineage DAG canvas, 4-operator launchpad, score spark charts, RTX 4090 VRAM gauge, and 9-tab documentation reader.".into(),
                     code_example: Some("cargo test --workspace\ncargo clippy --workspace --all-targets --all-features -- -D warnings".into()),
                 },
                 HelpSection {
@@ -179,24 +179,29 @@ pub fn all_help_tabs() -> Vec<HelpTab> {
         },
         HelpTab {
             id: "api".into(),
-            title: "7. 14 MCP Tools & CLI Reference".into(),
+            title: "7. 22 MCP Tools & CLI Reference".into(),
             badge: "MCP 2024-11-05".into(),
-            summary: "Complete reference for all 14 MCP tools (accepting both rsi_* and dotted rsi.* names) and their 1:1 CLI subcommands.".into(),
+            summary: "Complete reference for all 22 MCP tools (accepting both rsi_* and dotted rsi.* names) and their 1:1 CLI subcommands.".into(),
             sections: vec![
                 HelpSection {
-                    heading: "System, Hardware & Help Tools".into(),
-                    body: "- rsi_status (CLI: status): SQLite WAL store metrics, card counts, unique BLAKE3 hashes, and RTX 4090 endpoint summary.\n- rsi_hardware_profile (CLI: hardware): Full Goliath RTX 4090 24 GB VRAM budget, Frontis-MA1 MoE architecture, and llama-server launch flags.\n- rsi_help (CLI: help-tabs): 9-tab operator manual with tab selection (--tab) and live substring search (--search).".into(),
-                    code_example: Some("rsicraft status\nrsicraft hardware --json\nrsicraft help-tabs --tab tsinghua_openrsi\nrsicraft help-tabs --search \"Bowen Zhou\"".into()),
+                    heading: "System, Hardware, Probe & Help Tools".into(),
+                    body: "- rsi_status (CLI: status): SQLite WAL store metrics, card counts, unique BLAKE3 hashes, and RTX 4090 endpoint summary.\n- rsi_hardware_profile (CLI: hardware): Full Goliath RTX 4090 24 GB VRAM budget, Frontis-MA1 MoE architecture, and llama-server launch flags.\n- rsi_llm_probe (CLI: probe): Actively pings the LLM /v1/models endpoint, returning latency in ms, reachability status, and model alias.\n- rsi_help (CLI: help-tabs): 9-tab operator manual with tab selection (--tab) and live substring search (--search).".into(),
+                    code_example: Some("rsicraft status\nrsicraft hardware --json\nrsicraft probe --url http://127.0.0.1:8081\nrsicraft help-tabs --tab tsinghua_openrsi\nrsicraft help-tabs --search \"Bowen Zhou\"".into()),
                 },
                 HelpSection {
-                    heading: "Task Management & Evolutionary Execution Tools".into(),
-                    body: "- rsi_task_upsert (CLI: task upsert): Register or update an optimization task and its Python evaluator script.\n- rsi_task_list (CLI: task list): List all registered tasks.\n- rsi_task_show (CLI: task show <id>): Inspect task metadata, score/delta bounds, and current top frontier.\n- rsi_step (CLI: step): Run one evolutionary step (DRAFT, IMPROVE, DEBUG, CROSSOVER).\n- rsi_campaign (CLI: campaign): Run a multi-step autonomous evolutionary campaign.\n- rsi_evaluate (CLI: evaluate): Directly benchmark a Python snippet in the sandbox and optionally record an experience card.\n- rsi_demo_seed (CLI: demo-seed): Seed an empty database with the opt-synth benchmark and a 4-card trajectory.".into(),
-                    code_example: Some("rsicraft demo-seed\nrsicraft campaign --task-id opt-synth --steps 4 --provider demo --sandbox-mode demo".into()),
+                    heading: "Task Management, Export/Import & Delete Tools".into(),
+                    body: "- rsi_task_upsert (CLI: task upsert): Register or update an optimization task and its Python evaluator script.\n- rsi_task_list (CLI: task list): List all registered tasks.\n- rsi_task_show (CLI: task show <id>): Inspect task metadata, score/delta bounds, and current top frontier.\n- rsi_task_delete (CLI: task delete <id>): Permanently delete a task and cascade delete its experience cards and frontier records.\n- rsi_export (CLI: export): Export complete task lineage (task, CAS cards, and Pareto frontier) to JSON.\n- rsi_import (CLI: import --file <path>): Import complete task lineage from JSON into SQLite WAL store.".into(),
+                    code_example: Some("rsicraft task list\nrsicraft task delete old-task\nrsicraft export --task-id opt-synth --out opt-synth.json\nrsicraft import --file opt-synth.json".into()),
                 },
                 HelpSection {
-                    heading: "Frontier, Experience Card & Lineage DAG Tools".into(),
-                    body: "- rsi_get_frontier (CLI: frontier): Query materialized top-K Pareto frontier for a task.\n- rsi_card_list (CLI: cards): List experience cards ordered by composite utility with optional operator/status filters.\n- rsi_card_show (CLI: card <id>): Decompress and display full candidate source code, BLAKE3 hash, execution logs, and parent IDs.\n- rsi_lineage (CLI: lineage): Export the full evolutionary DAG (nodes and parent_a/parent_b edges) for visualization.".into(),
-                    code_example: Some("rsicraft frontier --task-id opt-synth\nrsicraft cards --task-id opt-synth --status SUCCESS\nrsicraft lineage --task-id opt-synth --json".into()),
+                    heading: "Evolutionary Execution & Sandbox Tools".into(),
+                    body: "- rsi_step (CLI: step): Run one evolutionary step (DRAFT, IMPROVE, DEBUG, CROSSOVER) with composite-utility parent selection.\n- rsi_campaign (CLI: campaign): Run a multi-step autonomous evolutionary campaign.\n- rsi_evaluate (CLI: evaluate): Directly benchmark candidate code in the sandbox (supports Python 3.12 and native Rust compilation) and optionally record an experience card.\n- rsi_demo_seed (CLI: demo-seed): Seed an empty database with the opt-synth benchmark and a 4-card trajectory.".into(),
+                    code_example: Some("rsicraft demo-seed\nrsicraft campaign --task-id opt-synth --steps 4 --provider demo --sandbox-mode demo\nrsicraft evaluate --task-id opt-synth --code \"def solve(arr): return max(arr)\"".into()),
+                },
+                HelpSection {
+                    heading: "Frontier, Experience Cards, Diff & Prune Tools".into(),
+                    body: "- rsi_get_frontier (CLI: frontier): Query materialized top-K Pareto frontier for a task.\n- rsi_card_list (CLI: cards): List experience cards ordered by composite utility with optional operator/status filters.\n- rsi_card_show (CLI: card <id>): Decompress and display full candidate source code, BLAKE3 hash, execution logs, and parent IDs.\n- rsi_diff (CLI: diff --card-a <id> --card-b <id>): Generate line-by-line unified diff comparing decompressed source code between two experience cards.\n- rsi_cards_prune (CLI: prune --task-id <id> --keep-frontier 10): Prune low-utility non-frontier cards while preserving top Pareto performers.\n- rsi_lineage (CLI: lineage): Export the full evolutionary DAG (nodes and parent_a/parent_b edges) for visualization.\n- rsi_hyperparams_get (CLI: hyperparams): Inspect current composite utility weights (w_score, w_delta, w_novelty).\n- rsi_hyperparams_set (CLI: hyperparams --w-score <val> ...): Dynamically tune composite utility weights at runtime.".into(),
+                    code_example: Some("rsicraft frontier --task-id opt-synth\nrsicraft cards --task-id opt-synth --status SUCCESS\nrsicraft diff --card-a card-001 --card-b card-002\nrsicraft prune --task-id opt-synth --keep-frontier 10\nrsicraft hyperparams --w-score 0.6 --w-delta 0.3 --w-novelty 0.1\nrsicraft lineage --task-id opt-synth --json".into()),
                 },
             ],
         },

@@ -13,6 +13,7 @@ mod tests;
 use cas::{compress_code, decompress_code, hash_code};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::path::Path;
 use thiserror::Error;
 use utility::{CandidateMetrics, UtilityCalculator, UtilityHyperparams};
@@ -75,6 +76,15 @@ pub struct ExperienceCard {
 pub struct FrontierEntry {
     pub rank: i64,
     pub card: ExperienceCard,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TaskBundle {
+    pub version: u32,
+    pub exported_at: i64,
+    pub task: TaskRecord,
+    pub cards: Vec<ExperienceCard>,
+    pub frontier: Vec<FrontierEntry>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
@@ -672,5 +682,149 @@ impl Registry {
         }
 
         Ok(candidates.first().cloned())
+    }
+
+    /// Delete a task and all its associated frontier entries and experience cards.
+    pub fn delete_task(&self, task_id: &str) -> StoreResult<bool> {
+        if self.get_task(task_id)?.is_none() {
+            return Ok(false);
+        }
+        self.conn.execute(
+            "DELETE FROM task_frontiers WHERE task_id = ?1",
+            params![task_id],
+        )?;
+        self.conn.execute(
+            "UPDATE experience_cards SET parent_a_id = NULL, parent_b_id = NULL WHERE task_id = ?1",
+            params![task_id],
+        )?;
+        self.conn.execute(
+            "DELETE FROM experience_cards WHERE task_id = ?1",
+            params![task_id],
+        )?;
+        let affected = self
+            .conn
+            .execute("DELETE FROM tasks WHERE task_id = ?1", params![task_id])?;
+        Ok(affected > 0)
+    }
+
+    /// Prune non-frontier experience cards for a task, keeping at least `keep_frontier` top cards.
+    pub fn prune_cards(&self, task_id: &str, keep_frontier: usize) -> StoreResult<usize> {
+        self.refresh_task_frontier(task_id, keep_frontier)?;
+        let mut stmt = self.conn.prepare(
+            "SELECT card_id FROM experience_cards
+             WHERE task_id = ?1
+               AND card_id NOT IN (SELECT card_id FROM task_frontiers WHERE task_id = ?1)
+             ORDER BY composite_utility ASC",
+        )?;
+        let prune_ids: Vec<String> = stmt
+            .query_map(params![task_id], |r| r.get(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+
+        if prune_ids.is_empty() {
+            return Ok(0);
+        }
+
+        for id in &prune_ids {
+            self.conn.execute(
+                "UPDATE experience_cards SET parent_a_id = NULL WHERE parent_a_id = ?1",
+                params![id],
+            )?;
+            self.conn.execute(
+                "UPDATE experience_cards SET parent_b_id = NULL WHERE parent_b_id = ?1",
+                params![id],
+            )?;
+            self.conn.execute(
+                "DELETE FROM experience_cards WHERE card_id = ?1",
+                params![id],
+            )?;
+        }
+        Ok(prune_ids.len())
+    }
+
+    /// Export a complete task lineage bundle (task, CAS cards, and frontier) to JSON Value.
+    pub fn export_task_bundle(&self, task_id: &str) -> StoreResult<Value> {
+        let task = self
+            .get_task(task_id)?
+            .ok_or_else(|| StoreError::NotFound(format!("task {task_id}")))?;
+        let cards = self.list_cards(task_id, None, None, 10_000)?;
+        let frontier = self.get_frontier(task_id)?;
+        let bundle = TaskBundle {
+            version: 1,
+            exported_at: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| i64::try_from(d.as_secs()).unwrap_or(0))
+                .unwrap_or(0),
+            task,
+            cards,
+            frontier,
+        };
+        serde_json::to_value(&bundle).map_err(|e| StoreError::Validation(e.to_string()))
+    }
+
+    /// Import a complete task lineage bundle into SQLite.
+    pub fn import_task_bundle(&self, bundle_val: &Value) -> StoreResult<usize> {
+        let bundle: TaskBundle = serde_json::from_value(bundle_val.clone())
+            .map_err(|e| StoreError::Validation(format!("invalid task bundle JSON: {e}")))?;
+
+        self.upsert_task(
+            &bundle.task.task_id,
+            &bundle.task.name,
+            &bundle.task.description,
+            &bundle.task.evaluator_script,
+        )?;
+
+        self.conn.execute("PRAGMA foreign_keys = OFF", [])?;
+
+        let mut inserted_count = 0;
+        for c in &bundle.cards {
+            let code_hash = hash_code(&c.code);
+            let code_zstd = compress_code(&c.code).map_err(StoreError::Validation)?;
+            let rows = self.conn.execute(
+                "INSERT INTO experience_cards (
+                    card_id, task_id, parent_a_id, parent_b_id, operator_used,
+                    code_hash, code_zstd, execution_status, raw_output,
+                    primary_score, delta_score, novelty_score, composite_utility,
+                    execution_time_ms, children_count, created_at
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
+                 ON CONFLICT(card_id) DO UPDATE SET
+                    composite_utility = excluded.composite_utility,
+                    primary_score = excluded.primary_score,
+                    delta_score = excluded.delta_score,
+                    novelty_score = excluded.novelty_score,
+                    children_count = excluded.children_count",
+                params![
+                    c.card_id,
+                    c.task_id,
+                    c.parent_a_id,
+                    c.parent_b_id,
+                    c.operator_used,
+                    code_hash,
+                    code_zstd,
+                    c.execution_status,
+                    c.raw_output,
+                    c.primary_score,
+                    c.delta_score,
+                    c.novelty_score,
+                    c.composite_utility,
+                    c.execution_time_ms,
+                    c.children_count,
+                    c.created_at,
+                ],
+            )?;
+            if rows > 0 {
+                inserted_count += 1;
+            }
+        }
+
+        for f in &bundle.frontier {
+            let _ = self.conn.execute(
+                "INSERT OR REPLACE INTO task_frontiers (task_id, card_id, rank) VALUES (?1, ?2, ?3)",
+                params![bundle.task.task_id, f.card.card_id, f.rank],
+            );
+        }
+
+        self.conn.execute("PRAGMA foreign_keys = ON", [])?;
+
+        Ok(inserted_count)
     }
 }
