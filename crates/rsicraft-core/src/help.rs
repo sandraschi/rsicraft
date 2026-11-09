@@ -50,6 +50,11 @@ pub fn all_help_tabs() -> Vec<HelpTab> {
                     body: "Verified on Goliath (AMD Ryzen 9 7900X, 64 GB DDR5, NVIDIA GeForce RTX 4090 24 GB VRAM) against live llama-server inference and Python 3.12 sandbox evaluation: DRAFT synthesized an O(N) Kadane baseline scoring 96.5207 (1.391 ms); CROSSOVER recombined parent_a and parent_b by replacing inner-loop Python max() calls with inline conditional branching, advancing the Pareto frontier to 96.6028 (1.359 ms, Rank 1, composite_utility = 1.0000).".into(),
                     code_example: Some("rsicraft --llama-url http://127.0.0.1:8081 campaign --task-id kadane-4090 --steps 4 --provider llama --sandbox-mode local".into()),
                 },
+                HelpSection {
+                    heading: "Explain Like I'm 10 (8-Panel Cartoon Explainer)".into(),
+                    body: "For clever 10-year-olds (and curious humans): Little Timmy dumps 1,000,000 Lego bricks on the carpet, but his sorting robot takes 10 minutes with slow bubble sort. Frontis, a 3B MoE AI kitten living on Goliath's RTX 4090 GPU, rewrites the code using DRAFT (Quicksort, 65%), tests it inside an air-gapped Docker Sandbox Playpen (no Skynet!), patches errors with DEBUG (82%), breeds code via CROSSOVER & IMPROVE (snipping slow max() calls), saves recipes in the BLAKE3/SQLite Memory Vault, and delivers a 1.35ms speed demon result on the Pareto frontier (96.6%)!".into(),
+                    code_example: Some("docs/assets/rsicraft-timmy-8panel-comic.jpg\ndocs/LITTLE_TIMMY_EXPLAINS_RSI.md".into()),
+                },
             ],
         },
         HelpTab {

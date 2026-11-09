@@ -23,6 +23,7 @@
 - 📚 **[Download EPUB eBook (`docs/brochure/rsicraft-brochure.epub`)](docs/brochure/rsicraft-brochure.epub)** — EPUB 3.0 operator handbook for Calibre, Apple Books, Kobo, and mobile e-readers.
 - 🌐 **[HTML Brochure Source (`docs/brochure/rsicraft-brochure.html`)](docs/brochure/rsicraft-brochure.html)** — Canonical HTML/CSS source compiled via `BookCraft`.
 - 🧭 **[Interactive 9-Tab Help Studio (`docs/help/index.html`)](docs/help/index.html)** | **[Markdown Manual (`HELP.md`)](HELP.md)** | **CLI/MCP (`rsicraft help-tabs` / `rsi_help`)**
+- 🎨 **[Little Timmy Explains RSI: 8-Panel Cartoon & YouTube Short Script (`docs/LITTLE_TIMMY_EXPLAINS_RSI.md`)](docs/LITTLE_TIMMY_EXPLAINS_RSI.md)** &mdash; Illustrated for clever 10-year-olds: Lego brick sorting crisis, Frontis the 3B kitten, isolated Docker sandbox playpen, genetic crossover, and the 1.35ms speed demon breakthrough!
 - 🌍 **[Bostrom, Yudkowsky & The Physical Reality of RSI (`docs/BOSTROM_YUDKOWSKY_AND_RSI_REALITY.md`)](docs/BOSTROM_YUDKOWSKY_AND_RSI_REALITY.md)** — Philosophical deep dive: Why the "Foom / Fast Takeoff" and "Paperclip Maximizer" myths fail against physical thermodynamics, non-zero sandbox latency, and complexity lower bounds.
 - ⚙️ **[RSI Engineering Manual: Limits, Models, Timings & Benchmarking (`docs/RSI_ENGINEERING_LIMITS_AND_BENCHMARKING.md`)](docs/RSI_ENGINEERING_LIMITS_AND_BENCHMARKING.md)** — The 5 hard ceilings, 4-stage future trajectory, compatible models (Frontis-MA1, Qwen2.5-Coder, DeepSeek-V2-Lite), generation time budgets, and pre/post holdout verification.
 - 🏛️ **[The Western "Skynet" Panic vs. Closed-Door Frontier RSI (`docs/RSI_LANDSCAPE_AND_SKYNET_MYTH.md`)](docs/RSI_LANDSCAPE_AND_SKYNET_MYTH.md)** — Why Washington/Brussels policy circles frame RSI as "Skynet," and how OpenAI (Preparedness Framework) and Anthropic (ASL-4) keep their internal RSI loops 100% closed.
@@ -38,6 +39,27 @@ On **July 30, 2026**, a 24-researcher team from **Tsinghua University**, **Front
 1. **Open Science Over Secrecy:** They formulated RSI ("AI4AI") as an executable, falsifiable optimization loop governed by four explicit atomic program-evolution operators (`Draft`, `Improve`, `Debug`, `Crossover`) and a 3-term composite utility function that prevents population collapse.
 2. **Single RTX 4090 Over 10,000-H100 Bunkers:** They benchmarked `Frontis-MA1` + `OpenMLE-Evo` on *MLE-Bench Lite* under a strict consumer hardware cap: **a single NVIDIA RTX 4090 over a 12-hour budget**.
 3. **Pure-Rust ArtCraft Hardening (`RSICraft`):** While `FrontisAI/OpenRSI` is a Python research stack, **RSICraft** compiles their exact mathematical and evolutionary architecture into a **zero-panic 3-crate Rust binary + native GPU `egui 0.37` desktop studio + 22-tool MCP server**.
+
+---
+
+## Explain Like I'm 10: How Little Timmy's PC Learned to Rewrite Its Own Code (8-Panel Cartoon)
+
+> *"Can a clever 10-year-old understand how RSICraft works without a computer science degree? Absolutely."*
+
+<p align="center">
+  <img src="docs/assets/rsicraft-timmy-8panel-comic.jpg" alt="RSICraft: Little Timmy's 8-Panel Cartoon Explainer" width="100%" />
+</p>
+
+📖 **Full illustrated walkthrough & 5-minute YouTube short script:** **[`docs/LITTLE_TIMMY_EXPLAINS_RSI.md`](docs/LITTLE_TIMMY_EXPLAINS_RSI.md)**
+
+1. **Panel 1: The Lego Brick Crisis** &mdash; Timmy dumps 1,000,000 Lego bricks on the carpet. His robotic sorter uses $O(N^2)$ bubble sort and takes a painful 10 minutes.
+2. **Panel 2: Frontis on the RTX 4090** &mdash; Meet **Frontis**, a lightweight 3B AI kitten living inside Goliath's 24 GB RTX 4090 GPU (running locally at 120 tokens/sec, no cloud bills!).
+3. **Panel 3: Step 1 &mdash; `DRAFT`** &mdash; Frontis sketches a fresh Quicksort algorithm from scratch. Score jumps from 10% to **65%**.
+4. **Panel 4: The Docker Sandbox Playpen** &mdash; **Why No Skynet!** All code is locked inside an air-gapped glass box with no internet and a 50ms killswitch. It cannot escape or steal your cookies.
+5. **Panel 5: Step 2 &mdash; `DEBUG`** &mdash; Frontis puts on tiny spectacles, inspects the red compiler error stack trace, patches an off-by-one bug, and score jumps to **82%**.
+6. **Panel 6: Steps 3 & 4 &mdash; `IMPROVE` & `CROSSOVER`** &mdash; Like breeding Pokémon, Frontis combines the best loop from Parent A with the memory buffer of Parent B and removes slow `max()` calls.
+7. **Panel 7: The Stigmergic Memory Vault** &mdash; SQLite WAL + BLAKE3 cryptographic hashes record every winning recipe with composite utility $U_i$ so no mistake is ever repeated.
+8. **Panel 8: The 1.35ms Speed Demon** &mdash; 1,000,000 bricks sorted in 1.35 milliseconds! Timmy and Frontis high-five with sunglasses on the Pareto frontier (**96.6%**).
 
 ---
 

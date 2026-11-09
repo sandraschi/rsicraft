@@ -16,6 +16,27 @@ rsicraft help-tabs --search "Bowen Zhou"
 
 ---
 
+## Visual Primer: Explain Like I'm 10 (8-Panel Cartoon)
+
+<p align="center">
+  <img src="docs/assets/rsicraft-timmy-8panel-comic.jpg" alt="RSICraft: Little Timmy's 8-Panel Cartoon Explainer" width="100%" />
+</p>
+
+> *"Teaching a clever 10-year-old how RSICraft works on an RTX 4090 with Lego bricks, an AI kitten, an isolated Docker playpen, and genetic code breeding."*
+
+📖 **Read the full illustrated story and YouTube short script:** **[`docs/LITTLE_TIMMY_EXPLAINS_RSI.md`](docs/LITTLE_TIMMY_EXPLAINS_RSI.md)**
+
+* **Panel 1: The Lego Brick Crisis:** Timmy's 10-minute sorting script is too slow ($O(N^2)$ bubble sort).
+* **Panel 2: Frontis on the RTX 4090:** A lightweight 3B MoE kitten running locally on Goliath at 120 tok/s.
+* **Panel 3: Step 1 &mdash; `DRAFT`:** Frontis sketches a Quicksort baseline from scratch; score jumps to 65%.
+* **Panel 4: The Docker Sandbox Playpen:** Unbreakable locked glass box with zero internet. Code cannot escape to steal cookies or become Skynet.
+* **Panel 5: Step 2 &mdash; `DEBUG`:** Reading the compiler's red stack trace and patching off-by-one errors to reach 82%.
+* **Panel 6: Steps 3 & 4 &mdash; `IMPROVE` & `CROSSOVER`:** Breeding the best parts of two programs and snipping slow `max()` calls.
+* **Panel 7: The Stigmergic Memory Vault:** Storing winning recipes with BLAKE3 cryptographic fingerprints in SQLite WAL.
+* **Panel 8: The 1.35ms Speed Demon:** 1,000,000 bricks sorted in 1.35 milliseconds! Pareto frontier victory (**96.6%**).
+
+---
+
 ## Tab 1: Overview & 3-Crate Architecture (`overview`)
 
 **RSICraft** is a pure-Rust Sovereign Recursive Self-Improvement (RSI) Studio, CLI & MCP Engine designed for consumer 24 GB GPUs (**Goliath**: AMD Ryzen 9 7900X, 64 GB DDR5, NVIDIA GeForce RTX 4090 24 GB VRAM).

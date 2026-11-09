@@ -18,6 +18,11 @@
 - **Philosophical & Engineering Treatises:**
   - `docs/BOSTROM_YUDKOWSKY_AND_RSI_REALITY.md`: Analysis of Bostrom, Yudkowsky, the Foom myth, and physical constraints refuting Skynet.
   - `docs/RSI_ENGINEERING_LIMITS_AND_BENCHMARKING.md`: 5 hard ceilings, 4-stage future trajectory, model feeding matrix, and 4-step benchmarking protocol.
+- **Pedagogical 8-Panel Cartoon & YouTube Short Storyboard:**
+  - `docs/LITTLE_TIMMY_EXPLAINS_RSI.md`: Standalone illustrated guide written for clever 10-year-olds ("Little Timmy Explains RSICraft"), breaking down the Lego sorting crisis, Frontis the 3B MoE AI kitten, Goliath RTX 4090, isolated Docker playpen (no Skynet), compiler debug loops, genetic crossover, stigmergic memory vault, and the 1.35ms speed demon breakthrough.
+  - Complete 5-minute YouTube short storyboard and voiceover script with timestamps, visual cues, and sound effects for YouTube / TikTok audiences.
+  - Little Timmy's Big Words Cheat-Sheet (Glossary) demystifying RSI, Pareto Frontier, Stigmergy, Sandbox, CAS, and MoE.
+  - Embedded high-res 8-panel comic strip in `README.md`, `HELP.md`, `docs/help/index.html`, and `docs/brochure/rsicraft-brochure.html` (recompiled EPUB & PDF).
 - **Fleet Integration:**
   - Added root `start.bat` and `start.ps1` launchers, mirrored to `mcp-central-docs/starts/rsicraft-start.bat`.
   - Rebuilt complete technical brochure suite (`HTML`, `EPUB`, `PDF`) via `BookCraft`.
