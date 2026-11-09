@@ -21,7 +21,7 @@ rsicraft help-tabs --search "Bowen Zhou"
 **RSICraft** is a pure-Rust Sovereign Recursive Self-Improvement (RSI) Studio, CLI & MCP Engine designed for consumer 24 GB GPUs (**Goliath**: AMD Ryzen 9 7900X, 64 GB DDR5, NVIDIA GeForce RTX 4090 24 GB VRAM).
 
 1. **`rsicraft-core` (`L1 Core + Store`)**: Transactional SQLite `WAL` store (`tasks`, `experience_cards`, `task_frontiers`), 256-bit **BLAKE3** content-addressable hashing, **Zstd** (level 3) source code compression, 3-term composite utility parent selection, 4-operator evolutionary loop (`DRAFT`, `IMPROVE`, `DEBUG`, `CROSSOVER`), `llama-server` OpenAI-compatible inference client, and multi-backend sandbox runner (`docker`, `local`, `demo`).
-2. **`rsicraft-mcp` (`L2 CLI + MCP Binary`)**: Single binary exposing 14 MCP tools over `stdio` (`2024-11-05`) and 1:1 CLI subcommands.
+2. **`rsicraft-mcp` (`L2 CLI + MCP Binary`)**: Single binary exposing 22 MCP tools over `stdio` (`2024-11-05`) and 1:1 CLI subcommands.
 3. **`rsicraft-app` (`L3 Native GPU Desktop Studio`)**: High-contrast `slate-950` `eframe`/`egui 0.37` desktop workstation featuring an interactive GPU-painted **Cubic Bézier Lineage DAG Canvas**, **Evolutionary Score Trajectory Spark Chart**, **4-Operator Launchpad**, **BLAKE3+Zstd CAS Inspector**, **RTX 4090 VRAM Gauge**, and **9-Tab Dossier**.
 
 ---
@@ -82,11 +82,11 @@ $$U_i = 0.50 \cdot s_{\text{norm}, i} + 0.35 \cdot \Delta_{\text{norm}, i} + 0.1
 | **Artifact Storage** | Proprietary cloud | Raw strings | Files on disk | **SQLite `WAL` + BLAKE3 + Zstd L3 CAS** |
 | **Parent Selection** | Undisclosed | Island Boltzmann score | $U_i$ Composite Utility | **$U_i = 0.50s + 0.35\Delta + 0.15\nu$ in SQLite** |
 | **Desktop Studio** | None | None | None | **Native `eframe`/`egui 0.37` Bézier DAG Studio** |
-| **MCP Support** | None | None | None | **14 Stdio Tools (`2024-11-05`)** |
+| **MCP Support** | None | None | None | **22 Stdio Tools (`2024-11-05`)** |
 
 ---
 
-## Tab 7: 14 MCP Tools & CLI Reference (`api`)
+## Tab 7: 22 MCP Tools & CLI Reference (`api`)
 
 See **[docs/TOOLS.md](docs/TOOLS.md)** for full JSON schemas and request/response payloads.
 

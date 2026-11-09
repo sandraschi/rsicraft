@@ -69,7 +69,7 @@ Launch with `cargo run -p rsicraft-app`:
   4. **Task & Sandbox Lab:** Interactive task editor and live Python candidate sandbox benchmarker (`demo`, `local`, `docker`).
   5. **RTX 4090 & LLM Config:** Visual 24 GB VRAM allocation gauge and endpoint configuration (`llama-server :8081`, Goliath runner, Ollama `:11434`).
   6. **RSI & Tsinghua Dossier:** Built-in deep-dive reader on the Western "Skynet" narrative, closed OpenAI/Anthropic RSI experiments, and the Tsinghua/Frontis.AI `arXiv:2607.28568` breakthrough.
-  7. **9-Tab Help & 14 Tools:** Searchable operator manual with one-click PDF/EPUB brochure launchers.
+  7. **9-Tab Help & 22 Tools:** Searchable operator manual with one-click PDF/EPUB brochure launchers.
 
 ---
 
@@ -161,24 +161,32 @@ cargo run -p rsicraft-mcp -- help-tabs --tab tsinghua_openrsi
 
 ---
 
-## Complete 14-Tool Surface (CLI & MCP `2024-11-05` Parity)
+## Complete 22-Tool Surface (CLI & MCP `2024-11-05` Parity)
 
 | MCP Tool | CLI Verb | Domain | Mode | Summary |
 | :--- | :--- | :--- | :---: | :--- |
 | `rsi_status` | `status` | system | Read-Only | SQLite `WAL` store stats, card counts, unique BLAKE3 hashes, RTX 4090 summary. |
 | `rsi_hardware_profile` | `hardware` | system | Read-Only | Goliath RTX 4090 (24 GB VRAM) + Frontis-MA1 MoE VRAM budget & launch flags. |
+| `rsi_llm_probe` | `probe` | system | Read-Only | Actively pings the LLM `/v1/models` endpoint, returning latency in ms and model alias. |
 | `rsi_help` | `help-tabs` | system | Read-Only | Query the 9-tab Operator Manual, Skynet vs Closed Labs & Tsinghua Dossier. |
 | `rsi_task_upsert` | `task upsert` | tasks | Mutating | Create or update an evolutionary optimization task and evaluator script. |
 | `rsi_task_list` | `task list` | tasks | Read-Only | List all registered optimization tasks. |
 | `rsi_task_show` | `task show` | tasks | Read-Only | Show task metadata, score/delta bounds, and current top-K frontier. |
+| `rsi_task_delete` | `task delete` | tasks | Mutating | Permanently delete a task and cascade delete its cards and frontier records. |
+| `rsi_export` | `export` | tasks | Read-Only | Export complete task lineage (task, CAS cards, Pareto frontier) to JSON. |
+| `rsi_import` | `import` | tasks | Mutating | Import complete task lineage from JSON bundle file into SQLite. |
 | `rsi_step` | `step` | evolution | Mutating | Execute one evolutionary step (`DRAFT`, `IMPROVE`, `DEBUG`, `CROSSOVER`). |
 | `rsi_campaign` | `campaign` | evolution | Mutating | Run a multi-step autonomous evolutionary campaign cycling across operators. |
-| `rsi_evaluate` | `evaluate` | evolution | Mutating | Benchmark a Python candidate snippet in the sandbox and optionally record it. |
+| `rsi_evaluate` | `evaluate` | evolution | Mutating | Benchmark candidate code in sandbox (Python 3.12 / native Rust) and record card. |
 | `rsi_demo_seed` | `demo-seed` | evolution | Mutating | Seed an empty DB with the `opt-synth` benchmark and 4 evolutionary cards. |
 | `rsi_get_frontier` | `frontier` | frontier | Read-Only | Return the materialized top-K Pareto frontier experience cards for a task. |
 | `rsi_card_list` | `cards` | lineage | Read-Only | List experience cards ordered by composite utility with optional filters. |
 | `rsi_card_show` | `card` | lineage | Read-Only | Decompress and display full candidate source code, BLAKE3 hash, and logs. |
+| `rsi_diff` | `diff` | lineage | Read-Only | Line-by-line unified diff comparing source code between two experience cards. |
+| `rsi_cards_prune` | `prune` | lineage | Mutating | Prune low-utility non-frontier cards while preserving top Pareto performers. |
 | `rsi_lineage` | `lineage` | lineage | Read-Only | Export the evolutionary lineage DAG (nodes and `parent_a`/`parent_b` edges). |
+| `rsi_hyperparams_get` | `hyperparams` | tuning | Read-Only | Inspect current composite utility weights ($\lambda_s, \lambda_\delta, \lambda_\nu$). |
+| `rsi_hyperparams_set` | `hyperparams` | tuning | Mutating | Dynamically tune composite utility weights at runtime. |
 
 ---
 
@@ -190,12 +198,14 @@ cargo run -p rsicraft-mcp -- help-tabs --tab tsinghua_openrsi
 | **[HELP.md](HELP.md)** | 9-Tab Operator Manual, Geopolitics Dossier & Competitive Architecture Matrix |
 | **[docs/RSI_LANDSCAPE_AND_SKYNET_MYTH.md](docs/RSI_LANDSCAPE_AND_SKYNET_MYTH.md)** | RSI fundamentals, the Western "Skynet" narrative, and closed OpenAI/Anthropic RSI loops |
 | **[docs/TSINGHUA_OPENRSI_TEAM.md](docs/TSINGHUA_OPENRSI_TEAM.md)** | Tsinghua University & Frontis.AI team profiles, `arXiv:2607.28568`, and `FrontisAI/OpenRSI` |
+| **[docs/RSI_ENGINEERING_LIMITS_AND_BENCHMARKING.md](docs/RSI_ENGINEERING_LIMITS_AND_BENCHMARKING.md)** | 5 hard ceilings, 4-stage future trajectory, model feeding matrix, and before/after benchmarking |
+| **[docs/BOSTROM_YUDKOWSKY_AND_RSI_REALITY.md](docs/BOSTROM_YUDKOWSKY_AND_RSI_REALITY.md)** | Bostrom, Yudkowsky, the Foom myth, and why physical reality refutes Skynet |
 | **[docs/brochure/rsicraft-brochure.pdf](docs/brochure/rsicraft-brochure.pdf)** | Printable A4 Technical Brochure & Operator Handbook (PDF) |
 | **[docs/brochure/rsicraft-brochure.epub](docs/brochure/rsicraft-brochure.epub)** | EPUB 3.0 Technical Brochure & Operator Handbook |
 | **[docs/help/index.html](docs/help/index.html)** | Interactive 9-Tab HTML Help Studio with live search |
 | **[docs/PRD.md](docs/PRD.md)** | Product Requirements Document, VRAM mathematics & operator specs |
 | **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** | 3-Crate design (`rsicraft-core`, `rsicraft-mcp`, `rsicraft-app`), SQLite `WAL` & safety guards |
-| **[docs/TOOLS.md](docs/TOOLS.md)** | Full JSON Schema & CLI examples for all 14 MCP tools |
+| **[docs/TOOLS.md](docs/TOOLS.md)** | Full JSON Schema & CLI examples for all 22 MCP tools |
 | **[docs/CONFIGURATION.md](docs/CONFIGURATION.md)** | Environment variables, CLI flags, utility hyperparameters, and sandbox modes |
 | **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** | Build, test, clippy gates, brochure regeneration, and release workflow |
 | **[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** | Incident-grounded runbook (Goliath RTX 4090 2026-11-09 verification fixes) |

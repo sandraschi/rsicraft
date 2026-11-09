@@ -234,7 +234,7 @@
     <button class="tab-btn" data-tab="wrappee">⚡ 4. RTX 4090 &amp; Sandbox <span class="tab-pill">24 GB</span></button>
     <button class="tab-btn" data-tab="operators">🧬 5. Operators &amp; Math <span class="tab-pill">4 Ops</span></button>
     <button class="tab-btn" data-tab="compare">⚖️ 6. Competitive Matrix <span class="tab-pill">vs FunSearch</span></button>
-    <button class="tab-btn" data-tab="api">🔌 7. 14 MCP Tools &amp; CLI <span class="tab-pill">2024-11-05</span></button>
+    <button class="tab-btn" data-tab="api">🔌 7. 22 MCP Tools &amp; CLI <span class="tab-pill">2024-11-05</span></button>
     <button class="tab-btn" data-tab="troubleshoot">🩺 8. Troubleshooting <span class="tab-pill">5 Fixes</span></button>
     <button class="tab-btn" data-tab="faq">❓ 9. FAQ &amp; Safety <span class="tab-pill">5 Guards</span></button>
   </nav>
@@ -266,7 +266,7 @@ rsicraft hardware --json</pre>
       <div class="section-card">
         <h3>3-Crate Pure-Rust ArtCraft Architecture (L1 / L2 / L3)</h3>
         <p><strong>1. <code>rsicraft-core</code> (L1 Core + Store):</strong> SQLite WAL database (<code>tasks</code>, <code>experience_cards</code>, <code>task_frontiers</code>), BLAKE3 content hashing, Zstd (level 3) source compression, composite utility calculation, 4-operator action space (<code>DRAFT</code>, <code>IMPROVE</code>, <code>DEBUG</code>, <code>CROSSOVER</code>), <code>llama-server</code> client, and isolated sandbox runner.<br/>
-        <strong>2. <code>rsicraft-mcp</code> (L2 CLI + MCP Binary):</strong> Single binary exposing 14 MCP tools over stdio and 1:1 matching CLI subcommands.<br/>
+        <strong>2. <code>rsicraft-mcp</code> (L2 CLI + MCP Binary):</strong> Single binary exposing 22 MCP tools over stdio and 1:1 matching CLI subcommands.<br/>
         <strong>3. <code>rsicraft-app</code> (L3 Native GPU Desktop Studio):</strong> High-contrast <code>slate-950</code> <code>eframe</code>/<code>egui 0.37</code> workstation with Cubic Bezier Lineage DAG Canvas, Score Spark Chart, and 9-Tab Dossier.</p>
       </div>
     </section>
@@ -398,7 +398,7 @@ rsicraft hardware --json</pre>
             <tr><td><strong>Openness</strong></td><td>100% Closed / Proprietary</td><td>Partial Python scripts</td><td>Open Weights + Python</td><td><strong>Pure Rust 3-Crate + GPU Studio</strong></td></tr>
             <tr><td><strong>Code Deduplication</strong></td><td>Undisclosed</td><td>Raw strings</td><td>Files on disk</td><td><strong>BLAKE3 256-bit + Zstd L3 CAS</strong></td></tr>
             <tr><td><strong>Parent Selection</strong></td><td>Undisclosed</td><td>Island Boltzmann score</td><td>Composite Utility $U_i$</td><td><strong>Score (0.50) + Delta (0.35) + Novelty (0.15)</strong></td></tr>
-            <tr><td><strong>Desktop Studio &amp; MCP</strong></td><td>None</td><td>None</td><td>None</td><td><strong>egui 0.37 Studio + 14 MCP Tools</strong></td></tr>
+            <tr><td><strong>Desktop Studio &amp; MCP</strong></td><td>None</td><td>None</td><td>None</td><td><strong>egui 0.37 Studio + 22 MCP Tools</strong></td></tr>
           </tbody>
         </table>
       </div>
@@ -407,7 +407,7 @@ rsicraft hardware --json</pre>
     <!-- TAB 7: API -->
     <section class="tab-panel" id="tab-api">
       <div class="section-card">
-        <h3>🔌 All 14 MCP Tools &amp; 1:1 CLI Subcommands</h3>
+        <h3>🔌 All 22 MCP Tools &amp; 1:1 CLI Subcommands</h3>
         <table>
           <thead>
             <tr><th>MCP Tool</th><th>CLI Verb</th><th>Arguments</th><th>Description</th></tr>
@@ -415,17 +415,25 @@ rsicraft hardware --json</pre>
           <tbody>
             <tr><td><code>rsi_status</code></td><td><code>status</code></td><td><code>{}</code></td><td>SQLite WAL store stats, card counts, unique BLAKE3 hashes, RTX 4090 summary.</td></tr>
             <tr><td><code>rsi_hardware_profile</code></td><td><code>hardware</code></td><td><code>{}</code></td><td>Goliath RTX 4090 (24 GB VRAM) + Frontis-MA1 MoE hardware profile.</td></tr>
+            <tr><td><code>rsi_llm_probe</code></td><td><code>probe</code></td><td><code>url?</code></td><td>Actively ping the LLM endpoint (/v1/models), returning reachability and latency in ms.</td></tr>
             <tr><td><code>rsi_help</code></td><td><code>help-tabs</code></td><td><code>tab, search</code></td><td>Query this 9-tab Operator Manual, Skynet Myth &amp; Tsinghua Dossier.</td></tr>
             <tr><td><code>rsi_task_upsert</code></td><td><code>task upsert</code></td><td><code>task_id, name, description, evaluator_script</code></td><td>Create or update an evolutionary optimization task.</td></tr>
             <tr><td><code>rsi_task_list</code></td><td><code>task list</code></td><td><code>{}</code></td><td>List all registered optimization tasks.</td></tr>
             <tr><td><code>rsi_task_show</code></td><td><code>task show</code></td><td><code>task_id</code></td><td>Show task metadata, score bounds, and top frontier.</td></tr>
+            <tr><td><code>rsi_task_delete</code></td><td><code>task delete</code></td><td><code>task_id</code></td><td>Permanently delete a task and cascade delete its cards and frontier records.</td></tr>
+            <tr><td><code>rsi_export</code></td><td><code>export</code></td><td><code>task_id, out?</code></td><td>Export complete task lineage (task, CAS cards, Pareto frontier) to JSON.</td></tr>
+            <tr><td><code>rsi_import</code></td><td><code>import</code></td><td><code>file</code></td><td>Import complete task lineage from JSON bundle file into SQLite WAL store.</td></tr>
             <tr><td><code>rsi_step</code></td><td><code>step</code></td><td><code>task_id, operator, provider, sandbox_mode, timeout_secs</code></td><td>Execute a single evolutionary step.</td></tr>
             <tr><td><code>rsi_campaign</code></td><td><code>campaign</code></td><td><code>task_id, steps, provider, sandbox_mode, timeout_secs</code></td><td>Execute a multi-step autonomous evolutionary campaign.</td></tr>
             <tr><td><code>rsi_get_frontier</code></td><td><code>frontier</code></td><td><code>task_id, limit</code></td><td>Get the materialized top-K Pareto frontier for a task.</td></tr>
             <tr><td><code>rsi_card_list</code></td><td><code>cards</code></td><td><code>task_id, operator, status, limit</code></td><td>List experience cards ordered by composite utility.</td></tr>
             <tr><td><code>rsi_card_show</code></td><td><code>card</code></td><td><code>card_id</code></td><td>Decompress and inspect full candidate code, BLAKE3 hash, and logs.</td></tr>
+            <tr><td><code>rsi_diff</code></td><td><code>diff</code></td><td><code>card_a, card_b</code></td><td>Generate line-by-line unified diff comparing source code between two experience cards.</td></tr>
+            <tr><td><code>rsi_cards_prune</code></td><td><code>prune</code></td><td><code>task_id, keep_frontier</code></td><td>Prune low-utility non-frontier cards while preserving top Pareto performers.</td></tr>
             <tr><td><code>rsi_lineage</code></td><td><code>lineage</code></td><td><code>task_id</code></td><td>Export evolutionary lineage DAG (nodes and parent edges).</td></tr>
-            <tr><td><code>rsi_evaluate</code></td><td><code>evaluate</code></td><td><code>task_id, code, operator, sandbox_mode, record</code></td><td>Directly benchmark a Python candidate snippet in the sandbox.</td></tr>
+            <tr><td><code>rsi_evaluate</code></td><td><code>evaluate</code></td><td><code>task_id, code, operator, sandbox_mode, record</code></td><td>Directly benchmark candidate code (Python 3.12 / native Rust) in sandbox.</td></tr>
+            <tr><td><code>rsi_hyperparams_get</code></td><td><code>hyperparams</code></td><td><code>{}</code></td><td>Inspect current composite utility weights (w_score, w_delta, w_novelty).</td></tr>
+            <tr><td><code>rsi_hyperparams_set</code></td><td><code>hyperparams</code></td><td><code>w_score?, w_delta?, w_novelty?</code></td><td>Dynamically tune composite utility weights at runtime.</td></tr>
             <tr><td><code>rsi_demo_seed</code></td><td><code>demo-seed</code></td><td><code>{}</code></td><td>Seed an empty DB with the <code>opt-synth</code> benchmark and 4 cards.</td></tr>
           </tbody>
         </table>
