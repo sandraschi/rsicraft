@@ -119,6 +119,16 @@ pub struct RsiCraftApp {
 
     pub status_banner: String,
     pub repo_root: PathBuf,
+
+    // 3D RTX 4090 GPU Studio State
+    pub gpu_rot_x: f32,
+    pub gpu_rot_y: f32,
+    pub gpu_auto_spin: bool,
+    pub gpu_spin_speed: f32,
+    pub gpu_zoom: f32,
+    pub gpu_style: usize,
+    pub gpu_show_vram_chips: bool,
+    pub gpu_plasma_fx: bool,
 }
 
 fn default_repo_root() -> PathBuf {
@@ -183,6 +193,14 @@ impl RsiCraftApp {
                 "RSICraft v{VERSION} Sovereign Studio Online (Goliath RTX 4090 Profile Ready)"
             ),
             repo_root: default_repo_root(),
+            gpu_rot_x: -0.32,
+            gpu_rot_y: 0.65,
+            gpu_auto_spin: true,
+            gpu_spin_speed: 0.012,
+            gpu_zoom: 1.0,
+            gpu_style: 0,
+            gpu_show_vram_chips: true,
+            gpu_plasma_fx: true,
         };
         app.refresh_all();
         Ok(app)
@@ -463,7 +481,494 @@ fn operator_color(op: &str) -> Color32 {
     }
 }
 
+#[derive(Clone, Copy)]
+struct Point3D {
+    x: f32,
+    y: f32,
+    z: f32,
+}
+
+impl Point3D {
+    const fn new(x: f32, y: f32, z: f32) -> Self {
+        Self { x, y, z }
+    }
+
+    fn project(
+        &self,
+        rot_x: f32,
+        rot_y: f32,
+        zoom: f32,
+        center: Pos2,
+        fov: f32,
+        cam_dist: f32,
+    ) -> Option<(Pos2, f32)> {
+        let cos_y = rot_y.cos();
+        let sin_y = rot_y.sin();
+        let cos_x = rot_x.cos();
+        let sin_x = rot_x.sin();
+
+        // Yaw around Y
+        let x1 = self.x * cos_y + self.z * sin_y;
+        let y1 = self.y;
+        let z1 = -self.x * sin_y + self.z * cos_y;
+
+        // Pitch around X
+        let x2 = x1;
+        let y2 = y1 * cos_x - z1 * sin_x;
+        let z2 = y1 * sin_x + z1 * cos_x;
+
+        let depth = cam_dist + z2;
+        if depth > 10.0 {
+            let scale = (fov * zoom) / depth;
+            let sx = center.x + x2 * scale;
+            let sy = center.y - y2 * scale;
+            Some((Pos2::new(sx, sy), z2))
+        } else {
+            None
+        }
+    }
+}
+
+fn draw_sparkle_star(
+    painter: &egui::Painter,
+    center: Pos2,
+    radius: f32,
+    color: Color32,
+    angle: f32,
+) {
+    if radius <= 0.8 {
+        return;
+    }
+    let cos_a = angle.cos();
+    let sin_a = angle.sin();
+    let arm_long = radius;
+    let arm_short = radius * 0.35;
+
+    let p_top = Pos2::new(center.x - sin_a * arm_long, center.y - cos_a * arm_long);
+    let p_bottom = Pos2::new(center.x + sin_a * arm_long, center.y + cos_a * arm_long);
+    let p_right = Pos2::new(center.x + cos_a * arm_long, center.y - sin_a * arm_long);
+    let p_left = Pos2::new(center.x - cos_a * arm_long, center.y + sin_a * arm_long);
+
+    let stroke = Stroke::new(1.3, color);
+    painter.line_segment([p_left, p_right], stroke);
+    painter.line_segment([p_top, p_bottom], stroke);
+
+    let cos_d = (angle + std::f32::consts::FRAC_PI_4).cos();
+    let sin_d = (angle + std::f32::consts::FRAC_PI_4).sin();
+    let d_top = Pos2::new(center.x - sin_d * arm_short, center.y - cos_d * arm_short);
+    let d_bottom = Pos2::new(center.x + sin_d * arm_short, center.y + cos_d * arm_short);
+    let d_right = Pos2::new(center.x + cos_d * arm_short, center.y - sin_d * arm_short);
+    let d_left = Pos2::new(center.x - cos_d * arm_short, center.y + sin_d * arm_short);
+
+    let dim_color = Color32::from_rgba_premultiplied(
+        color.r(),
+        color.g(),
+        color.b(),
+        (color.a() as f32 * 0.5) as u8,
+    );
+    let dim_stroke = Stroke::new(1.0, dim_color);
+    painter.line_segment([d_left, d_right], dim_stroke);
+    painter.line_segment([d_top, d_bottom], dim_stroke);
+
+    painter.circle_filled(center, (radius * 0.25).max(1.0), Color32::WHITE);
+}
+
 impl RsiCraftApp {
+    pub fn render_rtx_4090_3d_viewport(&mut self, ui: &mut egui::Ui, viewport_height: f32) {
+        let (rect, resp) = ui.allocate_exact_size(
+            Vec2::new(ui.available_width().max(380.0), viewport_height),
+            egui::Sense::click_and_drag(),
+        );
+
+        if resp.dragged() {
+            let delta = resp.drag_delta();
+            self.gpu_rot_y += delta.x * 0.012;
+            self.gpu_rot_x = (self.gpu_rot_x - delta.y * 0.012).clamp(-1.45, 1.45);
+        } else if self.gpu_auto_spin {
+            self.gpu_rot_y += self.gpu_spin_speed;
+        }
+
+        let painter = ui.painter_at(rect);
+        painter.rect_filled(rect, CornerRadius::same(8), Color32::from_rgb(6, 9, 15));
+        painter.rect_stroke(
+            rect,
+            CornerRadius::same(8),
+            Stroke::new(1.2, Color32::from_rgb(30, 48, 75)),
+            egui::StrokeKind::Inside,
+        );
+
+        // Cybernetic background grid dots
+        let grid_gap = 36.0_f32;
+        let x_start = rect.left() + (rect.width() % grid_gap) * 0.5;
+        let mut x = x_start;
+        while x < rect.right() {
+            let mut y = rect.top() + 12.0;
+            while y < rect.bottom() - 12.0 {
+                painter.circle_filled(
+                    Pos2::new(x, y),
+                    1.0,
+                    Color32::from_rgba_premultiplied(56, 189, 248, 28),
+                );
+                y += grid_gap;
+            }
+            x += grid_gap;
+        }
+
+        let center = rect.center();
+        let fov = 420.0;
+        let cam_dist = 520.0;
+
+        let proj = |pt: Point3D| -> Option<(Pos2, f32)> {
+            pt.project(
+                self.gpu_rot_x,
+                self.gpu_rot_y,
+                self.gpu_zoom,
+                center,
+                fov,
+                cam_dist,
+            )
+        };
+
+        // Style colors
+        let (frame_col, fin_col, _accent_light, fan_blade_col) = match self.gpu_style {
+            1 => (
+                Color32::from_rgb(148, 163, 184), // Founders Matte Gunmetal
+                Color32::from_rgb(71, 85, 105),
+                Color32::from_rgb(226, 232, 240),
+                Color32::from_rgb(100, 116, 139),
+            ),
+            2 => (
+                ACCENT_EMERALD, // Wireframe Holo
+                Color32::from_rgb(16, 185, 129),
+                ACCENT_EMERALD,
+                Color32::from_rgb(5, 150, 105),
+            ),
+            _ => (
+                ACCENT_CYAN, // Cyberpunk Neon
+                Color32::from_rgb(30, 58, 95),
+                ACCENT_PURPLE,
+                Color32::from_rgb(56, 189, 248),
+            ),
+        };
+
+        // 1. Shroud Bounding Box & Chamfers (RTX 4090 3.5-Slot Form Factor)
+        let hx = 125.0;
+        let hy = 50.0;
+        let hz = 25.0;
+
+        let corners = [
+            Point3D::new(-hx, -hy, -hz), // 0: LBB
+            Point3D::new(hx, -hy, -hz),  // 1: RBB
+            Point3D::new(hx, hy, -hz),   // 2: RTB
+            Point3D::new(-hx, hy, -hz),  // 3: LTB
+            Point3D::new(-hx, -hy, hz),  // 4: LBF
+            Point3D::new(hx, -hy, hz),   // 5: RBF
+            Point3D::new(hx, hy, hz),    // 6: RTF
+            Point3D::new(-hx, hy, hz),   // 7: LTF
+        ];
+
+        let proj_corners: Vec<Option<(Pos2, f32)>> = corners.iter().map(|c| proj(*c)).collect();
+
+        let draw_edge = |i: usize, j: usize, stroke: Stroke| {
+            if let (Some(Some((p1, _))), Some(Some((p2, _)))) =
+                (proj_corners.get(i), proj_corners.get(j))
+            {
+                painter.line_segment([*p1, *p2], stroke);
+            }
+        };
+
+        let frame_stroke = Stroke::new(2.0, frame_col);
+        // Back rect
+        draw_edge(0, 1, frame_stroke);
+        draw_edge(1, 2, frame_stroke);
+        draw_edge(2, 3, frame_stroke);
+        draw_edge(3, 0, frame_stroke);
+        // Front rect
+        draw_edge(4, 5, frame_stroke);
+        draw_edge(5, 6, frame_stroke);
+        draw_edge(6, 7, frame_stroke);
+        draw_edge(7, 4, frame_stroke);
+        // Connecting struts
+        draw_edge(0, 4, frame_stroke);
+        draw_edge(1, 5, frame_stroke);
+        draw_edge(2, 6, frame_stroke);
+        draw_edge(3, 7, frame_stroke);
+
+        // 2. Aluminum Heatsink Fin Array (Transverse Cooling Fins)
+        let fin_stroke = Stroke::new(1.0, fin_col);
+        for k in 0..15 {
+            let fx = -105.0 + (k as f32) * 15.0;
+            if (fx - (-65.0)).abs() > 28.0 && (fx - 65.0).abs() > 28.0 {
+                if let (Some((top_pt, _)), Some((bot_pt, _))) = (
+                    proj(Point3D::new(fx, hy - 4.0, hz)),
+                    proj(Point3D::new(fx, -hy + 4.0, hz)),
+                ) {
+                    painter.line_segment([top_pt, bot_pt], fin_stroke);
+                }
+            }
+        }
+
+        // 3. Dual Contra-Rotating Axial Flow Fans (Flow-Through Architecture)
+        let fan_centers = [(-62.0_f32, 1.0_f32), (62.0_f32, -1.0_f32)];
+        for (fan_idx, (cx, dir)) in fan_centers.iter().enumerate() {
+            let fan_rad = 38.0;
+            // Fan ring (16 segments)
+            let mut ring_pts: Vec<Pos2> = Vec::new();
+            for seg in 0..16 {
+                let theta = (seg as f32) * std::f32::consts::TAU / 16.0;
+                let px = cx + theta.cos() * fan_rad;
+                let py = theta.sin() * fan_rad;
+                if let Some((p, _)) = proj(Point3D::new(px, py, hz + 2.0)) {
+                    ring_pts.push(p);
+                }
+            }
+            if ring_pts.len() >= 3 {
+                ring_pts.push(ring_pts[0]);
+                let halo_col = if fan_idx == 0 {
+                    ACCENT_CYAN
+                } else {
+                    ACCENT_PURPLE
+                };
+                painter.add(egui::Shape::line(ring_pts, Stroke::new(1.6, halo_col)));
+            }
+
+            // Central fan hub
+            if let Some((hub_pt, _)) = proj(Point3D::new(*cx, 0.0, hz + 2.0)) {
+                painter.circle_filled(hub_pt, 7.0 * self.gpu_zoom, Color32::from_rgb(15, 23, 42));
+                painter.circle_stroke(
+                    hub_pt,
+                    7.0 * self.gpu_zoom,
+                    Stroke::new(1.2, ACCENT_EMERALD),
+                );
+            }
+
+            // 9 Contra-Rotating Fan Blades
+            let base_angle = (self.anim_tick as f32 * 0.12 * dir) % std::f32::consts::TAU;
+            for b in 0..9 {
+                let angle = base_angle + (b as f32) * std::f32::consts::TAU / 9.0;
+                let bx = cx + angle.cos() * (fan_rad - 2.0);
+                let by = angle.sin() * (fan_rad - 2.0);
+                if let (Some((hub_pt, _)), Some((tip_pt, _))) = (
+                    proj(Point3D::new(*cx, 0.0, hz + 2.0)),
+                    proj(Point3D::new(bx, by, hz + 1.5)),
+                ) {
+                    painter.line_segment([hub_pt, tip_pt], Stroke::new(1.8, fan_blade_col));
+                }
+            }
+        }
+
+        // 4. Central AD102 Die & 12x GDDR6X Micron VRAM Chips (PCB Backplate View)
+        if self.gpu_show_vram_chips {
+            // Central Silicon Die (AD102-300-A1)
+            let die_hw = 18.0_f32;
+            let die_corners = [
+                Point3D::new(-die_hw, -die_hw, -hz - 1.0),
+                Point3D::new(die_hw, -die_hw, -hz - 1.0),
+                Point3D::new(die_hw, die_hw, -hz - 1.0),
+                Point3D::new(-die_hw, die_hw, -hz - 1.0),
+            ];
+            let die_proj: Vec<Pos2> = die_corners
+                .iter()
+                .filter_map(|p| proj(*p).map(|(pos, _)| pos))
+                .collect();
+            if die_proj.len() == 4 {
+                painter.add(egui::Shape::convex_polygon(
+                    die_proj,
+                    Color32::from_rgb(18, 25, 38),
+                    Stroke::new(1.6, Color32::from_rgb(234, 179, 8)),
+                ));
+                if let Some((die_center, _)) = proj(Point3D::new(0.0, 0.0, -hz - 1.0)) {
+                    painter.text(
+                        die_center,
+                        egui::Align2::CENTER_CENTER,
+                        "AD102",
+                        FontId::monospace(9.0),
+                        Color32::WHITE,
+                    );
+                }
+            }
+
+            // 12 VRAM Chips (2 GB each): 10 Active (19.1 GB used), 2 Free (4.9 GB headroom)
+            let chip_coords = [
+                (-32.0, 30.0),
+                (0.0, 30.0),
+                (32.0, 30.0), // Top 3
+                (-32.0, -30.0),
+                (0.0, -30.0),
+                (32.0, -30.0), // Bottom 3
+                (-40.0, 14.0),
+                (-40.0, -14.0), // Left 2
+                (40.0, 14.0),
+                (40.0, -14.0), // Right 2
+                (-40.0, 0.0),
+                (40.0, 0.0), // Extra 2
+            ];
+
+            for (i, (vx, vy)) in chip_coords.iter().enumerate() {
+                let is_active = i < 10;
+                let chip_col = if is_active {
+                    Color32::from_rgb(16, 185, 129) // Emerald 2GB Active
+                } else {
+                    Color32::from_rgb(51, 65, 85) // Slate 2GB Free Safety Margin
+                };
+                let cw = 7.0_f32;
+                let ch = 7.0_f32;
+                let chip_pts = [
+                    Point3D::new(vx - cw, vy - ch, -hz - 1.0),
+                    Point3D::new(vx + cw, vy - ch, -hz - 1.0),
+                    Point3D::new(vx + cw, vy + ch, -hz - 1.0),
+                    Point3D::new(vx - cw, vy + ch, -hz - 1.0),
+                ];
+                let p_chip: Vec<Pos2> = chip_pts
+                    .iter()
+                    .filter_map(|p| proj(*p).map(|(pos, _)| pos))
+                    .collect();
+                if p_chip.len() == 4 {
+                    painter.add(egui::Shape::convex_polygon(
+                        p_chip,
+                        chip_col,
+                        Stroke::new(1.0, Color32::from_rgb(148, 163, 184)),
+                    ));
+                }
+            }
+        }
+
+        // 5. PCIe 4.0 x16 Interface (Gold Fingers along bottom edge)
+        if let (Some((p_start, _)), Some((p_end, _))) = (
+            proj(Point3D::new(-110.0, -hy, 0.0)),
+            proj(Point3D::new(-15.0, -hy, 0.0)),
+        ) {
+            painter.line_segment(
+                [p_start, p_end],
+                Stroke::new(3.2, Color32::from_rgb(234, 179, 8)),
+            );
+        }
+
+        // 6. 12VHPWR 16-Pin Power Header (Top edge)
+        if let Some((pwr_pt, _)) = proj(Point3D::new(60.0, hy, 0.0)) {
+            painter.circle_filled(pwr_pt, 4.0 * self.gpu_zoom, Color32::from_rgb(34, 197, 94));
+        }
+
+        // 7. "GEFORCE RTX" Illuminated Side Plate
+        if let Some((logo_pt, _)) = proj(Point3D::new(0.0, hy + 2.0, 0.0)) {
+            let glow = ((self.anim_tick as f32 * 0.08).sin() * 0.3 + 0.7).clamp(0.4, 1.0);
+            let logo_col = Color32::from_rgba_premultiplied(
+                (56.0 * glow) as u8,
+                (189.0 * glow) as u8,
+                (248.0 * glow) as u8,
+                255,
+            );
+            painter.text(
+                logo_pt,
+                egui::Align2::CENTER_CENTER,
+                "GEFORCE RTX 4090",
+                FontId::proportional(11.0 * self.gpu_zoom),
+                logo_col,
+            );
+        }
+
+        // 8. Plasma Sparks & Particle Glints
+        if self.gpu_plasma_fx {
+            let spark_count = 10;
+            for s in 0..spark_count {
+                let t_spark =
+                    (self.anim_tick as f32 * 0.04 + (s as f32) * 0.628) % std::f32::consts::TAU;
+                let sx = t_spark.cos() * 95.0;
+                let sy = t_spark.sin() * 45.0 + ((s as f32 * 7.0).sin() * 15.0);
+                let sz = ((s as f32 * 2.3).cos()) * 35.0;
+                if let Some((spark_pos, _)) = proj(Point3D::new(sx, sy, sz)) {
+                    let col = if s % 2 == 0 {
+                        ACCENT_CYAN
+                    } else {
+                        ACCENT_AMBER
+                    };
+                    draw_sparkle_star(&painter, spark_pos, 6.5, col, t_spark * 1.5);
+                }
+            }
+        }
+
+        // 9. Floating On-Screen HUD Overlay & Controls
+        let hud_rect = egui::Rect::from_min_size(
+            Pos2::new(rect.left() + 10.0, rect.bottom() - 36.0),
+            Vec2::new(rect.width() - 20.0, 28.0),
+        );
+        painter.rect_filled(
+            hud_rect,
+            CornerRadius::same(6),
+            Color32::from_rgba_premultiplied(10, 15, 26, 215),
+        );
+        painter.rect_stroke(
+            hud_rect,
+            CornerRadius::same(6),
+            Stroke::new(1.0, Color32::from_rgb(30, 48, 75)),
+            egui::StrokeKind::Inside,
+        );
+
+        let mut child_ui = ui.new_child(egui::UiBuilder::new().max_rect(hud_rect));
+        child_ui.horizontal(|ui| {
+            if ui
+                .selectable_label(
+                    self.gpu_auto_spin,
+                    if self.gpu_auto_spin {
+                        "[Auto-Spin: ON]"
+                    } else {
+                        "[Auto-Spin: OFF]"
+                    },
+                )
+                .clicked()
+            {
+                self.gpu_auto_spin = !self.gpu_auto_spin;
+            }
+            if ui
+                .small_button(match self.gpu_style {
+                    1 => "Style: Founders",
+                    2 => "Style: Wireframe",
+                    _ => "Style: Cyberpunk",
+                })
+                .clicked()
+            {
+                self.gpu_style = (self.gpu_style + 1) % 3;
+            }
+            if ui
+                .selectable_label(self.gpu_show_vram_chips, "12x VRAM")
+                .clicked()
+            {
+                self.gpu_show_vram_chips = !self.gpu_show_vram_chips;
+            }
+            if ui
+                .selectable_label(self.gpu_plasma_fx, "Plasma FX")
+                .clicked()
+            {
+                self.gpu_plasma_fx = !self.gpu_plasma_fx;
+            }
+            ui.separator();
+            if ui.small_button("Reset").clicked() {
+                self.gpu_rot_x = -0.32;
+                self.gpu_rot_y = 0.65;
+                self.gpu_zoom = 1.0;
+            }
+            if ui.small_button("Fans").clicked() {
+                self.gpu_rot_x = 0.0;
+                self.gpu_rot_y = 0.0;
+            }
+            if ui.small_button("PCB/Core").clicked() {
+                self.gpu_rot_x = 0.0;
+                self.gpu_rot_y = std::f32::consts::PI;
+            }
+            ui.separator();
+            let yaw_deg = (self.gpu_rot_y.to_degrees() % 360.0).round() as i32;
+            let pitch_deg = self.gpu_rot_x.to_degrees().round() as i32;
+            ui.label(
+                RichText::new(format!(
+                    "Yaw: {yaw_deg} deg | Pitch: {pitch_deg} deg | 19.1/24.0 GB"
+                ))
+                .size(11.0)
+                .monospace()
+                .color(ACCENT_EMERALD),
+            );
+        });
+    }
+
     fn render_kpi_ribbon(&self, ui: &mut egui::Ui) {
         let tasks_cnt = self
             .status_json
@@ -646,13 +1151,101 @@ impl RsiCraftApp {
 
             let line_pts: Vec<Pos2> = pts.iter().map(|(p, _)| *p).collect();
             if line_pts.len() >= 2 {
-                painter.add(egui::Shape::line(line_pts, Stroke::new(2.2, ACCENT_CYAN)));
+                // Translucent gradient trapezoid area fill below curve
+                for w in line_pts.windows(2) {
+                    let p0 = w[0];
+                    let p1 = w[1];
+                    let quad = vec![
+                        p0,
+                        p1,
+                        Pos2::new(p1.x, plot.bottom()),
+                        Pos2::new(p0.x, plot.bottom()),
+                    ];
+                    painter.add(egui::Shape::convex_polygon(
+                        quad,
+                        Color32::from_rgba_premultiplied(14, 165, 233, 24),
+                        Stroke::NONE,
+                    ));
+                }
+
+                // Glowing main trajectory line
+                painter.add(egui::Shape::line(
+                    line_pts.clone(),
+                    Stroke::new(2.4, ACCENT_CYAN),
+                ));
+
+                // Laser comet pulse moving along trajectory
+                let t_comet = ((self.anim_tick as f32 * 0.015) % 1.0).clamp(0.0, 1.0);
+                let seg_count = line_pts.len() - 1;
+                let seg_f = t_comet * (seg_count as f32);
+                let idx = (seg_f.floor() as usize).min(seg_count - 1);
+                let local_t = seg_f - idx as f32;
+                if let (Some(p0), Some(p1)) = (line_pts.get(idx), line_pts.get(idx + 1)) {
+                    let comet_pos = Pos2::new(
+                        p0.x * (1.0 - local_t) + p1.x * local_t,
+                        p0.y * (1.0 - local_t) + p1.y * local_t,
+                    );
+                    painter.circle_filled(comet_pos, 5.0, Color32::from_rgb(224, 242, 254));
+                    painter.circle_stroke(comet_pos, 8.0, Stroke::new(1.4, ACCENT_CYAN));
+                }
             }
+
+            // Data point dots
             for (pt, c) in &pts {
                 let op = c.get("operator").and_then(Value::as_str).unwrap_or("DRAFT");
                 let col = operator_color(op);
                 painter.circle_filled(*pt, 5.0, col);
                 painter.circle_stroke(*pt, 5.0, Stroke::new(1.2, Color32::WHITE));
+            }
+
+            // Peak frontier star sparkle
+            if let Some((max_pt, max_c)) = pts.iter().max_by(|(_, a), (_, b)| {
+                let sa = a
+                    .get("primary_score")
+                    .and_then(Value::as_f64)
+                    .unwrap_or(0.0);
+                let sb = b
+                    .get("primary_score")
+                    .and_then(Value::as_f64)
+                    .unwrap_or(0.0);
+                sa.total_cmp(&sb)
+            }) {
+                let pulse = ((self.anim_tick as f32 * 0.08).sin() * 2.5).abs();
+                painter.circle_stroke(*max_pt, 7.5 + pulse, Stroke::new(1.8, ACCENT_AMBER));
+                draw_sparkle_star(
+                    &painter,
+                    *max_pt,
+                    11.5 + pulse,
+                    ACCENT_AMBER,
+                    self.anim_tick as f32 * 0.05,
+                );
+
+                let max_s = max_c
+                    .get("primary_score")
+                    .and_then(Value::as_f64)
+                    .unwrap_or(0.0);
+                let badge_rect = egui::Rect::from_min_size(
+                    Pos2::new(max_pt.x - 45.0, max_pt.y - 23.0),
+                    Vec2::new(90.0, 15.0),
+                );
+                painter.rect_filled(
+                    badge_rect,
+                    CornerRadius::same(3),
+                    Color32::from_rgb(15, 23, 42),
+                );
+                painter.rect_stroke(
+                    badge_rect,
+                    CornerRadius::same(3),
+                    Stroke::new(1.0, ACCENT_AMBER),
+                    egui::StrokeKind::Inside,
+                );
+                painter.text(
+                    badge_rect.center(),
+                    egui::Align2::CENTER_CENTER,
+                    format!("FRONTIER: {max_s:.2}"),
+                    FontId::monospace(9.0),
+                    ACCENT_AMBER,
+                );
             }
 
             if let Some(mouse) = resp.hover_pos() {
@@ -809,6 +1402,20 @@ impl RsiCraftApp {
         self.render_score_spark_chart(ui);
         ui.add_space(6.0);
 
+        egui::CollapsingHeader::new(
+            RichText::new(
+                "Interactive 3D Hardware Telemetry: NVIDIA GeForce RTX 4090 (24 GB VRAM)",
+            )
+            .strong()
+            .color(ACCENT_AMBER),
+        )
+        .default_open(true)
+        .show(ui, |ui| {
+            self.render_rtx_4090_3d_viewport(ui, 250.0);
+        });
+
+        ui.add_space(6.0);
+
         ui.heading(
             "Materialized Top-K Pareto Frontier (Ranked by Primary Score & Composite Utility)",
         );
@@ -929,6 +1536,22 @@ impl RsiCraftApp {
             egui::StrokeKind::Inside,
         );
 
+        // Background cybernetic grid dots
+        let grid_gap = 40.0_f32;
+        let mut gx = response.rect.left() + 20.0;
+        while gx < response.rect.right() - 10.0 {
+            let mut gy = response.rect.top() + 20.0;
+            while gy < response.rect.bottom() - 10.0 {
+                painter.circle_filled(
+                    Pos2::new(gx, gy),
+                    1.0,
+                    Color32::from_rgba_premultiplied(56, 189, 248, 25),
+                );
+                gy += grid_gap;
+            }
+            gx += grid_gap;
+        }
+
         let mut ordered = nodes;
         ordered.reverse();
 
@@ -950,7 +1573,7 @@ impl RsiCraftApp {
             positions.insert(cid, rect);
         }
 
-        // Draw Bezier edges from parent -> child
+        // Draw Bezier edges with multi-particle streaming pulses
         for e in &edges {
             let from = e.get("from").and_then(Value::as_str).unwrap_or("");
             let to = e.get("to").and_then(Value::as_str).unwrap_or("");
@@ -973,21 +1596,30 @@ impl RsiCraftApp {
                 );
                 painter.add(bez);
 
-                let t = ((self.anim_tick as f32 * 0.06) % 1.0).clamp(0.0, 1.0);
-                let omt = 1.0 - t;
-                let px = p0.x * omt.powi(3)
-                    + p1.x * 3.0 * omt.powi(2) * t
-                    + p2.x * 3.0 * omt * t.powi(2)
-                    + p3.x * t.powi(3);
-                let py = p0.y * omt.powi(3)
-                    + p1.y * 3.0 * omt.powi(2) * t
-                    + p2.y * 3.0 * omt * t.powi(2)
-                    + p3.y * t.powi(3);
-                painter.circle_filled(Pos2::new(px, py), 4.0, Color32::WHITE);
+                // 3 Staggered streaming pulse particles per edge
+                for offset in [0.0_f32, 0.333, 0.667] {
+                    let t = ((self.anim_tick as f32 * 0.02 + offset) % 1.0).clamp(0.0, 1.0);
+                    let omt = 1.0 - t;
+                    let px = p0.x * omt.powi(3)
+                        + p1.x * 3.0 * omt.powi(2) * t
+                        + p2.x * 3.0 * omt * t.powi(2)
+                        + p3.x * t.powi(3);
+                    let py = p0.y * omt.powi(3)
+                        + p1.y * 3.0 * omt.powi(2) * t
+                        + p2.y * 3.0 * omt * t.powi(2)
+                        + p3.y * t.powi(3);
+                    let p_pos = Pos2::new(px, py);
+                    painter.circle_filled(p_pos, 4.2, col);
+                    painter.circle_filled(p_pos, 2.2, Color32::WHITE);
+                }
             }
         }
 
-        // Draw nodes & detect click
+        // Draw nodes & detect click with sparkling frontier nodes
+        let max_score = ordered
+            .iter()
+            .filter_map(|n| n.get("primary_score").and_then(Value::as_f64))
+            .fold(f64::NEG_INFINITY, f64::max);
         let mut clicked_card: Option<String> = None;
         let click_pos = if response.clicked() {
             response.interact_pointer_pos()
@@ -1008,14 +1640,38 @@ impl RsiCraftApp {
                 .and_then(Value::as_f64)
                 .unwrap_or(0.0);
             if let Some(rect) = positions.get(cid) {
-                let col = operator_color(op);
+                let is_frontier = (sc - max_score).abs() < 1e-4 && max_score > 0.0;
+                let col = if is_frontier {
+                    ACCENT_AMBER
+                } else {
+                    operator_color(op)
+                };
+
                 painter.rect_filled(*rect, CornerRadius::same(8), Color32::from_rgb(17, 25, 42));
                 painter.rect_stroke(
                     *rect,
                     CornerRadius::same(8),
-                    Stroke::new(1.6, col),
+                    Stroke::new(if is_frontier { 2.4 } else { 1.6 }, col),
                     egui::StrokeKind::Inside,
                 );
+
+                if is_frontier {
+                    // Shimmering second halo & corner sparkle star
+                    painter.rect_stroke(
+                        rect.expand(2.0),
+                        CornerRadius::same(10),
+                        Stroke::new(1.0, Color32::from_rgba_premultiplied(251, 191, 36, 90)),
+                        egui::StrokeKind::Outside,
+                    );
+                    draw_sparkle_star(
+                        &painter,
+                        Pos2::new(rect.right() - 8.0, rect.top() + 8.0),
+                        8.0,
+                        ACCENT_AMBER,
+                        self.anim_tick as f32 * 0.06,
+                    );
+                }
+
                 painter.text(
                     rect.min + Vec2::new(10.0, 10.0),
                     egui::Align2::LEFT_TOP,
@@ -1350,6 +2006,16 @@ impl RsiCraftApp {
 
         ui.add_space(8.0);
         accent_card(ui, ACCENT_CYAN, |ui| {
+            ui.heading("Interactive 3D Hardware Studio: NVIDIA GeForce RTX 4090 (AD102-300)");
+            ui.label(
+                "Real-time 3D GPU model showing dual contra-rotating flow-through fans, heatsink fin stack, 12x GDDR6X VRAM chips, PCIe 4.0 interface, and plasma emission (Click-and-drag to orbit in 3D).",
+            );
+            ui.add_space(4.0);
+            self.render_rtx_4090_3d_viewport(ui, 340.0);
+        });
+
+        ui.add_space(8.0);
+        accent_card(ui, ACCENT_AMBER, |ui| {
             ui.heading("LLM Inference Endpoint & Model Configuration");
             ui.horizontal_wrapped(|ui| {
                 ui.label("Base URL (/v1/chat/completions):");
@@ -1525,6 +2191,12 @@ impl eframe::App for RsiCraftApp {
             self.style_initialized = true;
         }
         handle_zoom(ui.ctx());
+
+        self.anim_tick = self.anim_tick.wrapping_add(1);
+        if self.gpu_auto_spin || self.gpu_plasma_fx {
+            ui.ctx()
+                .request_repaint_after(std::time::Duration::from_millis(33));
+        }
 
         // Top Header Bar
         ui.horizontal_wrapped(|ui| {
