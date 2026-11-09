@@ -1,15 +1,8 @@
-//! `rsicraft-store`: Stigmergic State Engine on SQLite (WAL mode).
+//! `store`: Stigmergic State Engine on SQLite (WAL mode).
 //!
 //! Manages `tasks`, `experience_cards` (with BLAKE3 content hashes and Zstd
 //! compressed code blobs), and `task_frontiers`, plus composite utility
 //! calculation and stochastic parent selection.
-#![deny(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::todo,
-    clippy::unimplemented
-)]
 
 pub mod cas;
 pub mod utility;
@@ -24,7 +17,7 @@ use std::path::Path;
 use thiserror::Error;
 use utility::{CandidateMetrics, UtilityCalculator, UtilityHyperparams};
 
-pub const SCHEMA_SQL: &str = include_str!("../../../schema.sql");
+pub const SCHEMA_SQL: &str = include_str!("../../../../schema.sql");
 
 pub const VALID_OPERATORS: &[&str] = &["DRAFT", "IMPROVE", "DEBUG", "CROSSOVER"];
 pub const VALID_STATUSES: &[&str] = &[
