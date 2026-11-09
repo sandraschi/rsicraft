@@ -94,6 +94,7 @@ impl LlamaClient {
         let payload = json!({
             "model": self.model_alias,
             "temperature": temperature,
+            "max_tokens": 2048,
             "messages": [
                 { "role": "system", "content": system_prompt },
                 { "role": "user", "content": user_prompt }

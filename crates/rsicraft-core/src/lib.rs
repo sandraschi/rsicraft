@@ -37,12 +37,18 @@ pub struct Ctx {
 
 impl Ctx {
     #[must_use]
-    pub fn new(reg: Registry, llama_url: Option<&str>, docker_image: Option<&str>) -> Self {
+    pub fn new(
+        reg: Registry,
+        llama_url: Option<&str>,
+        model_alias: Option<&str>,
+        docker_image: Option<&str>,
+    ) -> Self {
         let url = llama_url.unwrap_or(DEFAULT_LLAMA_URL);
+        let model = model_alias.unwrap_or(DEFAULT_MODEL_ALIAS);
         let img = docker_image.unwrap_or(DEFAULT_DOCKER_IMAGE);
         Self {
             reg,
-            llm: LlamaClient::new(url, DEFAULT_MODEL_ALIAS),
+            llm: LlamaClient::new(url, model),
             sandbox: SandboxRunner::new(img),
             hyperparams: UtilityHyperparams::default(),
         }
@@ -425,10 +431,15 @@ fn execute_step(
             &task.evaluator_script,
             timeout_secs,
         )?,
+        "local" | "python" => SandboxRunner::run_local_evaluation(
+            &candidate_code,
+            &task.evaluator_script,
+            timeout_secs,
+        )?,
         "demo" => SandboxRunner::run_demo_evaluation(&candidate_code, operator, parent_score),
         other => {
             return Err(format!(
-                "invalid sandbox_mode '{other}'; expected 'demo' or 'docker'"
+                "invalid sandbox_mode '{other}'; expected 'demo', 'local', or 'docker'"
             ))
         }
     };
@@ -733,10 +744,15 @@ pub fn dispatch(ctx: &mut Ctx, cmd: Command) -> Result<Value, String> {
                     &task.evaluator_script,
                     timeout_secs,
                 )?,
+                "local" | "python" => SandboxRunner::run_local_evaluation(
+                    &code,
+                    &task.evaluator_script,
+                    timeout_secs,
+                )?,
                 "demo" => SandboxRunner::run_demo_evaluation(&code, operator, parent_score),
                 other => {
                     return Err(format!(
-                        "invalid sandbox_mode '{other}'; expected 'demo' or 'docker'"
+                        "invalid sandbox_mode '{other}'; expected 'demo', 'local', or 'docker'"
                     ))
                 }
             };

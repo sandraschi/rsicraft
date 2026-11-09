@@ -116,18 +116,30 @@ impl PromptBuilder {
 
     #[must_use]
     pub fn extract_code_block(text: &str) -> String {
-        if let Some(start) = text.find("```python") {
+        let mut body = text;
+        if let Some(idx) = body.rfind("<channel|>") {
+            if let Some(after) = body.get(idx.saturating_add("<channel|>".len())..) {
+                body = after;
+            }
+        }
+        if let Some(idx) = body.rfind("</think>") {
+            if let Some(after) = body.get(idx.saturating_add("</think>".len())..) {
+                body = after;
+            }
+        }
+
+        if let Some(start) = body.find("```python") {
             let after_fence = start.saturating_add(9);
-            if let Some(code_part) = text.get(after_fence..) {
+            if let Some(code_part) = body.get(after_fence..) {
                 if let Some(end) = code_part.find("```") {
                     if let Some(extracted) = code_part.get(..end) {
                         return extracted.trim().to_string();
                     }
                 }
             }
-        } else if let Some(start) = text.find("```") {
+        } else if let Some(start) = body.find("```") {
             let after_fence = start.saturating_add(3);
-            if let Some(code_part) = text.get(after_fence..) {
+            if let Some(code_part) = body.get(after_fence..) {
                 if let Some(end) = code_part.find("```") {
                     if let Some(extracted) = code_part.get(..end) {
                         return extracted.trim().to_string();
@@ -135,6 +147,6 @@ impl PromptBuilder {
                 }
             }
         }
-        text.trim().to_string()
+        body.trim().to_string()
     }
 }

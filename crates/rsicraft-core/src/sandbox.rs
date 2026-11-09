@@ -83,20 +83,21 @@ impl SandboxRunner {
         })
         .to_string();
 
-        let py_harness = format!(
-            "import os, json, sys, subprocess\n\
-             p = json.loads(os.environ['RSI_PAYLOAD'])\n\
-             with open('/tmp/candidate.py', 'w', encoding='utf-8') as f: f.write(p['candidate_code'])\n\
-             with open('/tmp/evaluator.py', 'w', encoding='utf-8') as f: f.write(p['evaluator_script'])\n\
-             try:\n\
-                 res = subprocess.run(['python3', '/tmp/evaluator.py'], capture_output=True, text=True, timeout={timeout_secs})\n\
-                 sys.stdout.write(res.stdout)\n\
-                 sys.stderr.write(res.stderr)\n\
-                 sys.exit(res.returncode)\n\
-             except subprocess.TimeoutExpired:\n\
-                 print('RSI_METRIC_JSON={{\"status\":\"TIMEOUT\",\"score\":0.0}}')\n\
-                 sys.exit(124)\n"
-        );
+        let py_harness = [
+            "import os, json, sys, subprocess",
+            "p = json.loads(os.environ['RSI_PAYLOAD'])",
+            "with open('/tmp/candidate.py', 'w', encoding='utf-8') as f: f.write(p['candidate_code'])",
+            "with open('/tmp/evaluator.py', 'w', encoding='utf-8') as f: f.write(p['evaluator_script'])",
+            "try:",
+            &format!("    res = subprocess.run(['python3', '/tmp/evaluator.py'], capture_output=True, text=True, timeout={timeout_secs})"),
+            "    sys.stdout.write(res.stdout)",
+            "    sys.stderr.write(res.stderr)",
+            "    sys.exit(res.returncode)",
+            "except subprocess.TimeoutExpired:",
+            "    print('RSI_METRIC_JSON={\"status\":\"TIMEOUT\",\"score\":0.0}')",
+            "    sys.exit(124)",
+        ]
+        .join("\n");
 
         let output = ProcessCommand::new("docker")
             .args([
@@ -149,6 +150,109 @@ impl SandboxRunner {
             raw_output: combined,
             execution_time_ms: elapsed_ms,
             backend: "docker".into(),
+        })
+    }
+
+    fn resolve_python_bin() -> String {
+        if let Ok(p) = std::env::var("RSICRAFT_PYTHON") {
+            if !p.trim().is_empty() {
+                return p;
+            }
+        }
+        if let Ok(appdata) = std::env::var("APPDATA") {
+            let candidate = std::path::PathBuf::from(appdata)
+                .join("uv")
+                .join("python")
+                .join("cpython-3.12.9-windows-x86_64-none")
+                .join("python.exe");
+            if candidate.exists() {
+                return candidate.to_string_lossy().to_string();
+            }
+        }
+        "python3".into()
+    }
+
+    /// Evaluate candidate code in an isolated ephemeral local directory (`sandbox_mode = "local"`).
+    pub fn run_local_evaluation(
+        candidate_code: &str,
+        evaluator_script: &str,
+        timeout_secs: u64,
+    ) -> Result<SandboxExecutionResult, String> {
+        let start = Instant::now();
+        let eval_dir = std::env::temp_dir().join(format!("rsicraft-eval-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&eval_dir)
+            .map_err(|e| format!("failed to create ephemeral sandbox dir: {e}"))?;
+
+        let payload = serde_json::json!({
+            "candidate_code": candidate_code,
+            "evaluator_script": evaluator_script,
+        })
+        .to_string();
+
+        let py_harness = [
+            "import os, json, sys, subprocess",
+            "p = json.loads(os.environ['RSI_PAYLOAD'])",
+            "wdir = os.environ['RSI_WORKDIR']",
+            "cand_path = os.path.join(wdir, 'candidate.py')",
+            "eval_path = os.path.join(wdir, 'evaluator.py')",
+            "with open(cand_path, 'w', encoding='utf-8') as f: f.write(p['candidate_code'])",
+            "with open(eval_path, 'w', encoding='utf-8') as f: f.write(p['evaluator_script'])",
+            "try:",
+            &format!("    res = subprocess.run([sys.executable, eval_path], cwd=wdir, capture_output=True, text=True, timeout={timeout_secs})"),
+            "    sys.stdout.write(res.stdout)",
+            "    sys.stderr.write(res.stderr)",
+            "    sys.exit(res.returncode)",
+            "except subprocess.TimeoutExpired:",
+            "    print('RSI_METRIC_JSON={\"status\":\"TIMEOUT\",\"score\":0.0}')",
+            "    sys.exit(124)",
+        ]
+        .join("\n");
+
+        let py_bin = Self::resolve_python_bin();
+        let output = ProcessCommand::new(&py_bin)
+            .args(["-I", "-B", "-c", &py_harness])
+            .current_dir(&eval_dir)
+            .env("RSI_PAYLOAD", &payload)
+            .env("RSI_WORKDIR", eval_dir.to_string_lossy().as_ref())
+            .output();
+
+        let _ = std::fs::remove_dir_all(&eval_dir);
+
+        let output = output.map_err(|e| format!("failed to invoke python '{py_bin}': {e}"))?;
+        let elapsed_ms = i64::try_from(start.elapsed().as_millis()).unwrap_or(i64::MAX);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let combined = if stderr.trim().is_empty() {
+            stdout.to_string()
+        } else {
+            format!("{stdout}\n{stderr}")
+        };
+
+        if output.status.code() == Some(124) {
+            return Ok(SandboxExecutionResult {
+                status: "TIMEOUT".into(),
+                primary_score: 0.0,
+                raw_output: combined,
+                execution_time_ms: elapsed_ms,
+                backend: "local".into(),
+            });
+        }
+
+        let (mut status, primary_score) = Self::parse_evaluator_output(&combined);
+        if status == "METRIC_PARSE_ERROR" && !output.status.success() {
+            if combined.contains("SyntaxError") || combined.contains("IndentationError") {
+                status = "COMPILE_ERROR".into();
+            } else {
+                status = "RUNTIME_ERROR".into();
+            }
+        }
+
+        Ok(SandboxExecutionResult {
+            status,
+            primary_score,
+            raw_output: combined,
+            execution_time_ms: elapsed_ms,
+            backend: "local".into(),
         })
     }
 

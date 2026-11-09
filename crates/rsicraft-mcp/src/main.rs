@@ -31,9 +31,12 @@ struct Cli {
     /// SQLite database path. Default: $RSICRAFT_DB or %LOCALAPPDATA%\rsicraft\rsicraft.db
     #[arg(long, global = true)]
     db: Option<PathBuf>,
-    /// llama-server base URL (default: http://127.0.0.1:8081).
+    /// llama-server or Ollama base URL (default: http://127.0.0.1:8081).
     #[arg(long, global = true)]
     llama_url: Option<String>,
+    /// Model alias passed to /v1/chat/completions (default: frontis).
+    #[arg(long, global = true)]
+    model: Option<String>,
     /// Docker evaluator image tag (default: rsicraft-evaluator:latest).
     #[arg(long, global = true)]
     docker_image: Option<String>,
@@ -432,7 +435,12 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let mut ctx = Ctx::new(reg, cli.llama_url.as_deref(), cli.docker_image.as_deref());
+    let mut ctx = Ctx::new(
+        reg,
+        cli.llama_url.as_deref(),
+        cli.model.as_deref(),
+        cli.docker_image.as_deref(),
+    );
     if matches!(cli.cmd, Cmd::Mcp) {
         eprintln!("[rsicraft] db {}", db_path.display());
         let mut host = Host { ctx };
@@ -478,7 +486,7 @@ mod tests {
     fn test_host() -> Host {
         let reg = Registry::open_in_memory().unwrap();
         Host {
-            ctx: Ctx::new(reg, None, None),
+            ctx: Ctx::new(reg, None, None, None),
         }
     }
 

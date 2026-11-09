@@ -36,4 +36,9 @@ We wanted a sovereign, zero-dependency host engine that compiles to one static R
    - Candidates execute inside a rootless, read-only Docker container (`--network none --memory 4g --cpus 4 --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m`) and emit a deterministic `RSI_METRIC_JSON={"status": ..., "score": ...}` line.
    - Built on our 3-crate ArtCraft containment harness (`rsicraft-store`, `rsicraft-core`, `rsicraft-mcp`) with `#![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)]` across the workspace. The same binary runs as a CLI (`--json`) and as an MCP `stdio` server so external agents can inspect the frontier or trigger evolutionary campaigns directly.
 
+5. **First Live 4090 Campaign Trace (`kadane-4090`, 25,000-int benchmark):**
+   - `Step 1 (DRAFT, T=0.70)`: Synthesized baseline `O(n)` Kadane loop using Python `max(num, current_sum + num)` (`score = 96.5207`, `1.391 ms`).
+   - `Step 2 (IMPROVE, T=0.40)` & `Step 3 (DEBUG, T=0.20)`: Explored alternative loop structures (`93.5537`, `92.5160`), recorded in the stigmergic store with lower delta scores.
+   - `Step 4 (CROSSOVER, T=0.50)`: Sampled `parent_a` (`05b6bdd5`) and `parent_b` (`16d8f09e`) via the composite utility wheel and synthesized a hybrid that cached the list reference locally and replaced the inner-loop `max()` function call overhead with inline conditional branching (`if x > new_sum:`), dropping execution time to `1.359 ms` and taking Rank 1 on the frontier (`score = 96.6028`, `composite_utility = 1.0000`).
+
 Happy to answer questions about the composite utility weights, KV-cache sizing on 24 GB cards, or why we moved our entire agent fleet from Python to zero-unwrap Rust workspaces.

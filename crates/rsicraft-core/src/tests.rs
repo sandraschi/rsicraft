@@ -3,7 +3,7 @@ use serde_json::json;
 
 fn test_ctx() -> Ctx {
     let reg = Registry::open_in_memory().unwrap();
-    Ctx::new(reg, None, None)
+    Ctx::new(reg, None, None, None)
 }
 
 #[test]
@@ -17,6 +17,12 @@ fn operator_temperatures_and_code_extraction() {
     assert_eq!(
         PromptBuilder::extract_code_block(wrapped),
         "def solve(x):\n    return x * 2"
+    );
+
+    let thought_wrapped = "<|channel>thought\nLet's try ```python\nbad()\n``` first\n<channel|>```python\ndef solve(x):\n    return x + 1\n```";
+    assert_eq!(
+        PromptBuilder::extract_code_block(thought_wrapped),
+        "def solve(x):\n    return x + 1"
     );
 }
 
