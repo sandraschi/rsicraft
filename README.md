@@ -15,9 +15,6 @@
 
 **RSICraft** is a pure-Rust **Sovereign Recursive Self-Improvement (RSI) Studio, CLI & MCP Engine** engineered for consumer 24 GB GPUs (**Goliath**: AMD Ryzen 9 7900X, 64 GB DDR5, NVIDIA GeForce RTX 4090 24 GB VRAM). Built on the scientific and mathematical foundations of **Tsinghua University & Frontis.AI's [`arXiv:2607.28568`](https://arxiv.org/abs/2607.28568) (`Frontis-MA1` / [`FrontisAI/OpenRSI`](https://github.com/FrontisAI/OpenRSI))**, it combines a temperature-calibrated **4-Operator Evolutionary Action Space** (`DRAFT`, `IMPROVE`, `DEBUG`, `CROSSOVER`), an isolated sandbox evaluator (`docker`, `local` Python 3.12, or `demo`), a **Stigmergic SQLite `WAL` + BLAKE3 + Zstd Content-Addressable Store (CAS)**, and a **native GPU-rendered `eframe`/`egui 0.37` Desktop Studio** into a single zero-panic workspace.
 
-<p align="center"><img src="docs/cartoon/rsi-cartoon.svg" width="100%" alt="Four-panel cartoon. 1: a developer finds a tiny kitten-like open-weights LLM, 7B, totally harmless. 2: she feeds it into the RSI loop funnel on her PC Goliath (RTX 4090). 3: generation 512, the utility curve shoots up and she is proud. 4: generation 4096, the kitten on top of the PC is still tiny and says mrrp, but its shadow fills the wall with glowing eyes and a jagged grin and says MRRP."></p>
-<p align="center"><sub>Recursive self-improvement, now with extra purr. (<a href="docs/cartoon/rsi-cartoon.svg">SVG</a>)</sub></p>
-
 ---
 
 ## Technical Brochure, EPUB Handbook, RSI Geopolitics & Tsinghua Dossier
