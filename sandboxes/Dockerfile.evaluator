@@ -1,0 +1,26 @@
+FROM python:3.11-slim
+
+# Enforce security non-root environment and execution constraints
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1
+
+RUN groupadd -g 10001 evaluator && \
+    useradd -u 10000 -g evaluator -s /bin/false -m evaluator
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir \
+    numpy==1.26.4 \
+    scipy==1.13.0 \
+    scikit-learn==1.4.2 \
+    lightgbm==4.3.0 \
+    pytest==8.2.0
+
+WORKDIR /tmp
+USER evaluator:evaluator
+
+CMD ["python3"]
