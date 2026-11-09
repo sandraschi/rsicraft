@@ -111,3 +111,47 @@ fn direct_evaluate_detects_compile_and_runtime_errors() {
     let crash_res = dispatch(&mut ctx, crash).unwrap();
     assert_eq!(crash_res["execution_status"], "RUNTIME_ERROR");
 }
+
+#[test]
+fn multitab_help_supports_all_tabs_and_substring_search() {
+    let mut ctx = test_ctx();
+    let all = dispatch(
+        &mut ctx,
+        Command::Help {
+            tab: None,
+            search: None,
+        },
+    )
+    .unwrap();
+    assert_eq!(all["matched_tabs_count"], 9);
+
+    let tsinghua = dispatch(
+        &mut ctx,
+        Command::Help {
+            tab: Some("tsinghua_openrsi".into()),
+            search: None,
+        },
+    )
+    .unwrap();
+    assert_eq!(tsinghua["matched_tabs_count"], 1);
+    assert_eq!(tsinghua["tabs"][0]["id"], "tsinghua_openrsi");
+
+    let filtered = dispatch(
+        &mut ctx,
+        Command::Help {
+            tab: None,
+            search: Some("Kadane".into()),
+        },
+    )
+    .unwrap();
+    assert!(filtered["matched_tabs_count"].as_u64().unwrap() >= 1);
+
+    let bad = dispatch(
+        &mut ctx,
+        Command::Help {
+            tab: Some("nonexistent".into()),
+            search: None,
+        },
+    );
+    assert!(bad.is_err());
+}

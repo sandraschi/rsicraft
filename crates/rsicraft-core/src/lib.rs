@@ -11,19 +11,21 @@
     clippy::unimplemented
 )]
 
+pub mod help;
 pub mod llm;
 pub mod operators;
 pub mod sandbox;
+pub mod store;
 
 #[cfg(test)]
 mod tests;
 
 use llm::{goliath_4090_profile, LlamaClient, DEFAULT_LLAMA_URL, DEFAULT_MODEL_ALIAS};
 use operators::{PromptBuilder, SearchOperator};
-use rsicraft_store::utility::UtilityHyperparams;
-use rsicraft_store::{NewCardInput, Registry};
 use sandbox::{SandboxRunner, DEFAULT_DOCKER_IMAGE};
 use serde_json::{json, Value};
+pub use store::utility::UtilityHyperparams;
+pub use store::{NewCardInput, Registry};
 
 pub const APP: &str = "rsicraft";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -110,6 +112,10 @@ pub enum Command {
         record: bool,
     },
     DemoSeed,
+    Help {
+        tab: Option<String>,
+        search: Option<String>,
+    },
 }
 
 fn req_str(args: &Value, key: &str) -> Result<String, String> {
@@ -207,6 +213,10 @@ impl Command {
                 })
             }
             "rsi_demo_seed" => Ok(Self::DemoSeed),
+            "rsi_help" => Ok(Self::Help {
+                tab: opt_str(args, "tab"),
+                search: opt_str(args, "search"),
+            }),
             other => Err(format!("unknown tool '{other}'")),
         }
     }
@@ -343,6 +353,22 @@ pub fn tools() -> Vec<Value> {
             "rsi_demo_seed",
             "Seed an empty database with the spec's 'opt-synth' (Vector Max) benchmark task and a 4-card evolutionary progression.",
             json!({}),
+            &[],
+        ),
+        tool_def(
+            "rsi_help",
+            "Query the 9-tab RSICraft Operator Manual, RSI Geopolitics ('Skynet' vs Closed Labs), Tsinghua/Frontis.AI OpenRSI Dossier, and Competitive Matrix (tabs: overview, rsi_landscape, tsinghua_openrsi, wrappee, operators, compare, api, troubleshoot, faq, all) with optional substring search.",
+            json!({
+                "tab": {
+                    "type": "string",
+                    "enum": ["all", "overview", "rsi_landscape", "tsinghua_openrsi", "wrappee", "operators", "compare", "api", "troubleshoot", "faq"],
+                    "description": "Help tab to display (default: 'all')."
+                },
+                "search": {
+                    "type": "string",
+                    "description": "Optional case-insensitive substring query across all help tabs and sections."
+                }
+            }),
             &[],
         ),
     ]
@@ -820,5 +846,6 @@ pub fn dispatch(ctx: &mut Ctx, cmd: Command) -> Result<Value, String> {
                 "trajectory": [c1, c2, c3, c4],
             }))
         }
+        Command::Help { tab, search } => help::query_help(tab.as_deref(), search.as_deref()),
     }
 }

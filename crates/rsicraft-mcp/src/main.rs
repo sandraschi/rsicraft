@@ -15,8 +15,7 @@ mod mcp;
 
 use clap::{Parser, Subcommand};
 use mcp::{serve_stdio, ToolHost};
-use rsicraft_core::{dispatch, tools, Command, Ctx, APP, VERSION};
-use rsicraft_store::Registry;
+use rsicraft_core::{dispatch, tools, Command, Ctx, Registry, APP, VERSION};
 use serde_json::{json, Map, Value};
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -126,6 +125,13 @@ enum Cmd {
     },
     /// Seed an empty database with the 'opt-synth' (Vector Max) demo benchmark and 4 evolutionary cards.
     DemoSeed,
+    /// Query the 7-tab Operator Manual & Competitive Architecture Matrix (overview, wrappee, operators, compare, api, troubleshoot, faq, all).
+    HelpTabs {
+        #[arg(long, default_value = "all")]
+        tab: String,
+        #[arg(long)]
+        search: Option<String>,
+    },
     /// Print the MCP tool catalog as JSON.
     Tools,
     /// Run the MCP 2024-11-05 stdio server.
@@ -269,6 +275,13 @@ fn to_tool(cmd: Cmd) -> Result<(&'static str, Value), String> {
             }),
         ),
         Cmd::DemoSeed => ("rsi_demo_seed", json!({})),
+        Cmd::HelpTabs { tab, search } => (
+            "rsi_help",
+            obj(vec![
+                ("tab", Some(json!(tab))),
+                ("search", search.map(Value::String)),
+            ]),
+        ),
         Cmd::Tools | Cmd::Mcp => return Err("not a tool verb".into()),
     })
 }
@@ -358,6 +371,35 @@ fn render(v: &Value) -> String {
     let Some(obj) = v.as_object() else {
         return scalar(v);
     };
+    if let Some(tabs) = obj.get("tabs").and_then(Value::as_array) {
+        let mut out = String::new();
+        out.push_str("=== RSICraft 7-Tab Operator Manual & Architecture Guide ===\n");
+        out.push_str(
+            "Tabs: [overview] [wrappee] [operators] [compare] [api] [troubleshoot] [faq]\n\n",
+        );
+        for t in tabs {
+            let id = t.get("id").and_then(Value::as_str).unwrap_or("");
+            let title = t.get("title").and_then(Value::as_str).unwrap_or("");
+            let badge = t.get("badge").and_then(Value::as_str).unwrap_or("");
+            let summary = t.get("summary").and_then(Value::as_str).unwrap_or("");
+            out.push_str(&format!("## {title} [{id} | {badge}]\n{summary}\n\n"));
+            if let Some(sections) = t.get("sections").and_then(Value::as_array) {
+                for s in sections {
+                    let h = s.get("heading").and_then(Value::as_str).unwrap_or("");
+                    let b = s.get("body").and_then(Value::as_str).unwrap_or("");
+                    out.push_str(&format!("  ### {h}\n  {b}\n"));
+                    if let Some(code) = s.get("code_example").and_then(Value::as_str) {
+                        out.push_str(&format!(
+                            "  Example:\n    {}\n",
+                            code.replace('\n', "\n    ")
+                        ));
+                    }
+                    out.push('\n');
+                }
+            }
+        }
+        return out;
+    }
     let Some(list_key) = LIST_KEYS
         .iter()
         .find(|k| obj.get(**k).is_some_and(Value::is_array))
@@ -508,7 +550,7 @@ mod tests {
 
         let list =
             handle_line(&mut h, r#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#).unwrap();
-        assert_eq!(list["result"]["tools"].as_array().map(Vec::len), Some(13));
+        assert_eq!(list["result"]["tools"].as_array().map(Vec::len), Some(14));
 
         let seed = handle_line(
             &mut h,
@@ -561,6 +603,10 @@ mod tests {
                 task_id: "opt-synth".into(),
             },
             Cmd::DemoSeed,
+            Cmd::HelpTabs {
+                tab: "all".into(),
+                search: None,
+            },
         ];
         let known: Vec<String> = tools()
             .iter()

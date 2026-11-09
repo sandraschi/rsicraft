@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/rsicraft-store", "crates/rsicraft-core", "crates/rsicraft-mcp"]
+members = ["crates/rsicraft-core", "crates/rsicraft-mcp", "crates/rsicraft-app"]
 resolver = "2"
 
 [workspace.package]
@@ -19,6 +19,7 @@ blake3 = "1.5"
 zstd = "0.13"
 uuid = { version = "1.9", features = ["v4"] }
 ureq = { version = "2.10", features = ["json"] }
+eframe = "0.37"
 
 [workspace.lints.clippy]
 unwrap_used = "deny"

@@ -12,7 +12,6 @@ path = "src/main.rs"
 
 [dependencies]
 rsicraft-core = { path = "../rsicraft-core" }
-rsicraft-store = { path = "../rsicraft-store" }
 serde_json.workspace = true
 clap.workspace = true
 
