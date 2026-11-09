@@ -161,8 +161,7 @@ impl Command {
                 })
             }
             "rsi_campaign" => {
-                let steps =
-                    u32::try_from(opt_u64(args, "steps", 4).clamp(1, 64)).unwrap_or(4);
+                let steps = u32::try_from(opt_u64(args, "steps", 4).clamp(1, 64)).unwrap_or(4);
                 Ok(Self::Campaign {
                     task_id: opt_str(args, "task_id").unwrap_or_else(|| "opt-synth".into()),
                     steps,
@@ -407,11 +406,9 @@ fn execute_step(
     // 3. Synthesize candidate via LLM or Demo oracle
     let raw_llm_text = match provider.to_ascii_lowercase().as_str() {
         "llama" | "live" | "frontis" => ctx.llm.complete(sys_prompt, &user_prompt, temperature)?,
-        "demo" => LlamaClient::demo_synthesize(
-            operator,
-            task_id,
-            bounds.total_cards.saturating_add(1),
-        ),
+        "demo" => {
+            LlamaClient::demo_synthesize(operator, task_id, bounds.total_cards.saturating_add(1))
+        }
         other => {
             return Err(format!(
                 "invalid provider '{other}'; expected 'demo' or 'llama'"
@@ -423,10 +420,11 @@ fn execute_step(
     // 4. Evaluate candidate inside sandbox
     let parent_score = parent_a.as_ref().map(|p| p.primary_score);
     let eval_result = match sandbox_mode.to_ascii_lowercase().as_str() {
-        "docker" | "live" => {
-            ctx.sandbox
-                .run_docker_evaluation(&candidate_code, &task.evaluator_script, timeout_secs)?
-        }
+        "docker" | "live" => ctx.sandbox.run_docker_evaluation(
+            &candidate_code,
+            &task.evaluator_script,
+            timeout_secs,
+        )?,
         "demo" => SandboxRunner::run_demo_evaluation(&candidate_code, operator, parent_score),
         other => {
             return Err(format!(
@@ -530,10 +528,7 @@ pub fn dispatch(ctx: &mut Ctx, cmd: Command) -> Result<Value, String> {
                 .reg
                 .get_task_score_bounds(&task_id)
                 .map_err(|e| e.to_string())?;
-            let frontier = ctx
-                .reg
-                .get_frontier(&task_id)
-                .map_err(|e| e.to_string())?;
+            let frontier = ctx.reg.get_frontier(&task_id).map_err(|e| e.to_string())?;
             Ok(json!({
                 "task": task,
                 "bounds": bounds,
@@ -546,7 +541,14 @@ pub fn dispatch(ctx: &mut Ctx, cmd: Command) -> Result<Value, String> {
             provider,
             sandbox_mode,
             timeout_secs,
-        } => execute_step(ctx, &task_id, operator, &provider, &sandbox_mode, timeout_secs),
+        } => execute_step(
+            ctx,
+            &task_id,
+            operator,
+            &provider,
+            &sandbox_mode,
+            timeout_secs,
+        ),
         Command::Campaign {
             task_id,
             steps,
@@ -575,10 +577,7 @@ pub fn dispatch(ctx: &mut Ctx, cmd: Command) -> Result<Value, String> {
                     execute_step(ctx, &task_id, op, &provider, &sandbox_mode, timeout_secs)?;
                 results.push(step_val);
             }
-            let frontier = ctx
-                .reg
-                .get_frontier(&task_id)
-                .map_err(|e| e.to_string())?;
+            let frontier = ctx.reg.get_frontier(&task_id).map_err(|e| e.to_string())?;
             let best_score = frontier.first().map_or(0.0, |f| f.card.primary_score);
             Ok(json!({
                 "task_id": task_id,
@@ -591,10 +590,7 @@ pub fn dispatch(ctx: &mut Ctx, cmd: Command) -> Result<Value, String> {
             ctx.reg
                 .refresh_task_frontier(&task_id, limit)
                 .map_err(|e| e.to_string())?;
-            let entries = ctx
-                .reg
-                .get_frontier(&task_id)
-                .map_err(|e| e.to_string())?;
+            let entries = ctx.reg.get_frontier(&task_id).map_err(|e| e.to_string())?;
             let rows: Vec<Value> = entries
                 .iter()
                 .map(|e| {
@@ -732,10 +728,11 @@ pub fn dispatch(ctx: &mut Ctx, cmd: Command) -> Result<Value, String> {
                 None => None,
             };
             let eval_result = match sandbox_mode.to_ascii_lowercase().as_str() {
-                "docker" | "live" => {
-                    ctx.sandbox
-                        .run_docker_evaluation(&code, &task.evaluator_script, timeout_secs)?
-                }
+                "docker" | "live" => ctx.sandbox.run_docker_evaluation(
+                    &code,
+                    &task.evaluator_script,
+                    timeout_secs,
+                )?,
                 "demo" => SandboxRunner::run_demo_evaluation(&code, operator, parent_score),
                 other => {
                     return Err(format!(
@@ -783,7 +780,14 @@ pub fn dispatch(ctx: &mut Ctx, cmd: Command) -> Result<Value, String> {
 
             let c1 = execute_step(ctx, "opt-synth", SearchOperator::Draft, "demo", "demo", 30)?;
             let c2 = execute_step(ctx, "opt-synth", SearchOperator::Debug, "demo", "demo", 30)?;
-            let c3 = execute_step(ctx, "opt-synth", SearchOperator::Improve, "demo", "demo", 30)?;
+            let c3 = execute_step(
+                ctx,
+                "opt-synth",
+                SearchOperator::Improve,
+                "demo",
+                "demo",
+                30,
+            )?;
             let c4 = execute_step(
                 ctx,
                 "opt-synth",

@@ -265,18 +265,17 @@ impl Registry {
     }
 
     pub fn get_task_score_bounds(&self, task_id: &str) -> StoreResult<ScoreBounds> {
-        let (min_s, max_s, min_d, max_d, total): (f64, f64, f64, f64, i64) =
-            self.conn.query_row(
-                "SELECT
+        let (min_s, max_s, min_d, max_d, total): (f64, f64, f64, f64, i64) = self.conn.query_row(
+            "SELECT
                     COALESCE(MIN(primary_score), 0.0),
                     COALESCE(MAX(primary_score), 1.0),
                     COALESCE(MIN(delta_score), 0.0),
                     COALESCE(MAX(delta_score), 1.0),
                     COUNT(*)
                  FROM experience_cards WHERE task_id = ?1",
-                params![task_id],
-                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
-            )?;
+            params![task_id],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
+        )?;
         let success_cards: i64 = self.conn.query_row(
             "SELECT COUNT(*) FROM experience_cards
              WHERE task_id = ?1 AND execution_status = 'SUCCESS'",
@@ -650,10 +649,7 @@ impl Registry {
         // Deterministic-yet-varied stochastic roulette wheel seeded by BLAKE3 over
         // the current card count + sum of children counts so identical state yields
         // reproducible selection while advancing state explores the frontier.
-        let total_children: u64 = candidates
-            .iter()
-            .map(|c| u64::from(c.children_count))
-            .sum();
+        let total_children: u64 = candidates.iter().map(|c| u64::from(c.children_count)).sum();
         let seed_input = format!(
             "{task_id}:{}:{total_children}:{}",
             candidates.len(),

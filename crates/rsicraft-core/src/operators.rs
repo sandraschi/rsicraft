@@ -86,9 +86,7 @@ impl PromptBuilder {
     ) -> String {
         match op {
             SearchOperator::Draft => {
-                format!(
-                    "### TASK SPECIFICATION\n{task_desc}\n\nGenerate the complete solution."
-                )
+                format!("### TASK SPECIFICATION\n{task_desc}\n\nGenerate the complete solution.")
             }
             SearchOperator::Improve => {
                 format!(
