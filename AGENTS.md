@@ -1,30 +1,30 @@
-# AGENTS.md - rsicraft
+# RSICraft — Per-Repo Agent Instructions (`AGENTS.md`)
 
-Sovereign Recursive Self-Improvement (RSI) Engine in Pure Rust (Frontis-MA1 30B/35B MoE + OpenRSI on Goliath RTX 4090).
-Read first: `mcp-central-docs/standards/RUST_ARTCRAFT_STANDARD.md`.
+**Purpose:** Navigation map and hard invariants for agents working in `D:\Dev\repos\rsicraft`.
 
-## Layout
+## Fleet Reading Chain
 
-- `crates/rsicraft-store` (L1): Stigmergic SQLite WAL database (`tasks`, `experience_cards`, `task_frontiers`), BLAKE3 + Zstd Content-Addressable Storage (`cas.rs`), and composite utility parent selector (`utility.rs`).
-- `crates/rsicraft-core` (L1): 4-operator evolutionary engine (`DRAFT`, `IMPROVE`, `DEBUG`, `CROSSOVER`), Frontis-MA1 `llama-server` client (`llm.rs`), isolated Docker + deterministic Demo sandbox runner (`sandbox.rs`), and Universal `Command::dispatch` bus.
-- `crates/rsicraft-mcp` (L2): `rsicraft` binary combining CLI verbs (`--json`) and the MCP `2024-11-05` stdio server.
-- `sandboxes/Dockerfile.evaluator`: Hardened non-root Python 3.11 evaluator container image.
-- `schema.sql`: Canonical SQLite WAL schema DDL.
+1. [`../AGENTS.md`](../AGENTS.md) — Fleet root instructions and `AGENT_READING_ORDER.md` pointer.
+2. [`../mcp-central-docs/standards/rust-artcraft/RUST_ARTCRAFT_STANDARD.md`](../mcp-central-docs/standards/rust-artcraft/RUST_ARTCRAFT_STANDARD.md) — Pure-Rust ArtCraft 3-Crate Standard & 6 Merge Gates.
+3. [`../mcp-central-docs/standards/CRAFT_BROCHURE_STANDARD.md`](../mcp-central-docs/standards/CRAFT_BROCHURE_STANDARD.md) — Technical Brochure (`HTML` + `EPUB` + `PDF`) specification.
 
-## Invariants (never weaken)
+## Workspace Layout (3-Crate Pure-Rust ArtCraft Standard)
 
-- Zero-panic policy: `unwrap_used`, `expect_used`, `panic`, `todo`, `unimplemented` are denied across all crates outside tests.
-- MCP stdio invariant: in `mcp` mode, `stdout` carries 100% pure line-delimited JSON-RPC; all diagnostics go to `stderr`.
-- Composite utility formula: `U_i = lambda_s * s_norm_i + lambda_delta * delta_norm_i + lambda_nu * nu_i` with `nu_i = 1 / (1 + children_count_i)` and defaults `0.50 / 0.35 / 0.15`.
-- Operator target temperatures: `DRAFT = 0.70`, `IMPROVE = 0.40`, `DEBUG = 0.20`, `CROSSOVER = 0.50`.
-- Container sandbox isolation: `--network none`, `--memory 4g`, `--cpus 4`, `--read-only`, `--tmpfs /tmp:rw,noexec,nosuid,size=64m`.
-- Demo data only via `demo-seed` on an empty database, explicitly labelled `DEMO`.
+| Path | Role |
+| :--- | :--- |
+| `crates/rsicraft-store/` | `L1 Store`: SQLite `WAL` schema (`schema.sql`), BLAKE3 + Zstd CAS (`cas.rs`), composite utility parent selector (`utility.rs`). |
+| `crates/rsicraft-core/` | `L1 Core`: 4-operator action space (`operators.rs`), `LlamaClient` (`llm.rs`), `SandboxRunner` (`sandbox.rs`), 7-tab help (`help.rs`), and 14-tool `Command::dispatch` bus (`lib.rs`). |
+| `crates/rsicraft-mcp/` | `L2 CLI + MCP`: `clap` CLI (`--json` + table/help renderer) and pure-Rust MCP `2024-11-05` stdio loop (`mcp.rs`). |
+| `sandboxes/Dockerfile.evaluator` | Rootless air-gapped Python 3.12 + NumPy/SciPy evaluator image. |
+| `docs/brochure/` | `rsicraft-brochure.{html,epub,pdf}` compiled via `BookCraft`. |
+| `docs/help/index.html` | Interactive 7-tab HTML Help Studio. |
 
-## Gates
+## Hard Invariants
 
-1. `cargo clippy --workspace --all-targets --all-features -- -D warnings`
-2. `cargo test --workspace`
-3. `cargo fmt --all --check`
-4. MCP probe: `initialize` -> `tools/list` -> `tools/call`, stdout pure JSON
-5. `Cargo.lock` committed, clean `git status`
-6. `CHANGELOG.md` checkpoint line updated
+1. **Zero Panics:** Every crate MUST keep `#![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::todo, clippy::unimplemented)]`.
+2. **100% CLI / MCP Parity:** Every MCP tool in `rsicraft_core::tools()` must map through `Command::from_tool` and have a matching CLI verb tested in `cli_verbs_map_to_known_tools`.
+3. **Brochure Sync:** Whenever tools or architecture change, update `docs/brochure/rsicraft-brochure.html` and recompile `.epub` and `.pdf` via:
+   ```powershell
+   pwsh -File D:\Dev\repos\mcp-central-docs\scripts\build-craft-brochure.ps1 -RepoPath D:\Dev\repos\rsicraft -PreserveExistingHtml
+   ```
+4. **All 6 Gates Before Commit:** Run `just ci` (`cargo clippy -- -D warnings`, `cargo test --workspace`, `cargo fmt --all --check`).
