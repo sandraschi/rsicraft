@@ -1,0 +1,19 @@
+[package]
+name = "rsicraft-core"
+description = "rsicraft L1 core: 4-operator evolutionary engine, Frontis-MA1 4090 LLM client, isolated container sandbox, and Command::dispatch bus."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+rsicraft-store = { path = "../rsicraft-store" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+ureq.workspace = true
+blake3.workspace = true
+
+[lints]
+workspace = true
