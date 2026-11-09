@@ -129,6 +129,13 @@ pub struct RsiCraftApp {
     pub gpu_style: usize,
     pub gpu_show_vram_chips: bool,
     pub gpu_plasma_fx: bool,
+
+    // 3D RSI Evolutionary Landscape & Manifold State
+    pub dag_3d_mode: bool,
+    pub rsi_3d_rot_x: f32,
+    pub rsi_3d_rot_y: f32,
+    pub rsi_3d_auto_spin: bool,
+    pub rsi_3d_zoom: f32,
 }
 
 fn default_repo_root() -> PathBuf {
@@ -201,6 +208,11 @@ impl RsiCraftApp {
             gpu_style: 0,
             gpu_show_vram_chips: true,
             gpu_plasma_fx: true,
+            dag_3d_mode: false,
+            rsi_3d_rot_x: -0.38,
+            rsi_3d_rot_y: 0.52,
+            rsi_3d_auto_spin: true,
+            rsi_3d_zoom: 1.0,
         };
         app.refresh_all();
         Ok(app)
@@ -969,6 +981,341 @@ impl RsiCraftApp {
         });
     }
 
+    pub fn render_rsi_3d_landscape_viewport(&mut self, ui: &mut egui::Ui, viewport_height: f32) {
+        let (rect, resp) = ui.allocate_exact_size(
+            Vec2::new(ui.available_width().max(420.0), viewport_height),
+            egui::Sense::click_and_drag(),
+        );
+
+        if resp.dragged() {
+            let delta = resp.drag_delta();
+            self.rsi_3d_rot_y += delta.x * 0.012;
+            self.rsi_3d_rot_x = (self.rsi_3d_rot_x - delta.y * 0.012).clamp(-1.45, 1.45);
+        } else if self.rsi_3d_auto_spin {
+            self.rsi_3d_rot_y += 0.007;
+        }
+
+        let painter = ui.painter_at(rect);
+        painter.rect_filled(rect, CornerRadius::same(8), Color32::from_rgb(6, 9, 15));
+        painter.rect_stroke(
+            rect,
+            CornerRadius::same(8),
+            Stroke::new(1.2, Color32::from_rgb(30, 48, 75)),
+            egui::StrokeKind::Inside,
+        );
+
+        let center = rect.center();
+        let fov = 440.0;
+        let cam_dist = 560.0;
+
+        let proj = |pt: Point3D| -> Option<(Pos2, f32)> {
+            pt.project(
+                self.rsi_3d_rot_x,
+                self.rsi_3d_rot_y,
+                self.rsi_3d_zoom,
+                center,
+                fov,
+                cam_dist,
+            )
+        };
+
+        // 1. Cybernetic Ground Grid (Generation vs Novelty Floor)
+        let floor_y = -65.0_f32;
+        let grid_lines = 10;
+        let extent_x = 130.0_f32;
+        let extent_z = 90.0_f32;
+
+        let grid_stroke = Stroke::new(1.0, Color32::from_rgba_premultiplied(30, 58, 95, 110));
+        for i in 0..=grid_lines {
+            let frac = (i as f32) / (grid_lines as f32);
+            let gx = -extent_x + frac * (2.0 * extent_x);
+            if let (Some((p1, _)), Some((p2, _))) = (
+                proj(Point3D::new(gx, floor_y, -extent_z)),
+                proj(Point3D::new(gx, floor_y, extent_z)),
+            ) {
+                painter.line_segment([p1, p2], grid_stroke);
+            }
+
+            let gz = -extent_z + frac * (2.0 * extent_z);
+            if let (Some((p1, _)), Some((p2, _))) = (
+                proj(Point3D::new(-extent_x, floor_y, gz)),
+                proj(Point3D::new(extent_x, floor_y, gz)),
+            ) {
+                painter.line_segment([p1, p2], grid_stroke);
+            }
+        }
+
+        // 2. Coordinate Axis Labels in 3D
+        if let Some((p_x, _)) = proj(Point3D::new(extent_x + 14.0, floor_y, 0.0)) {
+            painter.text(
+                p_x,
+                egui::Align2::LEFT_CENTER,
+                "Generations (t) ->",
+                FontId::monospace(10.0),
+                ACCENT_CYAN,
+            );
+        }
+        if let Some((p_y, _)) = proj(Point3D::new(-extent_x - 10.0, 70.0, 0.0)) {
+            painter.text(
+                p_y,
+                egui::Align2::RIGHT_CENTER,
+                "^ Fitness Score (S)",
+                FontId::monospace(10.0),
+                ACCENT_EMERALD,
+            );
+        }
+        if let Some((p_z, _)) = proj(Point3D::new(0.0, floor_y, extent_z + 14.0)) {
+            painter.text(
+                p_z,
+                egui::Align2::CENTER_TOP,
+                "Novelty / Delta (Delta) ->",
+                FontId::monospace(10.0),
+                ACCENT_AMBER,
+            );
+        }
+
+        // 3. Extract experience cards
+        let cards = self
+            .cards_json
+            .get("cards")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default();
+        let mut chronological = cards;
+        chronological.reverse();
+
+        if !chronological.is_empty() {
+            let min_s = chronological
+                .iter()
+                .filter_map(|c| c.get("primary_score").and_then(Value::as_f64))
+                .fold(f64::INFINITY, f64::min);
+            let max_s = chronological
+                .iter()
+                .filter_map(|c| c.get("primary_score").and_then(Value::as_f64))
+                .fold(f64::NEG_INFINITY, f64::max);
+            let span_s = (max_s - min_s).abs().max(1.0);
+            let denom = (chronological.len().saturating_sub(1)).max(1) as f32;
+
+            // Map each card to 3D point (X=step, Y=score, Z=utility/novelty)
+            let mut mapped_nodes: Vec<(Point3D, Pos2, String, String, f64, f64)> = Vec::new();
+
+            for (idx, c) in chronological.iter().enumerate() {
+                let cid = c
+                    .get("card_id")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string();
+                let op = c
+                    .get("operator")
+                    .and_then(Value::as_str)
+                    .unwrap_or("DRAFT")
+                    .to_string();
+                let sc = c
+                    .get("primary_score")
+                    .and_then(Value::as_f64)
+                    .unwrap_or(0.0);
+                let ut = c
+                    .get("composite_utility")
+                    .and_then(Value::as_f64)
+                    .unwrap_or(0.0);
+
+                let tx = (idx as f32) / denom;
+                let ty = ((sc - min_s) / span_s) as f32;
+                let tz = (ut as f32).clamp(0.0, 1.0);
+
+                let x_3d = -110.0 + tx * 220.0;
+                let y_3d = floor_y + 12.0 + ty * 115.0;
+                let z_3d = -60.0 + tz * 120.0;
+
+                let pt = Point3D::new(x_3d, y_3d, z_3d);
+                if let Some((pos_2d, _)) = proj(pt) {
+                    mapped_nodes.push((pt, pos_2d, cid, op, sc, ut));
+                }
+            }
+
+            // 4. 3D Trajectory Splines Connecting Nodes
+            if mapped_nodes.len() >= 2 {
+                for i in 0..(mapped_nodes.len() - 1) {
+                    let (_, p0, _, _, _, _) = mapped_nodes[i];
+                    let (_, p1, _, op_next, _, _) = &mapped_nodes[i + 1];
+                    let col = operator_color(op_next);
+                    painter.line_segment([p0, *p1], Stroke::new(2.4, col));
+
+                    // Animated streaming 3D particle along segment
+                    let t_pulse =
+                        ((self.anim_tick as f32 * 0.03 + (i as f32) * 0.25) % 1.0).clamp(0.0, 1.0);
+                    let pulse_pos = Pos2::new(
+                        p0.x * (1.0 - t_pulse) + p1.x * t_pulse,
+                        p0.y * (1.0 - t_pulse) + p1.y * t_pulse,
+                    );
+                    painter.circle_filled(pulse_pos, 4.0, col);
+                    painter.circle_filled(pulse_pos, 2.0, Color32::WHITE);
+                }
+            }
+
+            // 5. Draw 3D Card Nodes
+            for (idx, (pt_3d, pos_2d, _cid, op, sc, _ut)) in mapped_nodes.iter().enumerate() {
+                let is_peak = (sc - max_s).abs() < 1e-4 && max_s > 0.0;
+                let col = if is_peak {
+                    ACCENT_AMBER
+                } else {
+                    operator_color(op)
+                };
+
+                // Drop line down to grid floor
+                if let Some((floor_pos, _)) = proj(Point3D::new(pt_3d.x, floor_y, pt_3d.z)) {
+                    painter.line_segment(
+                        [*pos_2d, floor_pos],
+                        Stroke::new(1.0, Color32::from_rgba_premultiplied(71, 85, 105, 90)),
+                    );
+                    painter.circle_filled(
+                        floor_pos,
+                        2.0,
+                        Color32::from_rgba_premultiplied(56, 189, 248, 60),
+                    );
+                }
+
+                painter.circle_filled(*pos_2d, if is_peak { 7.5 } else { 5.5 }, col);
+                painter.circle_stroke(
+                    *pos_2d,
+                    if is_peak { 7.5 } else { 5.5 },
+                    Stroke::new(1.4, Color32::WHITE),
+                );
+
+                if is_peak {
+                    let pulse = ((self.anim_tick as f32 * 0.08).sin() * 2.5).abs();
+                    draw_sparkle_star(
+                        &painter,
+                        *pos_2d,
+                        12.0 + pulse,
+                        ACCENT_AMBER,
+                        self.anim_tick as f32 * 0.05,
+                    );
+
+                    // Floating 3D Hypercube wireframe around peak summit
+                    let cube_rad = 12.0_f32;
+                    let c_pts = [
+                        Point3D::new(pt_3d.x - cube_rad, pt_3d.y - cube_rad, pt_3d.z - cube_rad),
+                        Point3D::new(pt_3d.x + cube_rad, pt_3d.y - cube_rad, pt_3d.z - cube_rad),
+                        Point3D::new(pt_3d.x + cube_rad, pt_3d.y + cube_rad, pt_3d.z - cube_rad),
+                        Point3D::new(pt_3d.x - cube_rad, pt_3d.y + cube_rad, pt_3d.z - cube_rad),
+                        Point3D::new(pt_3d.x - cube_rad, pt_3d.y - cube_rad, pt_3d.z + cube_rad),
+                        Point3D::new(pt_3d.x + cube_rad, pt_3d.y - cube_rad, pt_3d.z + cube_rad),
+                        Point3D::new(pt_3d.x + cube_rad, pt_3d.y + cube_rad, pt_3d.z + cube_rad),
+                        Point3D::new(pt_3d.x - cube_rad, pt_3d.y + cube_rad, pt_3d.z + cube_rad),
+                    ];
+                    let cp: Vec<Option<(Pos2, f32)>> = c_pts.iter().map(|p| proj(*p)).collect();
+                    let d_c = |i: usize, j: usize| {
+                        if let (Some(Some((a, _))), Some(Some((b, _)))) = (cp.get(i), cp.get(j)) {
+                            painter.line_segment([*a, *b], Stroke::new(1.2, ACCENT_AMBER));
+                        }
+                    };
+                    d_c(0, 1);
+                    d_c(1, 2);
+                    d_c(2, 3);
+                    d_c(3, 0);
+                    d_c(4, 5);
+                    d_c(5, 6);
+                    d_c(6, 7);
+                    d_c(7, 4);
+                    d_c(0, 4);
+                    d_c(1, 5);
+                    d_c(2, 6);
+                    d_c(3, 7);
+
+                    let badge_rect = egui::Rect::from_min_size(
+                        Pos2::new(pos_2d.x - 52.0, pos_2d.y - 25.0),
+                        Vec2::new(104.0, 16.0),
+                    );
+                    painter.rect_filled(
+                        badge_rect,
+                        CornerRadius::same(3),
+                        Color32::from_rgb(15, 23, 42),
+                    );
+                    painter.rect_stroke(
+                        badge_rect,
+                        CornerRadius::same(3),
+                        Stroke::new(1.0, ACCENT_AMBER),
+                        egui::StrokeKind::Inside,
+                    );
+                    painter.text(
+                        badge_rect.center(),
+                        egui::Align2::CENTER_CENTER,
+                        format!("PEAK: {sc:.2} (Gen {idx})"),
+                        FontId::monospace(9.0),
+                        ACCENT_AMBER,
+                    );
+                } else {
+                    painter.text(
+                        *pos_2d + Vec2::new(8.0, -8.0),
+                        egui::Align2::LEFT_BOTTOM,
+                        format!("{op} ({sc:.2})"),
+                        FontId::proportional(10.0),
+                        col,
+                    );
+                }
+            }
+        }
+
+        // 6. Floating On-Screen Controls HUD
+        let hud_rect = egui::Rect::from_min_size(
+            Pos2::new(rect.left() + 10.0, rect.bottom() - 36.0),
+            Vec2::new(rect.width() - 20.0, 28.0),
+        );
+        painter.rect_filled(
+            hud_rect,
+            CornerRadius::same(6),
+            Color32::from_rgba_premultiplied(10, 15, 26, 220),
+        );
+        painter.rect_stroke(
+            hud_rect,
+            CornerRadius::same(6),
+            Stroke::new(1.0, Color32::from_rgb(30, 48, 75)),
+            egui::StrokeKind::Inside,
+        );
+
+        let mut child_ui = ui.new_child(egui::UiBuilder::new().max_rect(hud_rect));
+        child_ui.horizontal(|ui| {
+            if ui
+                .selectable_label(
+                    self.rsi_3d_auto_spin,
+                    if self.rsi_3d_auto_spin {
+                        "[Auto-Spin: ON]"
+                    } else {
+                        "[Auto-Spin: OFF]"
+                    },
+                )
+                .clicked()
+            {
+                self.rsi_3d_auto_spin = !self.rsi_3d_auto_spin;
+            }
+            if ui.small_button("Reset Orbit").clicked() {
+                self.rsi_3d_rot_x = -0.38;
+                self.rsi_3d_rot_y = 0.52;
+                self.rsi_3d_zoom = 1.0;
+            }
+            if ui.small_button("Top (XY)").clicked() {
+                self.rsi_3d_rot_x = -1.45;
+                self.rsi_3d_rot_y = 0.0;
+            }
+            if ui.small_button("Side (YZ)").clicked() {
+                self.rsi_3d_rot_x = 0.0;
+                self.rsi_3d_rot_y = std::f32::consts::FRAC_PI_2;
+            }
+            ui.separator();
+            let yaw_deg = (self.rsi_3d_rot_y.to_degrees() % 360.0).round() as i32;
+            let pitch_deg = self.rsi_3d_rot_x.to_degrees().round() as i32;
+            ui.label(
+                RichText::new(format!(
+                    "Yaw: {yaw_deg} deg | Pitch: {pitch_deg} deg | 3D Evolutionary Fitness Manifold"
+                ))
+                .size(11.0)
+                .monospace()
+                .color(ACCENT_CYAN),
+            );
+        });
+    }
+
     fn render_kpi_ribbon(&self, ui: &mut egui::Ui) {
         let tasks_cnt = self
             .status_json
@@ -1492,10 +1839,26 @@ impl RsiCraftApp {
     fn render_lineage_dag_canvas(&mut self, ui: &mut egui::Ui) {
         self.anim_tick = self.anim_tick.wrapping_add(1);
         ui.ctx()
-            .request_repaint_after(std::time::Duration::from_millis(80));
+            .request_repaint_after(std::time::Duration::from_millis(50));
 
         ui.horizontal_wrapped(|ui| {
-            ui.heading("Stigmergic Evolutionary Lineage DAG Canvas (GPU Bezier Node Graph)");
+            ui.heading("Evolutionary Lineage & Fitness Architecture");
+            ui.separator();
+            if ui
+                .selectable_label(!self.dag_3d_mode, "[2D Bezier Node Graph]")
+                .clicked()
+            {
+                self.dag_3d_mode = false;
+            }
+            if ui
+                .selectable_label(
+                    self.dag_3d_mode,
+                    "[3D Fitness Manifold & Search Trajectory]",
+                )
+                .clicked()
+            {
+                self.dag_3d_mode = true;
+            }
             ui.separator();
             paint_status_dot(ui, ACCENT_CYAN);
             ui.label("DRAFT");
@@ -1506,6 +1869,13 @@ impl RsiCraftApp {
             paint_status_dot(ui, ACCENT_PURPLE);
             ui.label("CROSSOVER");
         });
+
+        if self.dag_3d_mode {
+            self.render_rsi_3d_landscape_viewport(ui, 420.0);
+            ui.add_space(6.0);
+            self.render_selected_card_inspector(ui);
+            return;
+        }
 
         let nodes = self
             .lineage_json
@@ -2193,7 +2563,7 @@ impl eframe::App for RsiCraftApp {
         handle_zoom(ui.ctx());
 
         self.anim_tick = self.anim_tick.wrapping_add(1);
-        if self.gpu_auto_spin || self.gpu_plasma_fx {
+        if self.gpu_auto_spin || self.gpu_plasma_fx || self.rsi_3d_auto_spin {
             ui.ctx()
                 .request_repaint_after(std::time::Duration::from_millis(33));
         }
