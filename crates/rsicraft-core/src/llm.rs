@@ -14,6 +14,18 @@ pub const DEFAULT_MODEL_ALIAS: &str = "frontis";
 /// Override with the `RSICRAFT_MAX_TOKENS` environment variable.
 pub const DEFAULT_MAX_TOKENS: u32 = 12288;
 
+/// Wall-clock limit for one completion. A 35B reasoning model can need several
+/// minutes for one step. Override with `RSICRAFT_LLM_TIMEOUT_SECS`.
+pub const DEFAULT_LLM_TIMEOUT_SECS: u64 = 600;
+
+fn configured_timeout_secs() -> u64 {
+    std::env::var("RSICRAFT_LLM_TIMEOUT_SECS")
+        .ok()
+        .and_then(|v| v.trim().parse::<u64>().ok())
+        .filter(|v| (5..=7200).contains(v))
+        .unwrap_or(DEFAULT_LLM_TIMEOUT_SECS)
+}
+
 fn configured_max_tokens() -> u32 {
     std::env::var("RSICRAFT_MAX_TOKENS")
         .ok()
@@ -84,7 +96,7 @@ impl Default for LlamaClient {
         Self {
             base_url: DEFAULT_LLAMA_URL.to_string(),
             model_alias: DEFAULT_MODEL_ALIAS.to_string(),
-            timeout_secs: 120,
+            timeout_secs: configured_timeout_secs(),
         }
     }
 }
@@ -95,7 +107,7 @@ impl LlamaClient {
         Self {
             base_url: base_url.into(),
             model_alias: model_alias.into(),
-            timeout_secs: 120,
+            timeout_secs: configured_timeout_secs(),
         }
     }
 
