@@ -2904,7 +2904,7 @@ dependencies = [
 
 [[package]]
 name = "rsicraft-app"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "eframe",
  "rsicraft-core",
@@ -2914,7 +2914,7 @@ dependencies = [
 
 [[package]]
 name = "rsicraft-core"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "blake3",
  "rusqlite",
@@ -2928,7 +2928,7 @@ dependencies = [
 
 [[package]]
 name = "rsicraft-mcp"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "clap",
  "rsicraft-core",

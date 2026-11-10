@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.3.0 - 2026-11-10
+
+### 4-Rung Frontis Ladder & 26-Tool Surface
 
 ### Correction and honest rework of the "Frontis ladder" tools (2026-11-10, evening)
 
