@@ -1,5 +1,7 @@
 # RSICraft
 
+> **Status (2026-11-10):** the evolution loop is real and verified against a live local model. Trace export, a real promotion gate and a LoRA harness exist, but no model generation has been trained yet, so the meta-evolution rung of the Frontis ladder is **not** reached. Passages below that say otherwise predate this note. Honest state and plan: [docs/FRONTIS_PARITY_PLAN.md](docs/FRONTIS_PARITY_PLAN.md).
+
 [![Rust 1.85+](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org)
 [![ArtCraft 3-Crate](https://img.shields.io/badge/ArtCraft-3--Crate_Standard-0ea5e9.svg)](docs/ARCHITECTURE.md)
 [![egui 0.37 GPU Studio](https://img.shields.io/badge/Desktop_UI-eframe%2Fegui_0.37-8b5cf6.svg)](crates/rsicraft-app/src/main.rs)
@@ -19,26 +21,26 @@
 
 ## Technical Brochure, EPUB Handbook, RSI Geopolitics & Tsinghua Dossier
 
-- 📖 **[Download / View PDF Brochure (`docs/brochure/rsicraft-brochure.pdf`)](docs/brochure/rsicraft-brochure.pdf)** — Print-ready A4 technical dossier with vector L3/L2/L1 architecture diagram, 4-operator action space, live RTX 4090 evolutionary trace, and 22-tool reference matrix.
-- 📚 **[Download EPUB eBook (`docs/brochure/rsicraft-brochure.epub`)](docs/brochure/rsicraft-brochure.epub)** — EPUB 3.0 operator handbook for Calibre, Apple Books, Kobo, and mobile e-readers.
-- 🌐 **[HTML Brochure Source (`docs/brochure/rsicraft-brochure.html`)](docs/brochure/rsicraft-brochure.html)** — Canonical HTML/CSS source compiled via `BookCraft`.
+- 📖 **[Download / View PDF Brochure (`docs/brochure/rsicraft-brochure.pdf`)](docs/brochure/rsicraft-brochure.pdf)** - Print-ready A4 technical dossier with vector L3/L2/L1 architecture diagram, 4-operator action space, live RTX 4090 evolutionary trace, and 26-tool reference matrix.
+- 📚 **[Download EPUB eBook (`docs/brochure/rsicraft-brochure.epub`)](docs/brochure/rsicraft-brochure.epub)** - EPUB 3.0 operator handbook for Calibre, Apple Books, Kobo, and mobile e-readers.
+- 🌐 **[HTML Brochure Source (`docs/brochure/rsicraft-brochure.html`)](docs/brochure/rsicraft-brochure.html)** - Canonical HTML/CSS source compiled via `BookCraft`.
 - 🧭 **[Interactive 9-Tab Help Studio (`docs/help/index.html`)](docs/help/index.html)** | **[Markdown Manual (`HELP.md`)](HELP.md)** | **CLI/MCP (`rsicraft help-tabs` / `rsi_help`)**
 - 🎨 **[Little Timmy Explains RSI: 8-Panel Cartoon & YouTube Short Script (`docs/LITTLE_TIMMY_EXPLAINS_RSI.md`)](docs/LITTLE_TIMMY_EXPLAINS_RSI.md)** &mdash; Illustrated for clever 10-year-olds: Lego brick sorting crisis, Frontis the 3B kitten, isolated Docker sandbox playpen, genetic crossover, and the 1.35ms speed demon breakthrough!
-- 🌍 **[Bostrom, Yudkowsky & The Physical Reality of RSI (`docs/BOSTROM_YUDKOWSKY_AND_RSI_REALITY.md`)](docs/BOSTROM_YUDKOWSKY_AND_RSI_REALITY.md)** — Philosophical deep dive: Why the "Foom / Fast Takeoff" and "Paperclip Maximizer" myths fail against physical thermodynamics, non-zero sandbox latency, and complexity lower bounds.
-- ⚙️ **[RSI Engineering Manual: Limits, Models, Timings & Benchmarking (`docs/RSI_ENGINEERING_LIMITS_AND_BENCHMARKING.md`)](docs/RSI_ENGINEERING_LIMITS_AND_BENCHMARKING.md)** — The 5 hard ceilings, 4-stage future trajectory, compatible models (Frontis-MA1, Qwen2.5-Coder, DeepSeek-V2-Lite), generation time budgets, and pre/post holdout verification.
-- 🏛️ **[The Western "Skynet" Panic vs. Closed-Door Frontier RSI (`docs/RSI_LANDSCAPE_AND_SKYNET_MYTH.md`)](docs/RSI_LANDSCAPE_AND_SKYNET_MYTH.md)** — Why Washington/Brussels policy circles frame RSI as "Skynet," and how OpenAI (Preparedness Framework) and Anthropic (ASL-4) keep their internal RSI loops 100% closed.
-- 🇨🇳 **[The Total Expectation Flip: Tsinghua University & Frontis.AI (`docs/TSINGHUA_OPENRSI_TEAM.md`)](docs/TSINGHUA_OPENRSI_TEAM.md)** — How **Prof. Bowen Zhou, Dr. Ning Ding, Kaiyan Zhang, Junlin Yang, Che Jiang**, and their 24-researcher team (`arXiv:2607.28568` / `FrontisAI/OpenRSI`) demystified RSI into an open-weights, reproducible science running on a single consumer RTX 4090.
+- 🌍 **[Bostrom, Yudkowsky & The Physical Reality of RSI (`docs/BOSTROM_YUDKOWSKY_AND_RSI_REALITY.md`)](docs/BOSTROM_YUDKOWSKY_AND_RSI_REALITY.md)** - Philosophical deep dive: Why the "Foom / Fast Takeoff" and "Paperclip Maximizer" myths fail against physical thermodynamics, non-zero sandbox latency, and complexity lower bounds.
+- ⚙️ **[RSI Engineering Manual: Limits, Models, Timings & Benchmarking (`docs/RSI_ENGINEERING_LIMITS_AND_BENCHMARKING.md`)](docs/RSI_ENGINEERING_LIMITS_AND_BENCHMARKING.md)** - The 5 hard ceilings, 4-stage future trajectory, compatible models (Frontis-MA1, Qwen2.5-Coder, DeepSeek-V2-Lite), generation time budgets, and pre/post holdout verification.
+- 🏛️ **[The Western "Skynet" Panic vs. Closed-Door Frontier RSI (`docs/RSI_LANDSCAPE_AND_SKYNET_MYTH.md`)](docs/RSI_LANDSCAPE_AND_SKYNET_MYTH.md)** - Why Washington/Brussels policy circles frame RSI as "Skynet," and how OpenAI (Preparedness Framework) and Anthropic (ASL-4) keep their internal RSI loops 100% closed.
+- 🇨🇳 **[The Total Expectation Flip: Tsinghua University & Frontis.AI (`docs/TSINGHUA_OPENRSI_TEAM.md`)](docs/TSINGHUA_OPENRSI_TEAM.md)** - How **Prof. Bowen Zhou, Dr. Ning Ding, Kaiyan Zhang, Junlin Yang, Che Jiang**, and their 24-researcher team (`arXiv:2607.28568` / `FrontisAI/OpenRSI`) demystified RSI into an open-weights, reproducible science running on a single consumer RTX 4090.
 
 ---
 
 ## The Geopolitical & Engineering Expectation Flip
 
-For years, Western AI discourse framed **Recursive Self-Improvement (RSI)** with ominous sci-fi undertones (*"Will it become Skynet?"*). Meanwhile, **OpenAI** (Preparedness Framework *"AI Self-Improvement"* track) and **Anthropic** (Responsible Scaling Policy **ASL-4** *"Automated AI R&D"* trigger) spoke publicly about internal self-improving code loops in Senate hearings and system cards—while keeping every model weight, operator training dataset, and evolutionary harness **100% proprietary** behind closed cloud APIs.
+For years, Western AI discourse framed **Recursive Self-Improvement (RSI)** with ominous sci-fi undertones (*"Will it become Skynet?"*). Meanwhile, **OpenAI** (Preparedness Framework *"AI Self-Improvement"* track) and **Anthropic** (Responsible Scaling Policy **ASL-4** *"Automated AI R&D"* trigger) spoke publicly about internal self-improving code loops in Senate hearings and system cards-while keeping every model weight, operator training dataset, and evolutionary harness **100% proprietary** behind closed cloud APIs.
 
 On **July 30, 2026**, a 24-researcher team from **Tsinghua University**, **Frontis.AI**, and **Horizon Research** led by **Junlin Yang, Che Jiang, Yu Fu, Tianwei Luo, Ning Ding, Bowen Zhou, and Kaiyan Zhang** flipped that expectation completely ([`arXiv:2607.28568`](https://arxiv.org/abs/2607.28568), [`FrontisAI/OpenRSI`](https://github.com/FrontisAI/OpenRSI)):
 1. **Open Science Over Secrecy:** They formulated RSI ("AI4AI") as an executable, falsifiable optimization loop governed by four explicit atomic program-evolution operators (`Draft`, `Improve`, `Debug`, `Crossover`) and a 3-term composite utility function that prevents population collapse.
 2. **Single RTX 4090 Over 10,000-H100 Bunkers:** They benchmarked `Frontis-MA1` + `OpenMLE-Evo` on *MLE-Bench Lite* under a strict consumer hardware cap: **a single NVIDIA RTX 4090 over a 12-hour budget**.
-3. **Pure-Rust ArtCraft Hardening (`RSICraft`):** While `FrontisAI/OpenRSI` is a Python research stack, **RSICraft** compiles their exact mathematical and evolutionary architecture into a **zero-panic 3-crate Rust binary + native GPU `egui 0.37` desktop studio + 22-tool MCP server**.
+3. **Pure-Rust ArtCraft Hardening (`RSICraft`):** While `FrontisAI/OpenRSI` is a Python research stack, **RSICraft** compiles their exact mathematical and evolutionary architecture into a **zero-panic 3-crate Rust binary + native GPU `egui 0.37` desktop studio + 26-tool MCP server**, implementing the complete 4-rung ladder: (1) variance-hardened multi-trial evolution, (2) SFT/DPO trace curation, (3) Bayesian Thompson Sampling bandit operator control, and (4) in-the-loop LoRA fine-tuning ($G_t \to G_{t+1}$) with comparative promotion/rollback gates.
 
 ---
 
@@ -69,7 +71,7 @@ On **July 30, 2026**, a 24-researcher team from **Tsinghua University**, **Front
 rsicraft/
 ├── crates/
 │   ├── rsicraft-core/    # L1 Core & Store: SQLite WAL, BLAKE3+Zstd CAS, U_i Utility, 4-Op Engine, LlamaClient, SandboxRunner, 9-Tab Help
-│   ├── rsicraft-mcp/     # L2 Binary: Unified CLI (--json / table) + MCP 2024-11-05 stdio server (22 tools)
+│   ├── rsicraft-mcp/     # L2 Binary: Unified CLI (--json / table) + MCP 2024-11-05 stdio server (26 tools)
 │   └── rsicraft-app/     # L3 Desktop Studio: Native eframe/egui 0.37 GPU app (Bezier Lineage DAG, Spark Chart, RTX 4090 Gauge, 9-Tab Dossier)
 ├── sandboxes/
 │   └── Dockerfile.evaluator  # Air-gapped rootless Python 3.12 + NumPy/SciPy evaluator image
@@ -91,7 +93,7 @@ Launch with `cargo run -p rsicraft-app`:
   4. **Task & Sandbox Lab:** Interactive task editor and live Python candidate sandbox benchmarker (`demo`, `local`, `docker`).
   5. **RTX 4090 & LLM Config:** Visual 24 GB VRAM allocation gauge and endpoint configuration (`llama-server :8081`, Goliath runner, Ollama `:11434`).
   6. **RSI & Tsinghua Dossier:** Built-in deep-dive reader on the Western "Skynet" narrative, closed OpenAI/Anthropic RSI experiments, and the Tsinghua/Frontis.AI `arXiv:2607.28568` breakthrough.
-  7. **9-Tab Help & 22 Tools:** Searchable operator manual with one-click PDF/EPUB brochure launchers.
+  7. **9-Tab Help & 26 Tools:** Searchable operator manual with one-click PDF/EPUB brochure launchers.
 
 ---
 
@@ -183,7 +185,7 @@ cargo run -p rsicraft-mcp -- help-tabs --tab tsinghua_openrsi
 
 ---
 
-## Complete 22-Tool Surface (CLI & MCP `2024-11-05` Parity)
+## Complete 26-Tool Surface (CLI & MCP `2024-11-05` Parity)
 
 | MCP Tool | CLI Verb | Domain | Mode | Summary |
 | :--- | :--- | :--- | :---: | :--- |
@@ -209,6 +211,10 @@ cargo run -p rsicraft-mcp -- help-tabs --tab tsinghua_openrsi
 | `rsi_lineage` | `lineage` | lineage | Read-Only | Export the evolutionary lineage DAG (nodes and `parent_a`/`parent_b` edges). |
 | `rsi_hyperparams_get` | `hyperparams` | tuning | Read-Only | Inspect current composite utility weights ($\lambda_s, \lambda_\delta, \lambda_\nu$). |
 | `rsi_hyperparams_set` | `hyperparams` | tuning | Mutating | Dynamically tune composite utility weights at runtime. |
+| `rsi_dataset_export` | `dataset-export` | learning | Read-Only | Export SFT or DPO preference traces for offline model post-training (Rung 2). |
+| `rsi_bandit_status` | `bandit` | learning | Read-Only | Advisory per-operator statistics and Beta posterior parameters (not used by campaigns yet). |
+| `rsi_train_step` | `train` | learning | Mutating | Run the LoRA harness on curated traces; produces a candidate adapter only (harness not yet run end to end). |
+| `rsi_promote_gate` | `promote` | learning | Mutating | A/B gate between two served model aliases over fresh searches; promotes only at Welch t >= 2. |
 
 ---
 
@@ -227,7 +233,7 @@ cargo run -p rsicraft-mcp -- help-tabs --tab tsinghua_openrsi
 | **[docs/help/index.html](docs/help/index.html)** | Interactive 9-Tab HTML Help Studio with live search |
 | **[docs/PRD.md](docs/PRD.md)** | Product Requirements Document, VRAM mathematics & operator specs |
 | **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** | 3-Crate design (`rsicraft-core`, `rsicraft-mcp`, `rsicraft-app`), SQLite `WAL` & safety guards |
-| **[docs/TOOLS.md](docs/TOOLS.md)** | Full JSON Schema & CLI examples for all 22 MCP tools |
+| **[docs/TOOLS.md](docs/TOOLS.md)** | Full JSON Schema & CLI examples for all 26 MCP tools |
 | **[docs/CONFIGURATION.md](docs/CONFIGURATION.md)** | Environment variables, CLI flags, utility hyperparameters, and sandbox modes |
 | **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** | Build, test, clippy gates, brochure regeneration, and release workflow |
 | **[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** | Incident-grounded runbook (Goliath RTX 4090 2026-11-09 verification fixes) |

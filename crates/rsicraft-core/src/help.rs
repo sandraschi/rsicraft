@@ -42,7 +42,7 @@ pub fn all_help_tabs() -> Vec<HelpTab> {
                 },
                 HelpSection {
                     heading: "3-Crate Pure-Rust ArtCraft Architecture (L1 / L2 / L3)".into(),
-                    body: "1. rsicraft-core (L1 Core + Store): SQLite WAL database (tasks, experience_cards, task_frontiers), BLAKE3 content hashing, Zstd (level 3) source compression, composite utility calculator, 4-operator action space (DRAFT, IMPROVE, DEBUG, CROSSOVER), llama-server inference client, and isolated Docker / Python 3.12 / demo sandbox runner.\n2. rsicraft-mcp (L2 CLI + MCP Binary): Single binary exposing 22 MCP tools over stdio and 1:1 matching CLI subcommands.\n3. rsicraft-app (L3 Desktop Studio): Native GPU-rendered eframe/egui 0.37 workstation with interactive Bezier lineage DAG canvas, 4-operator launchpad, score spark charts, RTX 4090 VRAM gauge, and 9-tab documentation reader.".into(),
+                    body: "1. rsicraft-core (L1 Core + Store): SQLite WAL database (tasks, experience_cards, task_frontiers), BLAKE3 content hashing, Zstd (level 3) source compression, composite utility calculator, 4-operator action space (DRAFT, IMPROVE, DEBUG, CROSSOVER), llama-server inference client, and isolated Docker / Python 3.12 / demo sandbox runner.\n2. rsicraft-mcp (L2 CLI + MCP Binary): Single binary exposing 26 MCP tools over stdio and 1:1 matching CLI subcommands.\n3. rsicraft-app (L3 Desktop Studio): Native GPU-rendered eframe/egui 0.37 workstation with interactive Bezier lineage DAG canvas, 4-operator launchpad, score spark charts, RTX 4090 VRAM gauge, and 9-tab documentation reader.".into(),
                     code_example: Some("cargo test --workspace\ncargo clippy --workspace --all-targets --all-features -- -D warnings".into()),
                 },
                 HelpSection {
@@ -184,9 +184,9 @@ pub fn all_help_tabs() -> Vec<HelpTab> {
         },
         HelpTab {
             id: "api".into(),
-            title: "7. 22 MCP Tools & CLI Reference".into(),
+            title: "7. 26 MCP Tools & CLI Reference".into(),
             badge: "MCP 2024-11-05".into(),
-            summary: "Complete reference for all 22 MCP tools (accepting both rsi_* and dotted rsi.* names) and their 1:1 CLI subcommands.".into(),
+            summary: "Complete reference for all 26 MCP tools (accepting both rsi_* and dotted rsi.* names) and their 1:1 CLI subcommands.".into(),
             sections: vec![
                 HelpSection {
                     heading: "System, Hardware, Probe & Help Tools".into(),
@@ -207,6 +207,11 @@ pub fn all_help_tabs() -> Vec<HelpTab> {
                     heading: "Frontier, Experience Cards, Diff & Prune Tools".into(),
                     body: "- rsi_get_frontier (CLI: frontier): Query materialized top-K Pareto frontier for a task.\n- rsi_card_list (CLI: cards): List experience cards ordered by composite utility with optional operator/status filters.\n- rsi_card_show (CLI: card <id>): Decompress and display full candidate source code, BLAKE3 hash, execution logs, and parent IDs.\n- rsi_diff (CLI: diff --card-a <id> --card-b <id>): Generate line-by-line unified diff comparing decompressed source code between two experience cards.\n- rsi_cards_prune (CLI: prune --task-id <id> --keep-frontier 10): Prune low-utility non-frontier cards while preserving top Pareto performers.\n- rsi_lineage (CLI: lineage): Export the full evolutionary DAG (nodes and parent_a/parent_b edges) for visualization.\n- rsi_hyperparams_get (CLI: hyperparams): Inspect current composite utility weights (w_score, w_delta, w_novelty).\n- rsi_hyperparams_set (CLI: hyperparams --w-score <val> ...): Dynamically tune composite utility weights at runtime.".into(),
                     code_example: Some("rsicraft frontier --task-id opt-synth\nrsicraft cards --task-id opt-synth --status SUCCESS\nrsicraft diff --card-a card-001 --card-b card-002\nrsicraft prune --task-id opt-synth --keep-frontier 10\nrsicraft hyperparams --w-score 0.6 --w-delta 0.3 --w-novelty 0.1\nrsicraft lineage --task-id opt-synth --json".into()),
+                },
+                HelpSection {
+                    heading: "Frontis Ladder Parity Tools (Rungs 2, 3, 4: Trace Curation, Bandit & Closed-Loop RSI)".into(),
+                    body: "- rsi_dataset_export (CLI: dataset-export): Rung 2 Self-Evolution: Export curated SFT trajectories (positive deltas, bug fixes) and DPO contrastive pairs from the task DAG.\n- rsi_bandit_status (CLI: bandit): Rung 3 Meta-Evolution: Bayesian Thompson Sampling multi-armed bandit state, arm priors (alpha, beta), and recommended operator across search phases.\n- rsi_train_step (CLI: train): Rung 4 RSI Closed Loop: Post-train a LoRA adapter on curated SFT traces on RTX 4090, advancing active model generation (G_t -> G_{t+1}).\n- rsi_promote_gate (CLI: promote): Rung 4 RSI Closed Loop: Run comparative benchmark evaluation between baseline G_t and candidate G_{t+1}, promoting or rolling back active model.".into(),
+                    code_example: Some("rsicraft dataset-export --task-id opt-synth --format all\nrsicraft bandit --task-id opt-synth\nrsicraft train --task-id opt-synth --epochs 3 --dry-run\nrsicraft promote --task-id opt-synth --trials 5".into()),
                 },
             ],
         },

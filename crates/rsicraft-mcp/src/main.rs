@@ -165,7 +165,45 @@ enum Cmd {
         #[arg(long)]
         file: PathBuf,
     },
-    /// Query the 7-tab Operator Manual & Competitive Architecture Matrix (overview, wrappee, operators, compare, api, troubleshoot, faq, all).
+    /// Export curated SFT trajectories and DPO preference pairs (Frontis Ladder Rung 2: Self-Evolution).
+    DatasetExport {
+        #[arg(long, default_value = "opt-synth")]
+        task_id: String,
+        #[arg(long, default_value = "all")]
+        format: String,
+        #[arg(long, default_value_t = 0.0)]
+        min_delta: f64,
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
+    /// Advisory per-operator statistics and a recommended next operator (not used by campaigns).
+    Bandit {
+        #[arg(long, default_value = "opt-synth")]
+        task_id: String,
+    },
+    /// Post-train a LoRA adapter on the curated traces of a task (candidate only; needs RSICRAFT_TRAIN_BASE_MODEL).
+    Train {
+        #[arg(long, default_value = "opt-synth")]
+        task_id: String,
+        #[arg(long, default_value_t = 3)]
+        epochs: u32,
+        #[arg(long, default_value_t = 0.0002)]
+        learning_rate: f64,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// A/B gate between baseline and candidate model aliases over fresh searches; promotes only on a clear win.
+    Promote {
+        #[arg(long, default_value = "opt-synth")]
+        task_id: String,
+        #[arg(long, default_value_t = 5)]
+        trials: u32,
+        #[arg(long)]
+        baseline: Option<String>,
+        #[arg(long)]
+        candidate: Option<String>,
+    },
+    /// Query the 9-tab Operator Manual, Geopolitical Dossier & Competitive Matrix.
     HelpTabs {
         #[arg(long, default_value = "all")]
         tab: String,
@@ -369,6 +407,53 @@ fn to_tool(cmd: Cmd) -> Result<(&'static str, Value), String> {
                 .map_err(|e| format!("invalid JSON in bundle file '{}': {e}", file.display()))?;
             ("rsi_import", json!({ "bundle": val }))
         }
+        Cmd::DatasetExport {
+            task_id,
+            format,
+            min_delta,
+            ..
+        } => (
+            "rsi_dataset_export",
+            json!({
+                "task_id": task_id,
+                "format": format,
+                "min_delta": min_delta,
+            }),
+        ),
+        Cmd::Bandit { task_id } => (
+            "rsi_bandit_status",
+            json!({
+                "task_id": task_id,
+            }),
+        ),
+        Cmd::Train {
+            task_id,
+            epochs,
+            learning_rate,
+            dry_run,
+        } => (
+            "rsi_train_step",
+            json!({
+                "task_id": task_id,
+                "epochs": epochs,
+                "learning_rate": learning_rate,
+                "dry_run": dry_run,
+            }),
+        ),
+        Cmd::Promote {
+            task_id,
+            trials,
+            baseline,
+            candidate,
+        } => (
+            "rsi_promote_gate",
+            obj(vec![
+                ("task_id", Some(json!(task_id))),
+                ("trials", Some(json!(trials))),
+                ("baseline_alias", baseline.map(Value::String)),
+                ("candidate_alias", candidate.map(Value::String)),
+            ]),
+        ),
         Cmd::HelpTabs { tab, search } => (
             "rsi_help",
             obj(vec![
@@ -662,7 +747,7 @@ mod tests {
 
         let list =
             handle_line(&mut h, r#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#).unwrap();
-        assert_eq!(list["result"]["tools"].as_array().map(Vec::len), Some(22));
+        assert_eq!(list["result"]["tools"].as_array().map(Vec::len), Some(26));
 
         let seed = handle_line(
             &mut h,
@@ -741,6 +826,27 @@ mod tests {
             Cmd::HelpTabs {
                 tab: "all".into(),
                 search: None,
+            },
+            Cmd::DatasetExport {
+                task_id: "opt-synth".into(),
+                format: "all".into(),
+                min_delta: 0.0,
+                out: None,
+            },
+            Cmd::Bandit {
+                task_id: "opt-synth".into(),
+            },
+            Cmd::Train {
+                task_id: "opt-synth".into(),
+                epochs: 3,
+                learning_rate: 0.0002,
+                dry_run: true,
+            },
+            Cmd::Promote {
+                task_id: "opt-synth".into(),
+                trials: 5,
+                baseline: None,
+                candidate: None,
             },
         ];
         let known: Vec<String> = tools()

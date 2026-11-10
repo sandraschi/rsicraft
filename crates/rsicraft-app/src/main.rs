@@ -17,10 +17,17 @@
 
 use eframe::egui::{self, Color32, CornerRadius, FontFamily, FontId, Pos2, RichText, Stroke, Vec2};
 use rsicraft_core::operators::SearchOperator;
-use rsicraft_core::{dispatch, tools, Command, Ctx, Registry, VERSION};
+use rsicraft_core::sandbox::{SandboxExecutionResult, SandboxRunner};
+use rsicraft_core::{
+    campaign_operator, commit_evaluate, commit_step, dispatch, plan_evaluate, plan_step,
+    run_evaluate, run_step, tools, Command, Ctx, EvalPlan, Registry, StepOutcome, StepPlan,
+    CAMPAIGN_MAX_CONSECUTIVE_FAILURES, VERSION,
+};
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 use std::process::Command as ProcessCommand;
+use std::sync::mpsc::{channel, Receiver, TryRecvError};
+use std::time::{Duration, Instant};
 
 const ACCENT_CYAN: Color32 = Color32::from_rgb(56, 189, 248);
 const ACCENT_EMERALD: Color32 = Color32::from_rgb(52, 211, 153);
@@ -62,7 +69,7 @@ impl StudioPage {
             Self::TaskAndSandboxLab => "4. Task & Sandbox Lab",
             Self::Goliath4090AndLlm => "5. RTX 4090 & LLM Config",
             Self::RsiAndTsinghuaDossier => "6. RSI & Tsinghua Dossier",
-            Self::MultitabHelpAndTools => "7. 9-Tab Help & 22 Tools",
+            Self::MultitabHelpAndTools => "7. 9-Tab Help & 26 Tools",
         }
     }
 }
@@ -137,6 +144,53 @@ pub struct RsiCraftApp {
     pub rsi_3d_rot_y: f32,
     pub rsi_3d_auto_spin: bool,
     pub rsi_3d_zoom: f32,
+
+    // Background run state: LLM and sandbox work happens on a worker thread.
+    pub job: Option<ActiveJob>,
+    pub run_feed: Vec<RunEvent>,
+    pub repaint_ctx: Option<egui::Context>,
+}
+
+/// One finished step as shown in the live run timeline.
+#[derive(Debug, Clone)]
+pub struct RunEvent {
+    pub operator: String,
+    pub status: String,
+    pub score: f64,
+    pub delta: f64,
+    pub secs: f32,
+    pub card_id: String,
+    pub new_best: bool,
+}
+
+/// Result handed back from the worker thread. The plan travels with it so the
+/// UI thread can commit exactly what was planned.
+enum WorkerMsg {
+    Step(Box<StepPlan>, Result<StepOutcome, String>),
+    Eval(Box<EvalPlan>, Result<SandboxExecutionResult, String>),
+}
+
+struct CampaignSpec {
+    task_id: String,
+    provider: String,
+    sandbox_mode: String,
+    timeout_secs: u64,
+}
+
+/// A run in progress. The slow phase (LLM inference and sandbox execution)
+/// runs on a worker thread; the SQLite store is only touched on the UI thread.
+pub struct ActiveJob {
+    rx: Receiver<WorkerMsg>,
+    pub label: String,
+    pub current: String,
+    pub done: u32,
+    pub total: u32,
+    pub started: Instant,
+    pub step_started: Instant,
+    pub stop_requested: bool,
+    /// Steps in a row that produced no card.
+    pub consecutive_failures: u32,
+    campaign: Option<CampaignSpec>,
 }
 
 fn default_repo_root() -> PathBuf {
@@ -215,6 +269,9 @@ impl RsiCraftApp {
             rsi_3d_rot_y: 0.52,
             rsi_3d_auto_spin: true,
             rsi_3d_zoom: 1.0,
+            job: None,
+            run_feed: Vec::new(),
+            repaint_ctx: None,
         };
         app.refresh_all();
         Ok(app)
@@ -290,42 +347,461 @@ impl RsiCraftApp {
         }
     }
 
+    #[must_use]
+    pub fn is_busy(&self) -> bool {
+        self.job.is_some()
+    }
+
+    fn refuse_if_busy(&mut self) -> bool {
+        if self.is_busy() {
+            self.status_banner =
+                "A run is already in progress; wait for it or stop the campaign".to_string();
+            return true;
+        }
+        false
+    }
+
+    /// Plan a step on this thread (store read), then run the slow LLM and
+    /// sandbox phase on a worker thread. `None` when the step could not start.
+    fn spawn_step(
+        &mut self,
+        task_id: &str,
+        op: SearchOperator,
+        provider: &str,
+        sandbox_mode: &str,
+        timeout_secs: u64,
+    ) -> Option<Receiver<WorkerMsg>> {
+        let plan = match plan_step(&self.ctx, task_id, op, provider, sandbox_mode, timeout_secs) {
+            Ok(p) => p,
+            Err(e) => {
+                self.status_banner = format!("Step {} error: {e}", op.as_str());
+                return None;
+            }
+        };
+        let (tx, rx) = channel();
+        let llm = self.ctx.llm.clone();
+        let sandbox = SandboxRunner::new(self.ctx.sandbox.image_tag.clone());
+        let repaint = self.repaint_ctx.clone();
+        std::thread::spawn(move || {
+            let res = run_step(&plan, &llm, &sandbox);
+            let _ = tx.send(WorkerMsg::Step(Box::new(plan), res));
+            if let Some(c) = repaint {
+                c.request_repaint();
+            }
+        });
+        Some(rx)
+    }
+
+    fn new_job(
+        rx: Receiver<WorkerMsg>,
+        label: String,
+        current: &str,
+        total: u32,
+        campaign: Option<CampaignSpec>,
+    ) -> ActiveJob {
+        let now = Instant::now();
+        ActiveJob {
+            rx,
+            label,
+            current: current.to_string(),
+            done: 0,
+            total,
+            started: now,
+            step_started: now,
+            stop_requested: false,
+            consecutive_failures: 0,
+            campaign,
+        }
+    }
+
+    /// Start one evolutionary step in the background.
     pub fn trigger_step(&mut self, op: SearchOperator) {
+        if self.refuse_if_busy() {
+            return;
+        }
         let tid = self.active_task_id.clone();
         let prov = self.provider_pick.clone();
         let sb = self.sandbox_pick.clone();
-        let t = self.timeout_secs;
-        match self.exec(Command::Step {
-            task_id: tid,
-            operator: op,
-            provider: prov,
-            sandbox_mode: sb,
-            timeout_secs: t,
-        }) {
-            Ok(v) => {
-                let cid = v.get("card_id").and_then(Value::as_str).unwrap_or("?");
-                let sc = v
-                    .get("primary_score")
-                    .and_then(Value::as_f64)
-                    .unwrap_or(0.0);
-                let util = v
-                    .get("composite_utility")
-                    .and_then(Value::as_f64)
-                    .unwrap_or(0.0);
-                self.status_banner = format!(
-                    "Step {} complete -> card {} (score={sc:.4}, U_i={util:.4})",
-                    op.as_str(),
-                    &cid[..cid.len().min(8)]
-                );
-                let full_id = cid.to_string();
-                self.refresh_all();
-                if let Ok(card) = self.exec(Command::CardShow { card_id: full_id }) {
-                    self.selected_card_json = Some(card);
+        if let Some(rx) = self.spawn_step(&tid, op, &prov, &sb, self.timeout_secs) {
+            self.job = Some(Self::new_job(
+                rx,
+                format!("Step {}", op.as_str()),
+                op.as_str(),
+                1,
+                None,
+            ));
+        }
+    }
+
+    /// Start a multi-step campaign in the background. Steps run one at a time;
+    /// each is committed and shown before the next one starts.
+    pub fn start_campaign(&mut self) {
+        if self.refuse_if_busy() {
+            return;
+        }
+        let spec = CampaignSpec {
+            task_id: self.active_task_id.clone(),
+            provider: self.provider_pick.clone(),
+            sandbox_mode: self.sandbox_pick.clone(),
+            timeout_secs: self.timeout_secs,
+        };
+        let total = self.campaign_steps.max(1);
+        let op = match campaign_operator(&self.ctx, &spec.task_id, 0) {
+            Ok(op) => op,
+            Err(e) => {
+                self.status_banner = format!("Campaign error: {e}");
+                return;
+            }
+        };
+        if let Some(rx) = self.spawn_step(
+            &spec.task_id,
+            op,
+            &spec.provider,
+            &spec.sandbox_mode,
+            spec.timeout_secs,
+        ) {
+            self.job = Some(Self::new_job(
+                rx,
+                format!("{total}-step campaign"),
+                op.as_str(),
+                total,
+                Some(spec),
+            ));
+        }
+    }
+
+    /// Evaluate the lab candidate in the background and record it as a card.
+    pub fn start_evaluate(&mut self) {
+        if self.refuse_if_busy() {
+            return;
+        }
+        let plan = match plan_evaluate(
+            &self.ctx,
+            &self.active_task_id,
+            &self.lab_candidate_code,
+            SearchOperator::Draft,
+            None,
+            None,
+            &self.sandbox_pick,
+            self.timeout_secs,
+            true,
+        ) {
+            Ok(p) => p,
+            Err(e) => {
+                self.status_banner = format!("Evaluation error: {e}");
+                return;
+            }
+        };
+        let (tx, rx) = channel();
+        let sandbox = SandboxRunner::new(self.ctx.sandbox.image_tag.clone());
+        let repaint = self.repaint_ctx.clone();
+        std::thread::spawn(move || {
+            let res = run_evaluate(&plan, &sandbox);
+            let _ = tx.send(WorkerMsg::Eval(Box::new(plan), res));
+            if let Some(c) = repaint {
+                c.request_repaint();
+            }
+        });
+        self.job = Some(Self::new_job(
+            rx,
+            "Sandbox evaluation".to_string(),
+            "EVALUATE",
+            1,
+            None,
+        ));
+    }
+
+    /// Ask a running campaign to end after the step that is in flight.
+    pub fn request_stop(&mut self) {
+        if let Some(job) = self.job.as_mut() {
+            job.stop_requested = true;
+        }
+    }
+
+    fn push_run_event(&mut self, step: &Value, secs: f32) {
+        let card_id = step
+            .get("card_id")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
+        let best_id = self
+            .frontier_json
+            .get("frontier")
+            .and_then(Value::as_array)
+            .and_then(|a| a.first())
+            .and_then(|c| c.get("card_id"))
+            .and_then(Value::as_str);
+        let str_of = |key: &str| {
+            step.get(key)
+                .and_then(Value::as_str)
+                .unwrap_or("?")
+                .to_string()
+        };
+        let num_of = |key: &str| step.get(key).and_then(Value::as_f64).unwrap_or(0.0);
+        self.run_feed.push(RunEvent {
+            operator: str_of("operator"),
+            status: str_of("status"),
+            score: num_of("primary_score"),
+            delta: num_of("delta_score"),
+            secs,
+            new_best: !card_id.is_empty() && best_id == Some(card_id.as_str()),
+            card_id,
+        });
+        if self.run_feed.len() > 200 {
+            let excess = self.run_feed.len() - 200;
+            self.run_feed.drain(..excess);
+        }
+    }
+
+    /// Collect a finished worker result, commit it to the store on this
+    /// thread, and start the next campaign step if there is one. Called once
+    /// per frame; returns immediately when nothing has finished.
+    pub fn poll_job(&mut self) {
+        let msg = match self.job.as_ref().map(|j| j.rx.try_recv()) {
+            None | Some(Err(TryRecvError::Empty)) => return,
+            Some(Err(TryRecvError::Disconnected)) => {
+                self.job = None;
+                self.status_banner =
+                    "Run failed: the worker thread ended without a result".to_string();
+                return;
+            }
+            Some(Ok(m)) => m,
+        };
+        let Some(mut job) = self.job.take() else {
+            return;
+        };
+        match msg {
+            WorkerMsg::Eval(plan, res) => {
+                match res.and_then(|r| commit_evaluate(&self.ctx, &plan, &r)) {
+                    Ok(v) => {
+                        self.lab_last_eval = Some(v);
+                        self.status_banner =
+                            "Sandbox evaluation completed and recorded".to_string();
+                        self.refresh_all();
+                    }
+                    Err(e) => self.status_banner = format!("Evaluation error: {e}"),
                 }
             }
-            Err(e) => {
-                self.status_banner = format!("Step {} error: {e}", op.as_str());
+            WorkerMsg::Step(plan, res) => {
+                let secs = job.step_started.elapsed().as_secs_f32();
+                match res.and_then(|o| commit_step(&self.ctx, &plan, &o)) {
+                    Ok(step) => {
+                        job.done += 1;
+                        job.consecutive_failures = 0;
+                        self.refresh_all();
+                        self.push_run_event(&step, secs);
+                        let cid = step.get("card_id").and_then(Value::as_str).unwrap_or("?");
+                        let score = step
+                            .get("primary_score")
+                            .and_then(Value::as_f64)
+                            .unwrap_or(0.0);
+                        self.status_banner = format!(
+                            "{}: {} of {} done, {} -> card {} (score={score:.4})",
+                            job.label,
+                            job.done,
+                            job.total,
+                            plan.operator.as_str(),
+                            &cid[..cid.len().min(8)]
+                        );
+                        if let Ok(card) = self.exec(Command::CardShow {
+                            card_id: cid.to_string(),
+                        }) {
+                            self.selected_card_json = Some(card);
+                        }
+                    }
+                    Err(e) => {
+                        // No card came out of this step. A campaign skips one such
+                        // step and carries on; two in a row end it.
+                        job.consecutive_failures += 1;
+                        let give_up = job.campaign.is_none()
+                            || job.consecutive_failures >= CAMPAIGN_MAX_CONSECUTIVE_FAILURES;
+                        if give_up {
+                            self.status_banner = format!(
+                                "{} stopped after {} of {} steps: {e}",
+                                job.label, job.done, job.total
+                            );
+                            return;
+                        }
+                        job.done += 1;
+                        self.run_feed.push(RunEvent {
+                            operator: plan.operator.as_str().to_string(),
+                            status: "NO_CARD".to_string(),
+                            score: 0.0,
+                            delta: 0.0,
+                            secs,
+                            card_id: String::new(),
+                            new_best: false,
+                        });
+                        self.status_banner =
+                            format!("{}: step {} skipped: {e}", job.label, job.done);
+                    }
+                }
+                let more = job.done < job.total && !job.stop_requested;
+                if let (true, Some(spec)) = (more, job.campaign.as_ref()) {
+                    let next = match campaign_operator(&self.ctx, &spec.task_id, job.done) {
+                        Ok(op) => op,
+                        Err(e) => {
+                            self.status_banner = format!("Campaign error: {e}");
+                            return;
+                        }
+                    };
+                    // spawn_step sets the banner itself when it cannot start.
+                    if let Some(rx) = self.spawn_step(
+                        &spec.task_id,
+                        next,
+                        &spec.provider,
+                        &spec.sandbox_mode,
+                        spec.timeout_secs,
+                    ) {
+                        job.rx = rx;
+                        job.current = next.as_str().to_string();
+                        job.step_started = Instant::now();
+                        self.job = Some(job);
+                    }
+                } else if job.campaign.is_some() {
+                    self.status_banner = format!(
+                        "{} {}: {} of {} steps in {:.0}s",
+                        job.label,
+                        if job.stop_requested && job.done < job.total {
+                            "stopped"
+                        } else {
+                            "finished"
+                        },
+                        job.done,
+                        job.total,
+                        job.started.elapsed().as_secs_f32()
+                    );
+                }
             }
+        }
+    }
+
+    /// Block until the current job has finished (headless use and tests).
+    /// Returns false when `timeout` passed first.
+    pub fn wait_for_job(&mut self, timeout: Duration) -> bool {
+        let start = Instant::now();
+        loop {
+            self.poll_job();
+            if self.job.is_none() {
+                return true;
+            }
+            if start.elapsed() >= timeout {
+                return false;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+    }
+
+    /// Live view of the running job and a timeline of the steps finished in
+    /// this session: operator, score bar scaled to the best score so far,
+    /// delta against the parent, and wall time per step.
+    fn render_live_run_panel(&mut self, ui: &mut egui::Ui) {
+        if self.job.is_none() && self.run_feed.is_empty() {
+            return;
+        }
+        ui.add_space(6.0);
+        let mut stop_clicked = false;
+        let mut clear_clicked = false;
+        accent_card(ui, ACCENT_CYAN, |ui| {
+            ui.horizontal_wrapped(|ui| {
+                ui.heading("Live Run");
+                if let Some(job) = &self.job {
+                    ui.add(egui::Spinner::new());
+                    ui.label(
+                        RichText::new(&job.current)
+                            .color(operator_color(&job.current))
+                            .strong(),
+                    );
+                    ui.label(format!(
+                        "{}: step {} of {} | this step {:.0}s | total {:.0}s",
+                        job.label,
+                        (job.done + 1).min(job.total),
+                        job.total,
+                        job.step_started.elapsed().as_secs_f32(),
+                        job.started.elapsed().as_secs_f32()
+                    ));
+                    if job.campaign.is_some() {
+                        if job.stop_requested {
+                            ui.label("stopping after this step");
+                        } else if ui.button("[Stop after this step]").clicked() {
+                            stop_clicked = true;
+                        }
+                    }
+                } else {
+                    ui.label(format!("idle | {} steps this session", self.run_feed.len()));
+                    if ui.small_button("Clear").clicked() {
+                        clear_clicked = true;
+                    }
+                }
+            });
+            if let Some(job) = &self.job {
+                let frac = job.done as f32 / job.total.max(1) as f32;
+                ui.add(egui::ProgressBar::new(frac).desired_height(6.0));
+            }
+
+            let max_score = self
+                .run_feed
+                .iter()
+                .filter(|e| e.status == "SUCCESS")
+                .map(|e| e.score)
+                .fold(0.0_f64, f64::max)
+                .max(1e-9);
+            egui::ScrollArea::vertical()
+                .id_salt("live_run_feed")
+                .max_height(170.0)
+                .stick_to_bottom(true)
+                .show(ui, |ui| {
+                    for (i, ev) in self.run_feed.iter().enumerate() {
+                        ui.horizontal(|ui| {
+                            ui.monospace(format!("{:>3}", i + 1));
+                            ui.label(
+                                RichText::new(format!("{:<9}", ev.operator))
+                                    .monospace()
+                                    .color(operator_color(&ev.operator))
+                                    .strong(),
+                            );
+                            let (rect, _) = ui
+                                .allocate_exact_size(Vec2::new(200.0, 12.0), egui::Sense::hover());
+                            let painter = ui.painter();
+                            painter.rect_filled(
+                                rect,
+                                CornerRadius::same(3),
+                                ui.visuals().extreme_bg_color,
+                            );
+                            let ok = ev.status == "SUCCESS";
+                            if ok {
+                                let frac = (ev.score / max_score).clamp(0.0, 1.0) as f32;
+                                let fill = egui::Rect::from_min_max(
+                                    rect.min,
+                                    Pos2::new(rect.min.x + rect.width() * frac, rect.max.y),
+                                );
+                                painter.rect_filled(
+                                    fill,
+                                    CornerRadius::same(3),
+                                    operator_color(&ev.operator),
+                                );
+                                ui.monospace(format!("{:.2} ({:+.2})", ev.score, ev.delta));
+                            } else {
+                                let mark = egui::Rect::from_min_max(
+                                    rect.min,
+                                    Pos2::new(rect.min.x + 6.0, rect.max.y),
+                                );
+                                painter.rect_filled(mark, CornerRadius::same(3), ACCENT_ROSE);
+                                ui.monospace(ev.status.clone());
+                            }
+                            if ev.new_best {
+                                ui.label(RichText::new("NEW BEST").color(ACCENT_EMERALD).strong());
+                            }
+                            ui.monospace(format!("{:.1}s", ev.secs));
+                        });
+                    }
+                });
+        });
+        if stop_clicked {
+            self.request_stop();
+        }
+        if clear_clicked {
+            self.run_feed.clear();
         }
     }
 
@@ -1723,30 +2199,12 @@ impl RsiCraftApp {
                     .button(RichText::new("[>> Run 4-Step Campaign]").strong())
                     .clicked()
                 {
-                    let tid = self.active_task_id.clone();
-                    let prov = self.provider_pick.clone();
-                    let sb = self.sandbox_pick.clone();
-                    let steps = self.campaign_steps;
-                    let timeout_secs = self.timeout_secs;
-                    match self.exec(Command::Campaign {
-                        task_id: tid,
-                        steps,
-                        provider: prov,
-                        sandbox_mode: sb,
-                        timeout_secs,
-                    }) {
-                        Ok(v) => {
-                            let best = v.get("best_score").and_then(Value::as_f64).unwrap_or(0.0);
-                            self.status_banner =
-                                format!("Executed {steps}-step campaign -> best_score={best:.4}");
-                            self.refresh_all();
-                        }
-                        Err(e) => self.status_banner = format!("Campaign error: {e}"),
-                    }
+                    self.start_campaign();
                 }
             });
         });
 
+        self.render_live_run_panel(ui);
         ui.add_space(6.0);
         self.render_score_spark_chart(ui);
         ui.add_space(6.0);
@@ -2381,25 +2839,7 @@ impl RsiCraftApp {
                         .desired_width(f32::INFINITY),
                 );
                 if ui.button("[Evaluate & Record Candidate Card]").clicked() {
-                    let cmd = Command::Evaluate {
-                        task_id: self.active_task_id.clone(),
-                        code: self.lab_candidate_code.clone(),
-                        operator: SearchOperator::Draft,
-                        parent_a_id: None,
-                        parent_b_id: None,
-                        sandbox_mode: self.sandbox_pick.clone(),
-                        timeout_secs: self.timeout_secs,
-                        record: true,
-                    };
-                    match self.exec(cmd) {
-                        Ok(v) => {
-                            self.lab_last_eval = Some(v);
-                            self.status_banner =
-                                "Sandbox evaluation completed and recorded".to_string();
-                            self.refresh_all();
-                        }
-                        Err(e) => self.status_banner = format!("Evaluation error: {e}"),
-                    }
+                    self.start_evaluate();
                 }
                 if let Some(ev) = &self.lab_last_eval {
                     ui.separator();
@@ -2544,7 +2984,7 @@ impl RsiCraftApp {
 
     fn render_multitab_help_and_tools(&mut self, ui: &mut egui::Ui) {
         ui.horizontal_wrapped(|ui| {
-            ui.heading("9-Tab Operator Manual, Geopolitical Dossier & 22 MCP Tools");
+            ui.heading("9-Tab Operator Manual, Geopolitical Dossier & 26 MCP Tools");
             ui.separator();
             if ui.button("[Open PDF Brochure]").clicked() {
                 self.open_external("docs/brochure/rsicraft-brochure.pdf");
@@ -2566,7 +3006,7 @@ impl RsiCraftApp {
                 ("wrappee", "4. RTX 4090 & Sandbox"),
                 ("operators", "5. Operators & Math"),
                 ("compare", "6. Competitive Matrix"),
-                ("api", "7. 22 MCP Tools"),
+                ("api", "7. 26 MCP Tools"),
                 ("troubleshoot", "8. Troubleshooting"),
                 ("faq", "9. FAQ & Safety"),
             ] {
@@ -2625,6 +3065,13 @@ impl eframe::App for RsiCraftApp {
             self.style_initialized = true;
         }
         handle_zoom(ui.ctx());
+        if self.repaint_ctx.is_none() {
+            self.repaint_ctx = Some(ui.ctx().clone());
+        }
+        self.poll_job();
+        if self.job.is_some() {
+            ui.ctx().request_repaint_after(Duration::from_millis(100));
+        }
 
         self.anim_tick = self.anim_tick.wrapping_add(1);
         if self.gpu_auto_spin || self.gpu_plasma_fx || self.rsi_3d_auto_spin {
@@ -2728,9 +3175,9 @@ fn main() {
                 })
                 .is_ok()
             && app.view_mode == ViewMode::Cards
-            && tools().len() == 22;
+            && tools().len() == 26;
         if ok {
-            println!("smoke: ok (rsicraft-app {VERSION}, default_view=cards, tools=22, tabs=9)");
+            println!("smoke: ok (rsicraft-app {VERSION}, default_view=cards, tools=26, tabs=9)");
             std::process::exit(0);
         }
         eprintln!("smoke: failed");
@@ -2745,7 +3192,7 @@ fn main() {
 
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_title("RSICraft — Sovereign Recursive Self-Improvement Studio (RTX 4090 / Frontis-MA1 / OpenRSI)")
+            .with_title("RSICraft - Sovereign Recursive Self-Improvement Studio (RTX 4090 / Frontis-MA1 / OpenRSI)")
             .with_inner_size([1360.0, 860.0]),
         ..Default::default()
     };
@@ -2766,13 +3213,52 @@ mod tests {
         assert_eq!(app.view_mode, ViewMode::Cards);
         let st = app.exec(Command::Status).unwrap();
         assert_eq!(st["cards_count"], 4);
-        assert_eq!(tools().len(), 22);
+        assert_eq!(tools().len(), 26);
+    }
+
+    #[test]
+    fn background_campaign_runs_off_the_ui_thread_and_commits_each_step() {
+        let mut app = RsiCraftApp::new(None).unwrap();
+        app.campaign_steps = 3;
+        app.start_campaign();
+        assert!(app.is_busy());
+
+        // A second run cannot start while one is in flight.
+        app.trigger_step(SearchOperator::Draft);
+        assert!(app.status_banner.contains("already in progress"));
+
+        assert!(app.wait_for_job(Duration::from_secs(20)));
+        assert_eq!(app.run_feed.len(), 3);
+        assert_eq!(app.exec(Command::Status).unwrap()["cards_count"], 7);
+        assert!(app.status_banner.contains("finished"));
+
+        // Stop request ends a campaign after the step in flight.
+        app.campaign_steps = 5;
+        app.start_campaign();
+        app.request_stop();
+        assert!(app.wait_for_job(Duration::from_secs(20)));
+        assert_eq!(app.run_feed.len(), 4);
+        assert!(app.status_banner.contains("stopped"));
+
+        // Single step and lab evaluation use the same path.
+        app.trigger_step(SearchOperator::Improve);
+        assert!(app.wait_for_job(Duration::from_secs(20)));
+        app.start_evaluate();
+        assert!(app.wait_for_job(Duration::from_secs(20)));
+        assert!(app.lab_last_eval.is_some());
+        assert_eq!(app.exec(Command::Status).unwrap()["cards_count"], 10);
+
+        // A step that cannot be planned reports the reason and starts nothing.
+        app.provider_pick = "bogus".to_string();
+        app.trigger_step(SearchOperator::Draft);
+        assert!(!app.is_busy());
+        assert!(app.status_banner.contains("invalid provider"));
     }
 
     #[test]
     fn glyph_allowlist_no_tofu_chars() {
         let src = include_str!("main.rs");
-        let allowed_non_ascii = ['°', '×', '·', '…', '—'];
+        let allowed_non_ascii = ['°', '×', '·', '…', '-'];
         for (line_no, line) in src.lines().enumerate() {
             for ch in line.chars() {
                 assert!(

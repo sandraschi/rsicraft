@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS tasks (
     name TEXT NOT NULL,
     description TEXT NOT NULL,
     evaluator_script TEXT NOT NULL,
+    active_model_gen INTEGER NOT NULL DEFAULT 0,
+    active_model_alias TEXT NOT NULL DEFAULT 'frontis',
     created_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
 
@@ -27,6 +29,9 @@ CREATE TABLE IF NOT EXISTS experience_cards (
     composite_utility REAL NOT NULL DEFAULT 0.0,
     execution_time_ms INTEGER NOT NULL DEFAULT 0,
     children_count INTEGER NOT NULL DEFAULT 0,
+    runs_count INTEGER NOT NULL DEFAULT 1,
+    score_std REAL NOT NULL DEFAULT 0.0,
+    model_generation INTEGER NOT NULL DEFAULT 0,
     created_at INTEGER NOT NULL DEFAULT (unixepoch()),
     FOREIGN KEY(task_id) REFERENCES tasks(task_id),
     FOREIGN KEY(parent_a_id) REFERENCES experience_cards(card_id),
@@ -45,3 +50,9 @@ CREATE TABLE IF NOT EXISTS task_frontiers (
 CREATE INDEX IF NOT EXISTS idx_cards_task_utility ON experience_cards(task_id, composite_utility DESC);
 CREATE INDEX IF NOT EXISTS idx_cards_hash ON experience_cards(code_hash);
 CREATE INDEX IF NOT EXISTS idx_cards_parents ON experience_cards(parent_a_id, parent_b_id);
+
+-- Key/value settings that must outlive one process (e.g. utility hyperparameters).
+CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);

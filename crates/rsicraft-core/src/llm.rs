@@ -9,6 +9,19 @@ use std::time::Duration;
 pub const DEFAULT_LLAMA_URL: &str = "http://127.0.0.1:8081";
 pub const DEFAULT_MODEL_ALIAS: &str = "frontis";
 
+/// Completion budget per synthesis call. Reasoning models spend part of it on
+/// their thought preamble, so a tight budget truncates the code block.
+/// Override with the `RSICRAFT_MAX_TOKENS` environment variable.
+pub const DEFAULT_MAX_TOKENS: u32 = 12288;
+
+fn configured_max_tokens() -> u32 {
+    std::env::var("RSICRAFT_MAX_TOKENS")
+        .ok()
+        .and_then(|v| v.trim().parse::<u32>().ok())
+        .filter(|v| (64..=65_536).contains(v))
+        .unwrap_or(DEFAULT_MAX_TOKENS)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct HardwareProfile {
     pub host_identifier: String,
@@ -51,6 +64,14 @@ pub fn goliath_4090_profile(llama_url: &str) -> HardwareProfile {
     }
 }
 
+/// Text from the last Python or Rust code fence in `text` onward, if any.
+fn last_code_fence(text: &str) -> Option<&str> {
+    ["```python", "```py\n", "```rust", "```rs\n"]
+        .iter()
+        .filter_map(|tag| text.rfind(tag))
+        .max()
+        .and_then(|idx| text.get(idx..))
+}
 #[derive(Debug, Clone)]
 pub struct LlamaClient {
     pub base_url: String,
@@ -91,15 +112,22 @@ impl LlamaClient {
             return Err("invalid llama_url length".into());
         }
         let endpoint = format!("{base}/v1/chat/completions");
-        let payload = json!({
+        let mut payload = json!({
             "model": self.model_alias,
             "temperature": temperature,
-            "max_tokens": 2048,
+            "max_tokens": configured_max_tokens(),
             "messages": [
                 { "role": "system", "content": system_prompt },
                 { "role": "user", "content": user_prompt }
             ]
         });
+        // Optional hint for reasoning models (Ollama and other OpenAI-compatible
+        // servers accept it; llama-server ignores unknown fields).
+        if let Ok(effort) = std::env::var("RSICRAFT_REASONING_EFFORT") {
+            if matches!(effort.trim(), "low" | "medium" | "high" | "none") {
+                payload["reasoning_effort"] = json!(effort.trim());
+            }
+        }
 
         let agent = ureq::AgentBuilder::new()
             .timeout_connect(Duration::from_secs(5))
@@ -116,14 +144,28 @@ impl LlamaClient {
             .into_json()
             .map_err(|e| format!("invalid JSON from llama-server: {e}"))?;
 
-        body.get("choices")
+        let message = body
+            .get("choices")
             .and_then(Value::as_array)
             .and_then(|arr| arr.first())
-            .and_then(|c| c.get("message"))
-            .and_then(|m| m.get("content"))
-            .and_then(Value::as_str)
-            .map(str::to_string)
-            .ok_or_else(|| "missing choices[0].message.content in llama-server response".into())
+            .and_then(|c| c.get("message"));
+        let field = |key: &str| {
+            message
+                .and_then(|m| m.get(key))
+                .and_then(Value::as_str)
+                .filter(|s| !s.trim().is_empty())
+        };
+        if let Some(content) = field("content") {
+            return Ok(content.to_string());
+        }
+        // Reasoning models can spend the whole completion budget thinking and
+        // return an empty answer. Their last drafted code block is still worth
+        // a sandbox run (the evaluator is the judge, not the model's prose).
+        let reasoning = field("reasoning").or_else(|| field("reasoning_content"));
+        if let Some(start) = reasoning.and_then(last_code_fence) {
+            return Ok(start.to_string());
+        }
+        Err("llama-server returned no message content (the completion budget was spent on reasoning without drafting code; raise RSICRAFT_MAX_TOKENS)".into())
     }
 
     /// Actively probe `llama-server` `/v1/models` endpoint, returning latency in ms,

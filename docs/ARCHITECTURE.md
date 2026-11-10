@@ -1,61 +1,117 @@
-# Architecture & Safety Invariants: RSICraft
+# Architecture and Systems Design: RSICraft
 
-**Navigation:** [README](../README.md) · [PRD](PRD.md) · [RSI & The "Skynet" Myth](RSI_LANDSCAPE_AND_SKYNET_MYTH.md) · [Tsinghua & OpenRSI Dossier](TSINGHUA_OPENRSI_TEAM.md) · [Tools](TOOLS.md)
+**Navigation:** [README](../README.md) · [Product Requirements (PRD)](PRD.md) · [Philosophical Foundations](BOSTROM_YUDKOWSKY_AND_RSI_REALITY.md) · [Tools Reference](TOOLS.md) · [9-Tab Help](../HELP.md)
 
 ---
 
-## 1. 3-Crate Pure-Rust ArtCraft Workspace (`L1` / `L2` / `L3`)
+## 1. The 3-Crate Pure-Rust ArtCraft Architecture
+
+RSICraft is architected as an ArtCraft-compliant three-crate Rust workspace enforcing `#![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::todo, clippy::unimplemented)]` across all production binaries:
 
 ```mermaid
-flowchart LR
+flowchart TD
     subgraph L3["L3: crates/rsicraft-app (Native GPU Desktop Studio)"]
-        UI["eframe / egui 0.37\nslate-950 + Bezier Lineage DAG\nSpark Chart + 9-Tab Help"]
+        UI["eframe / egui 0.37 Native Studio\nBézier Lineage DAG | Spark Chart | VRAM Gauge"]
     end
-    subgraph L2["L2: crates/rsicraft-mcp (CLI + MCP 2024-11-05)"]
-        CLI["clap CLI (--json / table)"]
-        MCP["Pure Stdio JSON-RPC 2.0\n22 Tools (rsi_* / rsi.*)"]
+
+    subgraph L2["L2: crates/rsicraft-mcp (CLI & MCP Stdio Server)"]
+        CLI["Clap CLI (--json / tabular)"]
+        MCP["MCP 2024-11-05 Stdio Server (26 Tools)"]
     end
-    subgraph L1["L1: crates/rsicraft-core (Evolutionary Engine & Store)"]
-        BUS["Command::dispatch Bus"]
-        OPS["4-Operator PromptBuilder\nDRAFT | IMPROVE | DEBUG | CROSSOVER"]
-        LLM["LlamaClient\nRTX 4090 /v1/chat/completions"]
-        SBX["SandboxRunner\ndocker | local Python/Rust | demo"]
-        DB["Stigmergic SQLite WAL Store\nBLAKE3 + Zstd L3 CAS + U_i Utility"]
+
+    subgraph L1["L1: crates/rsicraft-core (Engine, Store & Rungs 1-4)"]
+        BUS["Command::dispatch Command Bus"]
+        
+        subgraph R1["Rung 1: Evolution Engine"]
+            OPS["4-Operator Engine\nDRAFT | IMPROVE | DEBUG | CROSSOVER"]
+            SBX["Multi-Trial SandboxRunner\nRepeated Runs | Mean & Std Dev | Docker / Local"]
+            CAS["SQLite WAL + BLAKE3 & Zstd CAS\nComposite Utility U_i Selector"]
+        end
+
+        subgraph R2["Rung 2: Self-Evolution Engine"]
+            DATA["Dataset Curator\nSFT Positive Deltas | DPO Sibling Pairs"]
+        end
+
+        subgraph R3["R3: Meta-Evolution Engine"]
+            BANDIT["Bayesian Thompson Sampling Bandit\nBeta Priors | Phase Transitions"]
+        end
+
+        subgraph R4["R4: Closed-Loop RSI Engine"]
+            TRAIN["LoRA Training Coordinator\nRTX 4090 QLoRA (G_t -> G_{t+1})"]
+            GATE["Statistical Promotion Gate\nComparative Benchmark & Auto-Rollback"]
+        end
     end
+
     UI --> BUS
     CLI --> BUS
     MCP --> BUS
+
     BUS --> OPS
-    BUS --> LLM
     BUS --> SBX
-    BUS --> DB
+    BUS --> CAS
+    BUS --> DATA
+    BUS --> BANDIT
+    BUS --> TRAIN
+    BUS --> GATE
 ```
 
 ---
 
-## 2. Database Schema (`schema.sql`) & BLAKE3 + Zstd CAS
+## 2. Core Functional Subsystems
 
-`rsicraft-core::store` initializes an embedded SQLite database with `PRAGMA journal_mode = WAL`, `PRAGMA synchronous = NORMAL`, and `PRAGMA foreign_keys = ON`:
+### 2.1 Multi-Trial Sandbox Runner (`crates/rsicraft-core/src/sandbox.rs`)
+To prevent the evolutionary search loop from selecting measurement noise or transient scheduler fluctuations:
+- **Execution Gateway:** The unified `evaluate` entry point accepts candidate source code, task evaluator scripts, and a trial parameter (`trials: u32`, default 1).
+- **Single Compilation, Multi-Trial Run:** In native Rust sandbox mode, candidate code and evaluator harness compile once into a temporary binary (`rustc --crate-type=bin`), which is then executed $N$ times.
+- **Statistical Metric Extraction:** Computes sample mean ($\bar{s}$), sample standard deviation ($s$), and logs `runs_count` directly into the database card telemetry.
+- **Air-Gapped Docker Mode:** Evaluates Python candidates inside rootless containers (`sandboxes/Dockerfile.evaluator`) with `--network none`, `--read-only`, `--cap-drop ALL`, `--user 10000:10001`, and a 50 ms polling watchdog reaper.
 
-1. **`tasks`**: Stores `task_id`, `name`, `description`, `evaluator_script`, and `created_at`.
-2. **`experience_cards`**: Stores every evolutionary candidate node:
-   - Lineage edges: `parent_a_id`, `parent_b_id`, `operator_used` (`DRAFT`, `IMPROVE`, `DEBUG`, `CROSSOVER`).
-   - Content-Addressable Storage (`cas.rs`): `code_hash` (64-char hex **BLAKE3** digest) and `compressed_code` (**Zstd** level-3 compressed binary payload).
-   - Execution telemetry: `execution_status` (`SUCCESS`, `COMPILE_ERROR`, `RUNTIME_ERROR`, `TIMEOUT`, `METRIC_PARSE_ERROR`), `raw_output`, `execution_time_ms`.
-   - Evolutionary fitness: `primary_score`, `delta_score`, `novelty_score` ($\nu_i = \frac{1}{1+\text{children\_count}_i}$), `composite_utility` ($U_i$), and `children_count`.
-3. **`task_frontiers`**: Materialized top-K ranking per task (`task_id`, `card_id`, `rank`), atomically refreshed after every new card insertion.
+### 2.2 Content-Addressable Storage and Utility Selector (`store/`)
+- **Stigmergic Persistence:** SQLite WAL engine (`schema.sql`) maintains relational tables for `tasks`, `experience_cards`, and materialized `task_frontiers`.
+- **Deduplication and Compression:** Candidate source strings are digested via 256-bit **BLAKE3** cryptographic hashing and compressed with **Zstd (level 3)** binary payloads, preventing storage bloat over millions of iterations.
+- **Composite Utility ($U_i$):**
+  $$U_i = 0.50 \cdot \tilde{s}_i + 0.35 \cdot \tilde{\Delta}_i + 0.15 \cdot \frac{1}{1 + \text{children}_i}$$
+  Normalization bounds are calculated strictly over `SUCCESS` nodes to prevent failed cards from flattening selection pressure.
+
+### 2.3 Dataset Curation Engine (`store/dataset.rs`)
+- **SFT Trajectory Mining:** Identifies positive evolutionary leaps ($\Delta_i \ge \Delta_{\min}$) and successful `DEBUG` repairs from compiler/runtime errors, packaging them into standardized prompt-completion records.
+- **Contrastive DPO Pairs:** Finds sibling branches descending from a common parent node, pairing superior performers with inferior or failed siblings for offline preference alignment.
+
+### 2.4 Meta-Evolutionary Bandit Engine (`bandit.rs`)
+- **Bayesian Thompson Sampling:** Models operator selection via Beta conjugate priors $\text{Beta}(\alpha_k, \beta_k)$ across the four action arms (`Draft`, `Improve`, `Debug`, `Crossover`).
+- **Dynamic Phase Shifting:**
+  - `Bootstrapping`: Forces initial diversity when card count $N < 5$.
+  - `ErrorRecovery`: Shifts allocation toward deterministic `DEBUG` repair when sandbox error rates exceed 60%.
+  - `AdaptiveBayesian`: Samples posterior distributions to automatically balance exploitation of winning operators against exploration of stalled branches.
+
+### 2.5 Closed-Loop Model Generation and Promotion Gate (`trainer.rs`)
+- **RTX 4090 LoRA Harness:** Orchestrates consumer GPU fine-tuning (`sandboxes/train_lora.py`) utilizing 4-bit NormalFloat base quantization and rank 16 low-rank adapters.
+- **Model Lineage:** Tracks generation transitions ($G_0 \to G_1 \to \dots \to G_t$), updating task state in SQLite WAL.
+- **Hypothesis-Gated Promotion:** Benchmarks candidate generation $G_{t+1}$ against baseline $G_t$ over $K$ repeated evaluation trials. If candidate performance exceeds baseline by threshold $\epsilon$, the model is promoted; otherwise, the system initiates an automated rollback.
 
 ---
 
-## 3. Five Defense-in-Depth Safety Invariants
+## 3. Defense-in-Depth Safety Invariants
+
+```
++---------------------------------------------------------------------------------------------------+
+|                                  THE 5 PRODUCTION SAFETY INVARIANTS                               |
++---------------------------------------------------------------------------------------------------+
+| 1. ZERO-PANIC COMPILATION        | Denies unwrap, expect, panic, todo, and unimplemented at build.|
+| 2. AIR-GAPPED CONTAINER SANDBOX  | --network none, --read-only, --cap-drop ALL, unprivileged UID. |
+| 3. WALL-CLOCK WATCHDOG REAPER    | 50 ms polling loop terminates runaway processes deterministically.|
+| 4. METRIC BOUNDARY INTEGRITY     | Evaluator stdout parsed with strict JSON delimiter validation.  |
+| 5. GLYPH ALLOWLIST TOFU GUARD    | Automated GPU rendering checks reject unrenderable characters. |
++---------------------------------------------------------------------------------------------------+
+```
 
 1. **Compile-Time Zero-Panic Guarantee:**
-   Every crate in the workspace enforces `#![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::todo, clippy::unimplemented)]`.
-2. **Air-Gapped Rootless Container Sandbox (`sandboxes/Dockerfile.evaluator`):**
-   When `sandbox_mode = "docker"`, candidate code runs inside an unprivileged container with `--network none`, `--read-only`, `--cap-drop ALL`, `--security-opt no-new-privileges`, `--pids-limit 64`, `--memory 4g`, and `--cpus 4.0`.
-3. **50 ms Polling Wall-Clock Timeout Reaper:**
-   Both `docker` and `local` (Python 3.12 & native Rust `rustc`) evaluators poll child processes on a 50 ms interval and kill any runaway loop exceeding `timeout_secs`.
-4. **Reasoning-Model Output Sanitization:**
-   `PromptBuilder::extract_code_block` strips chain-of-thought blocks (`<|channel>thought...<channel|>`, `<think>...</think>`) before extracting the fenced Python module.
-5. **Tofu-Free GPU Desktop Rendering (`glyph_allowlist_no_tofu_chars`):**
-   `rsicraft-app` paints all status dots, theme icons, and Bézier lineage graphs with `ui.painter()` vector primitives and locks source code against unrenderable Unicode dingbats via an automated unit test.
+   Every workspace crate denies all forms of unhandled panics (`#![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::todo, clippy::unimplemented)]`). All error propagation traverses explicit `Result<T, RsiError>` types.
+2. **Air-Gapped Rootless Sandbox:**
+   In Docker mode, code execution runs with dropped capabilities, disabled network stacks, read-only root filesystems, and strict memory and PID ceilings.
+3. **Host-Side Watchdog:**
+   A polling reaper tracks process lifetime on the host side, eliminating child zombies and halting execution when wall-clock deadlines expire.
+4. **Metric Boundary Integrity:**
+   The evaluation metric `RSI_METRIC_JSON=` is parsed strictly from the final emitted stdout marker, protecting against candidate interference.
+5. **GPU Render Safety:**
+   `rsicraft-app` tests prevent UI lockups or unrenderable Unicode glyphs across all desktop studio panes.

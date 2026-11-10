@@ -1,4 +1,4 @@
-# Complete 22-Tool Reference: RSICraft (`MCP 2024-11-05` & CLI)
+# Complete 26-Tool Reference: RSICraft (`MCP 2024-11-05` & CLI)
 
 **Navigation:** [README](../README.md) · [Architecture](ARCHITECTURE.md) · [Configuration](CONFIGURATION.md) · [9-Tab Help Manual](../HELP.md) · [RSI Limits & Benchmarking](RSI_ENGINEERING_LIMITS_AND_BENCHMARKING.md) · [Bostrom & Yudkowsky Analysis](BOSTROM_YUDKOWSKY_AND_RSI_REALITY.md)
 
@@ -98,3 +98,19 @@ Returns current composite utility weights ($\lambda_s, \lambda_\delta, \lambda_\
 
 ### `rsi_hyperparams_set` (CLI: `rsicraft hyperparams [--w-score <s] [--w-delta <d>] [--w-novelty <n>]`)
 Dynamically adjusts composite utility weights ($\lambda_s, \lambda_\delta, \lambda_\nu$) at runtime without restarting the daemon.
+
+---
+
+## 6. Frontis Ladder Parity Tools (Rungs 2, 3, 4: Trace Curation, Bandit & Closed-Loop RSI)
+
+### `rsi_dataset_export` (CLI: `rsicraft dataset-export [--task-id <id>] [--format <all|sft|dpo>] [--min-delta <d>]`)
+Rung 2 Self-Evolution: Exports curated SFT trajectories (positive deltas, compiler/runtime error repairs) and DPO contrastive preference pairs from the SQLite WAL DAG ready for fine-tuning.
+
+### `rsi_bandit_status` (CLI: `rsicraft bandit [--task-id <id>]`)
+Advisory per-operator statistics (pulls, wins, Beta posterior parameters, mean reward) and a recommended next operator. Not Thompson sampling yet and not used by campaigns.
+
+### `rsi_train_step` (CLI: `rsicraft train [--task-id <id>] [--epochs <n>] [--learning-rate <lr>] [--dry-run]`)
+Exports the curated SFT traces of a task as chat JSONL and runs `sandboxes/train_lora.py` on them (needs `RSICRAFT_TRAIN_BASE_MODEL` and a CUDA Python environment). Produces a candidate adapter; never changes the active model. Trains or fails; `dry_run` changes nothing. The harness has not been run end to end yet.
+
+### `rsi_promote_gate` (CLI: `rsicraft promote [--task-id <id>] [--trials <n>] [--baseline <alias>] [--candidate <alias>]`)
+A/B gate between two model aliases served by the LLM endpoint: `trials` fresh searches of `steps` steps per model on scratch copies of the task; promotes the candidate only at Welch t >= 2. Requires `candidate_alias`, a live endpoint and the `local` or `docker` sandbox.

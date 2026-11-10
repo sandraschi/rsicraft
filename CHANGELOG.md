@@ -1,5 +1,41 @@
 # Changelog
 
+## Unreleased
+
+### Correction and honest rework of the "Frontis ladder" tools (2026-11-10, evening)
+
+An earlier entry in this section claimed full four-rung parity with `arXiv:2607.28568`. It was wrong: the training step printed a hardcoded loss curve without training, the promotion gate awarded every candidate a constant +4.5%, and model generations had no effect on which model was called. Corrected state (details in `docs/FRONTIS_PARITY_PLAN.md` and `HANDOVER.md`):
+
+- **`rsi_train_step`:** exports chat-format JSONL and runs `sandboxes/train_lora.py` (a real PEFT script, not yet run end to end). It trains or fails. A dry run changes nothing. Training never changes the active model.
+- **`rsi_promote_gate`:** real A/B between two served model aliases: `trials` fresh searches of `steps` steps per model on scratch copies of the task, promote only at Welch t >= 2. New arguments `steps`, `sandbox_mode`, `timeout_secs`; `candidate_alias` is required; the demo sandbox is refused.
+- **Generations are real:** a step sends the task's promoted alias to the endpoint.
+- **Step pipeline in three phases** (`plan_step`, `run_step`, `commit_step`, plus `plan_evaluate` / `run_evaluate` / `commit_evaluate` and `campaign_operator`), so the slow phase can run off the store's thread.
+- **Desktop app:** steps, campaigns and lab evaluations run on a worker thread. New Live Run panel (running operator, elapsed time, stop-after-this-step, per-step timeline with score bars). The window no longer freezes during LLM calls.
+- **Reasoning models:** default completion budget 12,288 tokens; when the answer is empty the last code block drafted in the reasoning field is evaluated instead; code fences nested in markdown lists are dedented; optional `RSICRAFT_REASONING_EFFORT`.
+- **Still not true, still to do:** the operator bandit is not Thompson sampling and is not used by campaigns; multi-trial scoring exists in the sandbox but steps use one trial; SFT traces re-synthesize prompts instead of recording the real ones; no held-out task split; no way to serve a trained adapter.
+
+### Earlier additions in this section (tool surface 22 to 26)
+
+- **Multi-trial sandbox evaluation:** `trials` parameter computing mean, sample standard deviation and count across the Docker, local and demo backends.
+- **Trace export:** `rsi_dataset_export` / `rsicraft dataset-export` (SFT traces and DPO sibling pairs from the lineage).
+- **Operator statistics:** `rsi_bandit_status` / `rsicraft bandit` (advisory).- **Expanded Tool Surface (22 to 26 Tools):** 100% CLI and MCP parity for all 4 new tools across `rsicraft-core`, `rsicraft-mcp`, and `rsicraft-app`.
+
+### Correctness, Sandbox Hardening & Performance Pass
+
+- **Store:** every multi-statement mutation (`record_experience_card`, prune, delete, import, frontier refresh) now runs in one transaction. Utility recompute reads numeric columns only instead of decompressing every card's code on every insert, and no longer stops at 10,000 cards. Parent sampling scans numeric rows and decompresses one card. 5 s busy timeout so the studio, CLI and MCP server can share one database file.
+- **Selection:** normalization bounds come from `SUCCESS` cards, so failed cards (score 0) no longer squeeze all working candidates into the top of the range. Failed cards get no score term.
+- **Hyperparameters persist:** `rsi_hyperparams_set` writes to a new `settings` table and re-ranks all tasks. Previously the weights lived in process memory, so `rsicraft hyperparams --w-score ...` from the CLI had no lasting effect.
+- **Import:** atomic, deferred foreign keys instead of switching enforcement off (an error used to leave `foreign_keys = OFF` on the connection), cards are filed under the bundle's own task, dangling parents are cleared, the frontier is rebuilt.
+- **Lineage integrity:** parents must belong to the same task; `CROSSOVER` can no longer receive the same card as both parents; `IMPROVE`/`DEBUG`/`CROSSOVER` return a clear error on a task without the cards they need.
+- **Docker sandbox:** now actually passes `--cap-drop ALL`, `--security-opt no-new-privileges`, `--pids-limit 256` and `--user 10000:10001` (the docs claimed the first three, the code did not pass them). Payload goes over stdin instead of an environment variable on the command line (Windows caps that at 32,767 characters). Host-side deadline with `docker kill`. `docker run` infrastructure failures are errors, not experience cards.
+- **Local sandbox:** all children run through one captured-output runner with a host-side reaper. Fixes a deadlock where a Rust runner printing more than a pipe buffer was reported as `TIMEOUT`; `rustc` invocations have a deadline; uv-managed Python is found for any 3.x patch version.
+- **Metric parsing:** read from evaluator stdout only (a candidate could forge a `RSI_METRIC_JSON` line on stderr that outranked the evaluator's), unknown statuses become `METRIC_PARSE_ERROR` instead of failing the insert, stored logs are capped at 256 KiB.
+- **Prompts and extraction:** prompts follow the task language (Rust tasks were prompted for Python); the code-fence parser no longer leaks the info string (` ```rust ` produced a first line `rust`), prefers tagged code blocks, and recovers code from a fence left open by a truncated reply. `max_tokens` raised to 4096 and configurable via `RSICRAFT_MAX_TOKENS`. DEBUG prompts quote the last 6000 bytes of the parent log.
+- **Campaign:** DEBUG and CROSSOVER slots fall back to IMPROVE when there is nothing to debug or cross; a failing step returns the completed steps with `aborted: true` instead of discarding them.
+- **Diff:** common prefix/suffix trimmed before the LCS table, with a cap on table size.
+- **MCP schema:** `sandbox_mode` enum now lists `local`, which the dispatcher already accepted.
+- **Docs:** `AGENTS.md` layout corrected (it listed a `rsicraft-store` crate that does not exist and omitted `rsicraft-app`), repo hygiene rules added; `ARCHITECTURE.md` and `CONFIGURATION.md` sandbox claims now match the code.
+
 ## 0.2.0 - 2026-11-09
 
 - **Expanded Tool Surface (14 to 22 Tools):** Complete 100% CLI and MCP parity closing all functional gaps:

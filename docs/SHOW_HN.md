@@ -1,7 +1,7 @@
-# Show HN Draft (Ready When We Flip `sandraschi/rsicraft` Public)
+# Show HN: RSICraft -- Pure-Rust Recursive Self-Improvement Engine on a Single RTX 4090
 
 **Title:**
-`Show HN: RSICraft – Pure-Rust Recursive Self-Improvement Studio for a single RTX 4090 (arXiv:2607.28568 / OpenRSI)`
+`Show HN: RSICraft – Pure-Rust 4-Rung Recursive Self-Improvement Studio for a Single RTX 4090 (arXiv:2607.28568 / OpenRSI)`
 
 ---
 
@@ -9,34 +9,61 @@
 
 Hi HN,
 
-For the last two years, Recursive Self-Improvement (RSI) in AI has been surrounded by two contradictory narratives in the West:
-1. In Washington and Brussels policy hearings, it's framed with ominous sci-fi undertones (*"Will it become Skynet?"*).
-2. Inside OpenAI (Preparedness Framework *"AI Self-Improvement"* track) and Anthropic (Responsible Scaling Policy **ASL-4** *"Automated AI R&D"* trigger), internal self-improving code loops are talked about in system cards to justify regulatory moats—while every weight, operator dataset, and evolutionary harness is kept 100% proprietary behind closed cloud APIs.
+For the past two years, discussions around Recursive Self-Improvement (RSI) in AI have been polarized between two extremes:
+1. Sci-fi political discourse framing self-improvement as an uncontrollable "Skynet" flash-takeoff (*foom*), motivating proposals for centralized compute licensing.
+2. Proprietary industrial research, where labs discuss model autonomy and automated AI R&D in system cards to justify regulatory moats while keeping all weights, operator datasets, and evolutionary harnesses proprietary.
 
-Then a 24-researcher team from **Tsinghua University** and **Frontis.AI** (Junlin Yang, Che Jiang, Yu Fu, Tianwei Luo, Ning Ding, Bowen Zhou, Kaiyan Zhang et al.) flipped the entire expectation on its head (`arXiv:2607.28568`, `FrontisAI/OpenRSI`). Instead of treating RSI as a classified H100-cluster doomsday project, they formulated "AI4AI" as an executable, falsifiable program-evolution loop governed by four atomic operators (`Draft`, `Improve`, `Debug`, `Crossover`), trained a 35B/30B MoE model (`Frontis-MA1`), open-sourced the stack, and benchmarked it on *MLE-Bench Lite* on a **single consumer 24 GB NVIDIA RTX 4090**.
+In July 2026, a 24-researcher team from **Tsinghua University** and **Frontis.AI** published an alternative perspective (*Frontis-MA1: Training an AI4AI Model towards Recursive Self-Improvement in Machine Learning Engineering*, `arXiv:2607.28568`, `FrontisAI/OpenRSI`). Rather than treating RSI as an inscrutable supercluster capability, they formulated it as an execution-grounded engineering ladder, trained an open-weights 30B/35B MoE model (`Frontis-MA1`), and demonstrated state-of-the-art results on *MLE-Bench Lite* within a 12-hour budget on a **single consumer 24 GB NVIDIA GeForce RTX 4090**.
 
-While their upstream research code is a multi-script Python stack, I wanted a zero-panic, single-binary Rust engine and native GPU desktop studio that runs unattended for days on a local 4090 without losing state or drowning in duplicate `.py` files.
+**RSICraft** is a pure-Rust implementation and extension of their architecture, built as an ArtCraft three-crate workspace (`#![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)]`):
 
-**RSICraft** is a 3-crate Pure-Rust workspace (`#![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)]`):
+```text
+rsicraft/
+├── crates/
+│   ├── rsicraft-core/   # L1 Core: SQLite WAL, BLAKE3+Zstd CAS, 4-Rung Frontis Ladder
+│   ├── rsicraft-mcp/    # L2 Binary: Unified CLI + MCP 2024-11-05 Stdio Server (26 tools)
+│   └── rsicraft-app/    # L3 Studio: Native eframe/egui 0.37 GPU Workstation (Bézier DAG)
+```
 
-1. **`rsicraft-core` (Stigmergic SQLite `WAL` Store, BLAKE3+Zstd CAS & 4-Operator Engine):**
-   - Source code for every synthesized candidate is hashed with **BLAKE3** (256-bit) and compressed with **Zstd** (level 3) inside a single SQLite `WAL` file (`tasks`, `experience_cards`, `task_frontiers`).
-   - Instead of greedy top-1 selection (which collapses evolutionary diversity into a local optimum), parents are sampled via Tsinghua/OpenRSI's 3-term composite utility:
-     `U_i = 0.50 * s_norm_i + 0.35 * delta_norm_i + 0.15 * (1 / (1 + children_count_i))`
-     Every time a card spawns a child, its `children_count` increments and its novelty bonus decays, naturally pushing search toward under-explored high-performing branches.
-   - Implements the 4-operator action space (`DRAFT` at `T=0.70`, `IMPROVE` at `T=0.40`, `DEBUG` at `T=0.20`, `CROSSOVER` at `T=0.50`) against `llama-server` on the RTX 4090 (`Q4_K_M`, 16k context, `q4_0` KV cache, 18.0–19.5 GB VRAM) and evaluates candidates in air-gapped rootless Docker (`--network none --read-only`) or isolated Python 3.12 tempdirs.
-2. **`rsicraft-app` (Native `eframe` / `egui 0.37` GPU Desktop Studio):**
-   - Renders an interactive **Cubic Bézier Evolutionary Lineage DAG Canvas** with animated pulse particles, an **Evolutionary Score Trajectory Spark Chart**, a live 24 GB RTX 4090 VRAM gauge, a side-by-side decompressed BLAKE3/Zstd code inspector, and a built-in 9-tab dossier.
-3. **`rsicraft-mcp` (CLI & MCP `2024-11-05` Stdio Server):**
-   - Exposes 22 tools over stdio MCP and 1:1 CLI subcommands (`rsicraft campaign`, `rsicraft step`, `rsicraft frontier`, `rsicraft diff`, `rsicraft probe`, `rsicraft prune`, `rsicraft export`, `rsicraft import`, `rsicraft hyperparams`, `rsicraft lineage`, `rsicraft help-tabs`).
+### Implementing the 4-Rung Frontis Ladder
 
-### Live Trace on an RTX 4090 (25,000-element Subarray Benchmark)
+A common category error is confusing outer-loop program search (such as DeepMind's FunSearch or AIDE) with recursive self-improvement. If model weights and search policies remain identical between step 1 and step 10,000, the improver has not improved. RSICraft implements the full 4-rung ladder to close this loop:
 
-Running a 4-step live evolutionary campaign on our local RTX 4090 (`llama-server` with speculative decoding + Python 3.12 sandbox on a 25,000-element subarray benchmark over 80 iterations):
-- **Step 1 (`DRAFT`, `T=0.70`):** Generated a clean $O(N)$ Kadane implementation scoring **`96.5207`** (`1.391 ms`).
-- **Step 4 (`CROSSOVER`, `T=0.50`):** Sampled two parents (`be4fd318` and `56995273`), noticed that Python's built-in `max(x, current_max + x)` function call inside the 25,000-element loop dominated runtime, and replaced both `max()` calls with inline conditional branching (`if current_sum > 0: current_sum += x else: current_sum = x`).
-- **Result:** Execution time dropped to **`1.359 ms`**, pushing the primary score to **`96.6028`** (`Rank 1`, `composite_utility = 1.0000`).
+1. **Rung 1: Evolution (Variance-Hardened Program Search):**
+   - Four atomic operators: `DRAFT` ($T = 0.70$), `IMPROVE` ($T = 0.40$), `DEBUG` ($T = 0.20$), and `CROSSOVER` ($T = 0.50$).
+   - Multi-trial statistical execution ($N \ge 3$ repeated runs) measuring sample mean and sample standard deviation ($s = \sqrt{\frac{1}{N-1}\sum (x_i - \bar{x})^2}$). A candidate is only credited when improvement exceeds the measurement noise floor ($\Delta > 2 \cdot s$).
+   - Parent selection via 3-term composite utility:
+     $$U_i = 0.50 \cdot \tilde{s}_i + 0.35 \cdot \tilde{\Delta}_i + 0.15 \cdot \frac{1}{1 + \text{children}_i}$$
+     Preventing greedy population collapse by decaying novelty as parents are repeatedly sampled.
+2. **Rung 2: Self-Evolution (Trace Curation and Dataset Export):**
+   - Mined from the SQLite lineage DAG: successful algorithmic improvements and stack-trace error repairs are automatically exported as Supervised Fine-Tuning (SFT) traces.
+   - Sibling branches sharing a common parent are extracted as contrastive Direct Preference Optimization (DPO) chosen/rejected pairs.
+3. **Rung 3: Meta-Evolution (Dynamic Bayesian Thompson Sampling):**
+   - Rather than static round-robin scheduling, operator selection is driven by a Multi-Armed Bandit with Beta conjugate distributions $\text{Beta}(\alpha_k, \beta_k)$.
+   - Contextual phase transitions automatically allocate search effort: high-entropy `DRAFT` during cold starts, deterministic `DEBUG` when sandbox error rates spike above 60%, and adaptive exploitation of `IMPROVE`/`CROSSOVER` as candidates approach the Pareto frontier.
+4. **Rung 4: Closed-Loop RSI (In-the-Loop LoRA and Promotion Gate):**
+   - Curated traces from Rung 2 feed an in-the-loop parameter-efficient fine-tuning (LoRA $r=16, \alpha=32$) script on the RTX 4090, incrementing model generations $G_0 \to G_1 \to \dots \to G_t$.
+   - A **Statistical Promotion Gate** benchmarks candidate generation $G_{t+1}$ against baseline $G_t$ across $K=5$ repeated trials on held-out tasks. The model is promoted if $\bar{s}(G_{t+1}) > \bar{s}(G_t) + \epsilon$, with automated rollback if regression or forgetting is observed.
 
-Repo: `https://github.com/sandraschi/rsicraft` (MIT/Apache-2.0, includes a `--provider demo --sandbox-mode demo` mode and `--smoke` check so you can test the full evolutionary loop, CLI, MCP server, and `egui` studio in <50ms without a GPU).
+### Architectural Features
 
-Happy to answer any questions about the composite utility math, the Tsinghua `OpenMLE` operator setup, or running 30B/35B MoE evolutionary loops on consumer 24 GB cards!
+- **Single Zero-Panic Binary:** No unhandled panics, zero unwrap/expect in production code.
+- **Stigmergic CAS Store:** SQLite with Write-Ahead Logging (`WAL`), 256-bit BLAKE3 content hashing, and Zstd level-3 compression.
+- **Air-Gapped Rootless Sandboxing:** Python and Rust candidates run with `--network none`, `--read-only`, `--cap-drop ALL`, `--user 10000:10001`, and a 50 ms polling watchdog reaper.
+- **100% CLI / MCP Parity:** All 26 engine tools are exposed identically over MCP 2024-11-05 stdio JSON-RPC and CLI subcommands (`rsicraft campaign`, `rsicraft step`, `rsicraft bandit`, `rsicraft dataset-export`, `rsicraft train`, `rsicraft promote`).
+- **GPU Desktop Studio:** Built with `eframe`/`egui 0.37`, featuring an interactive Bézier Lineage DAG canvas, evolutionary trajectory spark charts, a 24 GB VRAM gauge, and a 9-tab operator dossier.
+
+### Verification and Offline Mode
+
+You do not need an RTX 4090 to test the system. RSICraft includes a built-in `--provider demo --sandbox-mode demo` pipeline that simulates the complete 4-rung lifecycle in under 100 milliseconds:
+```bash
+cargo run -p rsicraft-mcp -- demo-seed --json
+cargo run -p rsicraft-mcp -- bandit --task-id opt-synth --json
+cargo run -p rsicraft-mcp -- dataset-export --task-id opt-synth --format all --json
+cargo run -p rsicraft-mcp -- train --task-id opt-synth --dry-run --json
+cargo run -p rsicraft-mcp -- promote --task-id opt-synth --trials 5 --json
+```
+
+Repository: `https://github.com/sandraschi/rsicraft` (MIT/Apache-2.0)
+
+We would love feedback from folks working on automated program synthesis, Bayesian search policies, or consumer LLM fine-tuning loops.

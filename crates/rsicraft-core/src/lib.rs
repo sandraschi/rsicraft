@@ -11,24 +11,34 @@
     clippy::unimplemented
 )]
 
+pub mod bandit;
 pub mod help;
 pub mod llm;
 pub mod operators;
 pub mod sandbox;
 pub mod store;
+pub mod trainer;
 
 #[cfg(test)]
 mod tests;
 
 use llm::{goliath_4090_profile, LlamaClient, DEFAULT_LLAMA_URL, DEFAULT_MODEL_ALIAS};
-use operators::{PromptBuilder, SearchOperator};
-use sandbox::{SandboxRunner, DEFAULT_DOCKER_IMAGE};
+use operators::{CodeLanguage, PromptBuilder, SearchOperator};
+use sandbox::{tail_str, SandboxExecutionResult, SandboxRunner, DEFAULT_DOCKER_IMAGE};
 use serde_json::{json, Value};
 pub use store::utility::UtilityHyperparams;
 pub use store::{NewCardInput, Registry};
 
 pub const APP: &str = "rsicraft";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// Upper bound for the parent's sandbox log quoted in a DEBUG prompt. The tail
+/// is kept because that is where the traceback ends.
+const MAX_PROMPT_LOG_BYTES: usize = 6000;
+
+/// Largest LCS table (`differing lines of A` x `differing lines of B`) the diff
+/// will allocate. Beyond it the differing region is reported as one replaced block.
+const MAX_DIFF_CELLS: usize = 4_000_000;
 
 pub struct Ctx {
     pub reg: Registry,
@@ -48,11 +58,12 @@ impl Ctx {
         let url = llama_url.unwrap_or(DEFAULT_LLAMA_URL);
         let model = model_alias.unwrap_or(DEFAULT_MODEL_ALIAS);
         let img = docker_image.unwrap_or(DEFAULT_DOCKER_IMAGE);
+        let hyperparams = reg.load_hyperparams();
         Self {
             reg,
             llm: LlamaClient::new(url, model),
             sandbox: SandboxRunner::new(img),
-            hyperparams: UtilityHyperparams::default(),
+            hyperparams,
         }
     }
 }
@@ -142,6 +153,29 @@ pub enum Command {
     Import {
         bundle: Value,
     },
+    DatasetExport {
+        task_id: String,
+        format: String,
+        min_delta: f64,
+    },
+    BanditStatus {
+        task_id: String,
+    },
+    TrainStep {
+        task_id: String,
+        epochs: u32,
+        learning_rate: f64,
+        dry_run: bool,
+    },
+    PromoteGate {
+        task_id: String,
+        trials: u32,
+        steps: u32,
+        sandbox_mode: String,
+        timeout_secs: u64,
+        baseline_alias: Option<String>,
+        candidate_alias: Option<String>,
+    },
 }
 
 fn req_str(args: &Value, key: &str) -> Result<String, String> {
@@ -188,9 +222,6 @@ pub fn generate_unified_diff(
     let a_lines: Vec<&str> = a_code.lines().collect();
     let b_lines: Vec<&str> = b_code.lines().collect();
 
-    let n = a_lines.len();
-    let m = b_lines.len();
-
     if a_code == b_code {
         return (
             format!("--- {a_name}\n+++ {b_name}\n(identical content)\n"),
@@ -198,6 +229,29 @@ pub fn generate_unified_diff(
             0,
         );
     }
+
+    // Only the lines between the common prefix and the common suffix need the
+    // quadratic LCS table; a typical parent/child pair differs in a few lines.
+    let (a_all, b_all) = (a_lines, b_lines);
+    let mut prefix = 0;
+    while prefix < a_all.len() && prefix < b_all.len() && a_all[prefix] == b_all[prefix] {
+        prefix += 1;
+    }
+    let mut suffix = 0;
+    while suffix < a_all.len() - prefix
+        && suffix < b_all.len() - prefix
+        && a_all[a_all.len() - 1 - suffix] == b_all[b_all.len() - 1 - suffix]
+    {
+        suffix += 1;
+    }
+    let a_lines = &a_all[prefix..a_all.len() - suffix];
+    let b_lines = &b_all[prefix..b_all.len() - suffix];
+    let oversized = a_lines.len().saturating_mul(b_lines.len()) > MAX_DIFF_CELLS;
+    let (n, m) = if oversized {
+        (0, 0)
+    } else {
+        (a_lines.len(), b_lines.len())
+    };
 
     let mut dp = vec![vec![0u32; m + 1]; n + 1];
     for i in 0..n {
@@ -227,6 +281,15 @@ pub fn generate_unified_diff(
         }
     }
     edits.reverse();
+    if oversized {
+        edits.extend(a_lines.iter().map(|l| ('-', *l)));
+        edits.extend(b_lines.iter().map(|l| ('+', *l)));
+    }
+    let mut full: Vec<(char, &str)> = Vec::with_capacity(prefix + edits.len() + suffix);
+    full.extend(a_all[..prefix].iter().map(|l| (' ', *l)));
+    full.extend(edits);
+    full.extend(a_all[a_all.len() - suffix..].iter().map(|l| (' ', *l)));
+    let edits = full;
 
     let mut out = String::new();
     out.push_str(&format!("--- {a_name}\n"));
@@ -365,6 +428,40 @@ impl Command {
                 };
                 Ok(Self::Import { bundle })
             }
+            "rsi_dataset_export" => Ok(Self::DatasetExport {
+                task_id: opt_str(args, "task_id").unwrap_or_else(|| "opt-synth".into()),
+                format: opt_str(args, "format").unwrap_or_else(|| "all".into()),
+                min_delta: opt_f64(args, "min_delta").unwrap_or(0.0),
+            }),
+            "rsi_bandit_status" => Ok(Self::BanditStatus {
+                task_id: opt_str(args, "task_id").unwrap_or_else(|| "opt-synth".into()),
+            }),
+            "rsi_train_step" => {
+                let epochs = u32::try_from(opt_u64(args, "epochs", 3).clamp(1, 100)).unwrap_or(3);
+                let dry_run = args
+                    .get("dry_run")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false);
+                let lr = opt_f64(args, "learning_rate").unwrap_or(0.0002);
+                Ok(Self::TrainStep {
+                    task_id: opt_str(args, "task_id").unwrap_or_else(|| "opt-synth".into()),
+                    epochs,
+                    learning_rate: lr,
+                    dry_run,
+                })
+            }
+            "rsi_promote_gate" => {
+                let trials = u32::try_from(opt_u64(args, "trials", 5).clamp(1, 100)).unwrap_or(5);
+                Ok(Self::PromoteGate {
+                    task_id: opt_str(args, "task_id").unwrap_or_else(|| "opt-synth".into()),
+                    trials,
+                    steps: u32::try_from(opt_u64(args, "steps", 6).clamp(1, 64)).unwrap_or(6),
+                    sandbox_mode: opt_str(args, "sandbox_mode").unwrap_or_else(|| "local".into()),
+                    timeout_secs: opt_u64(args, "timeout_secs", 30).clamp(1, 600),
+                    baseline_alias: opt_str(args, "baseline_alias"),
+                    candidate_alias: opt_str(args, "candidate_alias"),
+                })
+            }
             other => Err(format!("unknown tool '{other}'")),
         }
     }
@@ -429,7 +526,7 @@ pub fn tools() -> Vec<Value> {
                 "task_id": { "type": "string", "description": "Target task ID (default: 'opt-synth')." },
                 "operator": { "type": "string", "enum": ["DRAFT", "IMPROVE", "DEBUG", "CROSSOVER"] },
                 "provider": { "type": "string", "enum": ["demo", "llama"], "description": "'llama' queries Frontis-MA1 on llama-server; 'demo' uses deterministic oracle." },
-                "sandbox_mode": { "type": "string", "enum": ["demo", "docker"], "description": "'docker' runs isolated container; 'demo' runs deterministic oracle." },
+                "sandbox_mode": { "type": "string", "enum": ["demo", "local", "docker"], "description": "'docker' runs an isolated container; 'local' runs Python or rustc directly on the host (no isolation, trusted code only); 'demo' runs a deterministic oracle." },
                 "timeout_secs": { "type": "integer", "description": "Sandbox execution timeout in seconds (default 30)." }
             }),
             &[],
@@ -441,7 +538,7 @@ pub fn tools() -> Vec<Value> {
                 "task_id": { "type": "string" },
                 "steps": { "type": "integer", "description": "Number of evolutionary steps to execute (1..=64)." },
                 "provider": { "type": "string", "enum": ["demo", "llama"] },
-                "sandbox_mode": { "type": "string", "enum": ["demo", "docker"] },
+                "sandbox_mode": { "type": "string", "enum": ["demo", "local", "docker"] },
                 "timeout_secs": { "type": "integer" }
             }),
             &[],
@@ -491,7 +588,7 @@ pub fn tools() -> Vec<Value> {
                 "operator": { "type": "string", "enum": ["DRAFT", "IMPROVE", "DEBUG", "CROSSOVER"] },
                 "parent_a_id": { "type": "string" },
                 "parent_b_id": { "type": "string" },
-                "sandbox_mode": { "type": "string", "enum": ["demo", "docker"] },
+                "sandbox_mode": { "type": "string", "enum": ["demo", "local", "docker"] },
                 "timeout_secs": { "type": "integer" },
                 "record": { "type": "boolean" }
             }),
@@ -544,7 +641,7 @@ pub fn tools() -> Vec<Value> {
         ),
         tool_def(
             "rsi_hyperparams_set",
-            "Dynamically set composite utility weights (w_score, w_delta, w_novelty) at runtime.",
+            "Set composite utility weights (w_score, w_delta, w_novelty). The weights are persisted in the store and every task is re-ranked immediately.",
             json!({
                 "w_score": { "type": "number", "description": "Weight for normalized primary task score." },
                 "w_delta": { "type": "number", "description": "Weight for delta improvement over parent score." },
@@ -586,24 +683,157 @@ pub fn tools() -> Vec<Value> {
             }),
             &[],
         ),
+        tool_def(
+            "rsi_dataset_export",
+            "Rung 2 Self-Evolution: Export curated SFT trajectories (positive deltas, error repairs) and DPO contrastive preference pairs from the task DAG.",
+            json!({
+                "task_id": { "type": "string", "description": "Task ID to extract learning traces from (default: 'opt-synth')." },
+                "format": { "type": "string", "enum": ["all", "sft", "dpo"], "description": "Dataset export format (default: 'all')." },
+                "min_delta": { "type": "number", "description": "Minimum score improvement delta required to include an SFT trace (default: 0.0)." }
+            }),
+            &[],
+        ),
+        tool_def(
+            "rsi_bandit_status",
+            "Advisory operator statistics for a task: per-operator pulls, wins, Beta posterior parameters and a recommended next operator. Not Thompson sampling yet and not used by campaigns.",
+            json!({
+                "task_id": { "type": "string", "description": "Task ID to inspect bandit state for." }
+            }),
+            &[],
+        ),
+        tool_def(
+            "rsi_train_step",
+            "Post-train a LoRA adapter on the task's curated SFT traces with sandboxes/train_lora.py (needs RSICRAFT_TRAIN_BASE_MODEL and a CUDA Python environment). Produces a candidate adapter only; the active model changes only through rsi_promote_gate. Nothing is simulated: it trains or it fails.",
+            json!({
+                "task_id": { "type": "string", "description": "Task ID to post-train on (default: 'opt-synth')." },
+                "epochs": { "type": "integer", "description": "Number of fine-tuning epochs (1..=100, default: 3)." },
+                "learning_rate": { "type": "number", "description": "LoRA learning rate (default: 0.0002)." },
+                "dry_run": { "type": "boolean", "description": "Report how many traces would be trained and change nothing." }
+            }),
+            &[],
+        ),
+        tool_def(
+            "rsi_promote_gate",
+            "A/B gate between two model aliases served by the LLM endpoint: runs `trials` fresh searches of `steps` steps per model on scratch copies of the task and promotes the candidate only if its best scores are clearly higher (Welch t >= 2). Needs a live endpoint and a real sandbox; can take a long time.",
+            json!({
+                "task_id": { "type": "string", "description": "Task ID to evaluate (default: 'opt-synth')." },
+                "trials": { "type": "integer", "description": "Fresh searches per model (3..=20, default 5)." },
+                "steps": { "type": "integer", "description": "Search steps per trial (1..=64, default 6)." },
+                "sandbox_mode": { "type": "string", "enum": ["local", "docker"], "description": "Sandbox backend (default local)." },
+                "timeout_secs": { "type": "integer", "description": "Sandbox timeout per evaluation (default 30)." },
+                "baseline_alias": { "type": "string", "description": "Baseline model alias (defaults to the task's current model)." },
+                "candidate_alias": { "type": "string", "description": "Required. Alias under which the endpoint serves the model to test." }
+            }),
+            &[],
+        ),
     ]
 }
 
-fn execute_step(
-    ctx: &mut Ctx,
+// ---------------------------------------------------------------------------
+// Three-phase step pipeline: plan (store read) -> run (no store) -> commit
+// (store write). Only the middle phase is slow (LLM inference and sandbox
+// execution) and it borrows nothing from the store, so a GUI can run it on a
+// worker thread while the single SQLite connection stays on its own thread.
+// ---------------------------------------------------------------------------
+
+/// Everything one evolutionary step needs once its parents are chosen.
+/// Owns all of its data, so it can be moved to another thread.
+#[derive(Debug, Clone)]
+pub struct StepPlan {
+    pub task_id: String,
+    pub operator: SearchOperator,
+    pub provider: String,
+    pub sandbox_mode: String,
+    pub timeout_secs: u64,
+    pub temperature: f64,
+    pub evaluator_script: String,
+    pub system_prompt: String,
+    pub user_prompt: String,
+    pub parent_a_id: Option<String>,
+    pub parent_b_id: Option<String>,
+    pub parent_score: Option<f64>,
+    /// Model alias this step sends to the LLM endpoint.
+    pub model_alias: String,
+    pub model_generation: u32,
+    /// 1-based index of the card this step will create (demo provider only).
+    pub demo_step_index: u32,
+}
+
+/// Result of the slow phase of a step: the synthesized candidate and its verdict.
+#[derive(Debug, Clone)]
+pub struct StepOutcome {
+    pub candidate_code: String,
+    pub eval: SandboxExecutionResult,
+}
+
+/// A direct evaluation (`rsi_evaluate`) with its store lookups already done.
+#[derive(Debug, Clone)]
+pub struct EvalPlan {
+    pub task_id: String,
+    pub code: String,
+    pub operator: SearchOperator,
+    pub parent_a_id: Option<String>,
+    pub parent_b_id: Option<String>,
+    pub sandbox_mode: String,
+    pub timeout_secs: u64,
+    pub record: bool,
+    pub evaluator_script: String,
+    pub parent_score: Option<f64>,
+    pub model_generation: u32,
+}
+
+fn normalize_sandbox_mode(raw: &str) -> Result<&'static str, String> {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "docker" | "live" => Ok("docker"),
+        "local" | "python" => Ok("local"),
+        "demo" => Ok("demo"),
+        other => Err(format!(
+            "invalid sandbox_mode '{other}'; expected 'demo', 'local', or 'docker'"
+        )),
+    }
+}
+
+fn normalize_provider(raw: &str) -> Result<&'static str, String> {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "llama" | "live" | "frontis" => Ok("llama"),
+        "demo" => Ok("demo"),
+        other => Err(format!(
+            "invalid provider '{other}'; expected 'demo' or 'llama'"
+        )),
+    }
+}
+
+/// Model alias a task's steps are sent to. Generation 0 uses the alias the
+/// process was configured with (`--model`); a promoted generation uses the
+/// alias recorded on the task.
+#[must_use]
+pub fn effective_model_alias(ctx: &Ctx, task: &store::TaskRecord) -> String {
+    if task.active_model_gen > 0 && !task.active_model_alias.trim().is_empty() {
+        task.active_model_alias.clone()
+    } else {
+        ctx.llm.model_alias.clone()
+    }
+}
+
+/// Phase 1: validate the request, select parents by composite utility and
+/// build the prompts. Reads the store, writes nothing.
+pub fn plan_step(
+    ctx: &Ctx,
     task_id: &str,
     operator: SearchOperator,
     provider: &str,
     sandbox_mode: &str,
     timeout_secs: u64,
-) -> Result<Value, String> {
+) -> Result<StepPlan, String> {
+    // Reject bad modes before any inference is spent on the step.
+    let provider = normalize_provider(provider)?;
+    let sandbox_mode = normalize_sandbox_mode(sandbox_mode)?;
     let task = ctx
         .reg
         .get_task(task_id)
         .map_err(|e| e.to_string())?
         .ok_or_else(|| format!("task '{task_id}' not found"))?;
 
-    // 1. Select parents using composite utility
     let (parent_a, parent_b) = match operator {
         SearchOperator::Draft => (None, None),
         SearchOperator::Improve => {
@@ -630,77 +860,106 @@ fn execute_step(
                 .reg
                 .sample_parent_by_utility(task_id, false, exclude)
                 .map_err(|e| e.to_string())?;
+            if pa.is_none() || pb.is_none() {
+                return Err(format!(
+                    "CROSSOVER needs two distinct cards in task '{task_id}'; run DRAFT or IMPROVE first"
+                ));
+            }
             (pa, pb)
         }
     };
+    if operator != SearchOperator::Draft && parent_a.is_none() {
+        return Err(format!(
+            "{operator} needs an existing card in task '{task_id}'; run DRAFT first"
+        ));
+    }
 
-    // 2. Build system & user prompts with target temperature
-    let sys_prompt = PromptBuilder::build_system_prompt(operator);
+    let lang = CodeLanguage::from_evaluator(&task.evaluator_script).unwrap_or(CodeLanguage::Python);
+    let system_prompt = PromptBuilder::build_system_prompt(operator, lang);
     let user_prompt = PromptBuilder::build_user_prompt(
         operator,
+        lang,
         &task.description,
         parent_a.as_ref().map(|p| p.code.as_str()),
         parent_b.as_ref().map(|p| p.code.as_str()),
-        parent_a.as_ref().map(|p| p.raw_output.as_str()),
+        parent_a
+            .as_ref()
+            .map(|p| tail_str(&p.raw_output, MAX_PROMPT_LOG_BYTES)),
     );
-    let temperature = operator.target_temperature();
-
     let bounds = ctx
         .reg
         .get_task_score_bounds(task_id)
         .map_err(|e| e.to_string())?;
 
-    // 3. Synthesize candidate via LLM or Demo oracle
-    let raw_llm_text = match provider.to_ascii_lowercase().as_str() {
-        "llama" | "live" | "frontis" => ctx.llm.complete(sys_prompt, &user_prompt, temperature)?,
-        "demo" => {
-            LlamaClient::demo_synthesize(operator, task_id, bounds.total_cards.saturating_add(1))
-        }
-        other => {
-            return Err(format!(
-                "invalid provider '{other}'; expected 'demo' or 'llama'"
-            ))
-        }
+    Ok(StepPlan {
+        task_id: task_id.to_string(),
+        operator,
+        provider: provider.to_string(),
+        sandbox_mode: sandbox_mode.to_string(),
+        timeout_secs,
+        temperature: operator.target_temperature(),
+        model_alias: effective_model_alias(ctx, &task),
+        model_generation: task.active_model_gen,
+        evaluator_script: task.evaluator_script,
+        system_prompt,
+        user_prompt,
+        parent_score: parent_a.as_ref().map(|p| p.primary_score),
+        parent_a_id: parent_a.map(|p| p.card_id),
+        parent_b_id: parent_b.map(|p| p.card_id),
+        demo_step_index: bounds.total_cards.saturating_add(1),
+    })
+}
+
+/// Phase 2: synthesize the candidate (LLM or demo oracle) and evaluate it in
+/// the sandbox. This is the slow phase and it touches no store.
+pub fn run_step(
+    plan: &StepPlan,
+    llm: &LlamaClient,
+    sandbox: &SandboxRunner,
+) -> Result<StepOutcome, String> {
+    let raw_llm_text = if plan.provider == "llama" {
+        let mut client = llm.clone();
+        client.model_alias.clone_from(&plan.model_alias);
+        client.complete(&plan.system_prompt, &plan.user_prompt, plan.temperature)?
+    } else {
+        LlamaClient::demo_synthesize(plan.operator, &plan.task_id, plan.demo_step_index)
     };
     let candidate_code = PromptBuilder::extract_code_block(&raw_llm_text);
+    let eval = sandbox.evaluate(
+        &plan.sandbox_mode,
+        &candidate_code,
+        &plan.evaluator_script,
+        plan.operator,
+        plan.parent_score,
+        plan.timeout_secs,
+        1,
+    )?;
+    Ok(StepOutcome {
+        candidate_code,
+        eval,
+    })
+}
 
-    // 4. Evaluate candidate inside sandbox
-    let parent_score = parent_a.as_ref().map(|p| p.primary_score);
-    let eval_result = match sandbox_mode.to_ascii_lowercase().as_str() {
-        "docker" | "live" => ctx.sandbox.run_docker_evaluation(
-            &candidate_code,
-            &task.evaluator_script,
-            timeout_secs,
-        )?,
-        "local" | "python" => SandboxRunner::run_local_evaluation(
-            &candidate_code,
-            &task.evaluator_script,
-            timeout_secs,
-        )?,
-        "demo" => SandboxRunner::run_demo_evaluation(&candidate_code, operator, parent_score),
-        other => {
-            return Err(format!(
-                "invalid sandbox_mode '{other}'; expected 'demo', 'local', or 'docker'"
-            ))
-        }
-    };
-
-    // 5. Persist experience card & refresh frontier
+/// Phase 3: persist the experience card and refresh utilities and frontier.
+pub fn commit_step(ctx: &Ctx, plan: &StepPlan, outcome: &StepOutcome) -> Result<Value, String> {
     let card_id = uuid::Uuid::new_v4().to_string();
     let card = ctx
         .reg
         .record_experience_card(
             &NewCardInput {
                 card_id: &card_id,
-                task_id,
-                parent_a_id: parent_a.as_ref().map(|p| p.card_id.as_str()),
-                parent_b_id: parent_b.as_ref().map(|p| p.card_id.as_str()),
-                operator_used: operator.as_str(),
-                code: &candidate_code,
-                execution_status: &eval_result.status,
-                raw_output: &eval_result.raw_output,
-                primary_score: eval_result.primary_score,
-                execution_time_ms: eval_result.execution_time_ms,
+                task_id: &plan.task_id,
+                parent_a_id: plan.parent_a_id.as_deref(),
+                parent_b_id: plan.parent_b_id.as_deref(),
+                operator_used: plan.operator.as_str(),
+                code: &outcome.candidate_code,
+                execution_status: &outcome.eval.status,
+                raw_output: &outcome.eval.raw_output,
+                primary_score: outcome.eval.primary_score,
+                score_std: outcome.eval.score_std,
+                runs_count: outcome.eval.runs_count,
+                model_generation: plan.model_generation,
+                execution_time_ms: outcome.eval.execution_time_ms,
             },
             &ctx.hyperparams,
         )
@@ -711,9 +970,11 @@ fn execute_step(
         "card_id": card.card_id,
         "task_id": card.task_id,
         "operator": card.operator_used,
-        "temperature": temperature,
-        "provider": provider,
-        "sandbox_backend": eval_result.backend,
+        "temperature": plan.temperature,
+        "provider": plan.provider,
+        "model_alias": if plan.provider == "llama" { Some(plan.model_alias.as_str()) } else { None },
+        "model_generation": plan.model_generation,
+        "sandbox_backend": outcome.eval.backend,
         "status": card.execution_status,
         "primary_score": card.primary_score,
         "delta_score": card.delta_score,
@@ -726,6 +987,314 @@ fn execute_step(
     }))
 }
 
+fn execute_step(
+    ctx: &mut Ctx,
+    task_id: &str,
+    operator: SearchOperator,
+    provider: &str,
+    sandbox_mode: &str,
+    timeout_secs: u64,
+) -> Result<Value, String> {
+    let plan = plan_step(ctx, task_id, operator, provider, sandbox_mode, timeout_secs)?;
+    let outcome = run_step(&plan, &ctx.llm, &ctx.sandbox)?;
+    commit_step(ctx, &plan, &outcome)
+}
+
+/// Operator a campaign runs at `step_index` (0-based). The fixed DRAFT, IMPROVE,
+/// DEBUG, CROSSOVER cycle adapts to what the task can support: an empty task
+/// starts with DRAFT, and DEBUG or CROSSOVER slots fall back to IMPROVE when
+/// there is no failed card to repair or fewer than two cards to recombine.
+pub fn campaign_operator(
+    ctx: &Ctx,
+    task_id: &str,
+    step_index: u32,
+) -> Result<SearchOperator, String> {
+    const SCHEDULE: [SearchOperator; 4] = [
+        SearchOperator::Draft,
+        SearchOperator::Improve,
+        SearchOperator::Debug,
+        SearchOperator::Crossover,
+    ];
+    let bounds = ctx
+        .reg
+        .get_task_score_bounds(task_id)
+        .map_err(|e| e.to_string())?;
+    let failed_cards = bounds.total_cards.saturating_sub(bounds.success_cards);
+    Ok(match SCHEDULE[(step_index as usize) % SCHEDULE.len()] {
+        _ if bounds.total_cards == 0 => SearchOperator::Draft,
+        SearchOperator::Debug if failed_cards == 0 => SearchOperator::Improve,
+        SearchOperator::Crossover if bounds.total_cards < 2 => SearchOperator::Improve,
+        scheduled => scheduled,
+    })
+}
+
+/// Phase 1 of a direct evaluation: resolve the task evaluator and parent score.
+#[allow(clippy::too_many_arguments)]
+pub fn plan_evaluate(
+    ctx: &Ctx,
+    task_id: &str,
+    code: &str,
+    operator: SearchOperator,
+    parent_a_id: Option<&str>,
+    parent_b_id: Option<&str>,
+    sandbox_mode: &str,
+    timeout_secs: u64,
+    record: bool,
+) -> Result<EvalPlan, String> {
+    let sandbox_mode = normalize_sandbox_mode(sandbox_mode)?;
+    let task = ctx
+        .reg
+        .get_task(task_id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("task '{task_id}' not found"))?;
+    let parent_score = match parent_a_id {
+        Some(pid) => ctx
+            .reg
+            .get_card(pid)
+            .map_err(|e| e.to_string())?
+            .map(|c| c.primary_score),
+        None => None,
+    };
+    Ok(EvalPlan {
+        task_id: task_id.to_string(),
+        code: code.to_string(),
+        operator,
+        parent_a_id: parent_a_id.map(str::to_string),
+        parent_b_id: parent_b_id.map(str::to_string),
+        sandbox_mode: sandbox_mode.to_string(),
+        timeout_secs,
+        record,
+        model_generation: task.active_model_gen,
+        evaluator_script: task.evaluator_script,
+        parent_score,
+    })
+}
+
+/// Phase 2 of a direct evaluation: the sandbox run. Touches no store.
+pub fn run_evaluate(
+    plan: &EvalPlan,
+    sandbox: &SandboxRunner,
+) -> Result<SandboxExecutionResult, String> {
+    sandbox.evaluate(
+        &plan.sandbox_mode,
+        &plan.code,
+        &plan.evaluator_script,
+        plan.operator,
+        plan.parent_score,
+        plan.timeout_secs,
+        1,
+    )
+}
+
+/// Phase 3 of a direct evaluation: return the verdict, recording it as an
+/// experience card first when the plan asks for that.
+pub fn commit_evaluate(
+    ctx: &Ctx,
+    plan: &EvalPlan,
+    result: &SandboxExecutionResult,
+) -> Result<Value, String> {
+    if !plan.record {
+        return serde_json::to_value(result).map_err(|e| e.to_string());
+    }
+    let card_id = uuid::Uuid::new_v4().to_string();
+    let card = ctx
+        .reg
+        .record_experience_card(
+            &NewCardInput {
+                card_id: &card_id,
+                task_id: &plan.task_id,
+                parent_a_id: plan.parent_a_id.as_deref(),
+                parent_b_id: plan.parent_b_id.as_deref(),
+                operator_used: plan.operator.as_str(),
+                code: &plan.code,
+                execution_status: &result.status,
+                raw_output: &result.raw_output,
+                primary_score: result.primary_score,
+                score_std: result.score_std,
+                runs_count: result.runs_count,
+                model_generation: plan.model_generation,
+                execution_time_ms: result.execution_time_ms,
+            },
+            &ctx.hyperparams,
+        )
+        .map_err(|e| e.to_string())?;
+    serde_json::to_value(card).map_err(|e| e.to_string())
+}
+
+// ---------------------------------------------------------------------------
+// Promotion gate: a real A/B comparison of two model aliases.
+// ---------------------------------------------------------------------------
+
+/// Best frontier score one model reaches in a fresh `steps`-step search on a
+/// scratch copy of the task. The scratch task is always deleted afterwards.
+fn gate_trial(
+    ctx: &mut Ctx,
+    task: &store::TaskRecord,
+    alias: &str,
+    steps: u32,
+    sandbox_mode: &str,
+    timeout_secs: u64,
+) -> Result<f64, String> {
+    let scratch = format!("gate-{}", uuid::Uuid::new_v4());
+    ctx.reg
+        .upsert_task(
+            &scratch,
+            &task.name,
+            &task.description,
+            &task.evaluator_script,
+        )
+        .map_err(|e| e.to_string())?;
+    let run = (|| -> Result<f64, String> {
+        // Generation 1 pins the scratch task to exactly this alias.
+        ctx.reg
+            .set_task_active_model(&scratch, 1, alias)
+            .map_err(|e| e.to_string())?;
+        for idx in 0..steps {
+            let op = campaign_operator(ctx, &scratch, idx)?;
+            execute_step(ctx, &scratch, op, "llama", sandbox_mode, timeout_secs)?;
+        }
+        let frontier = ctx.reg.get_frontier(&scratch).map_err(|e| e.to_string())?;
+        Ok(frontier.first().map_or(0.0, |f| f.card.primary_score))
+    })();
+    let _ = ctx.reg.delete_task(&scratch);
+    run
+}
+
+fn mean_and_var(xs: &[f64]) -> (f64, f64) {
+    if xs.is_empty() {
+        return (0.0, 0.0);
+    }
+    #[allow(clippy::cast_precision_loss)]
+    let n = xs.len() as f64;
+    let mean = xs.iter().sum::<f64>() / n;
+    let var = if xs.len() < 2 {
+        0.0
+    } else {
+        xs.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n - 1.0)
+    };
+    (mean, var)
+}
+
+/// Welch t statistic for `candidate` against `baseline` (positive favours the candidate).
+#[must_use]
+pub fn welch_t(baseline: &[f64], candidate: &[f64]) -> f64 {
+    let (mb, vb) = mean_and_var(baseline);
+    let (mc, vc) = mean_and_var(candidate);
+    #[allow(clippy::cast_precision_loss)]
+    let se = (vb / baseline.len().max(1) as f64 + vc / candidate.len().max(1) as f64).sqrt();
+    if se <= f64::EPSILON {
+        return match (mc - mb).partial_cmp(&0.0) {
+            Some(std::cmp::Ordering::Greater) => f64::INFINITY,
+            Some(std::cmp::Ordering::Less) => f64::NEG_INFINITY,
+            _ => 0.0,
+        };
+    }
+    (mc - mb) / se
+}
+
+/// A campaign stops after this many steps in a row that produced no card.
+pub const CAMPAIGN_MAX_CONSECUTIVE_FAILURES: u32 = 2;
+
+/// One-sided threshold on the Welch statistic. 2.0 is deliberately stricter
+/// than the large-sample 5% value (1.645) because gates run with few trials.
+pub const GATE_T_THRESHOLD: f64 = 2.0;
+
+/// Compare a candidate model against the baseline by running `trials` fresh
+/// searches of `steps` steps each per model on scratch copies of the task, and
+/// promote the candidate only when its best-score distribution is clearly
+/// higher. Needs a live LLM endpoint serving both aliases.
+#[allow(clippy::too_many_arguments)]
+fn execute_promote_gate(
+    ctx: &mut Ctx,
+    task_id: &str,
+    trials: u32,
+    steps: u32,
+    sandbox_mode: &str,
+    timeout_secs: u64,
+    baseline_alias: Option<&str>,
+    candidate_alias: Option<&str>,
+) -> Result<Value, String> {
+    let sandbox_mode = normalize_sandbox_mode(sandbox_mode)?;
+    if sandbox_mode == "demo" {
+        return Err(
+            "the promotion gate needs a real sandbox ('local' or 'docker'): the demo oracle scores candidates from the operator name and cannot tell two models apart".into(),
+        );
+    }
+    let task = ctx
+        .reg
+        .get_task(task_id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("task '{task_id}' not found"))?;
+    let candidate = candidate_alias.ok_or_else(|| {
+        "candidate_alias is required: the alias under which the LLM endpoint serves the model to test".to_string()
+    })?;
+    let baseline = baseline_alias
+        .map(str::to_string)
+        .unwrap_or_else(|| effective_model_alias(ctx, &task));
+    if baseline == candidate {
+        return Err(format!(
+            "baseline and candidate are the same alias '{baseline}'"
+        ));
+    }
+    let trials = trials.clamp(3, 20);
+
+    let mut baseline_scores = Vec::new();
+    let mut candidate_scores = Vec::new();
+    // Interleave the two arms so drift on the host affects both equally.
+    for _ in 0..trials {
+        baseline_scores.push(gate_trial(
+            ctx,
+            &task,
+            &baseline,
+            steps,
+            sandbox_mode,
+            timeout_secs,
+        )?);
+        candidate_scores.push(gate_trial(
+            ctx,
+            &task,
+            candidate,
+            steps,
+            sandbox_mode,
+            timeout_secs,
+        )?);
+    }
+
+    let (mb, _) = mean_and_var(&baseline_scores);
+    let (mc, _) = mean_and_var(&candidate_scores);
+    let t = welch_t(&baseline_scores, &candidate_scores);
+    let promoted = t >= GATE_T_THRESHOLD;
+    let active_alias = if promoted {
+        ctx.reg
+            .set_task_active_model(task_id, task.active_model_gen.saturating_add(1), candidate)
+            .map_err(|e| e.to_string())?;
+        candidate.to_string()
+    } else {
+        effective_model_alias(ctx, &task)
+    };
+    Ok(json!({
+        "task_id": task_id,
+        "baseline_alias": baseline,
+        "candidate_alias": candidate,
+        "trials": trials,
+        "steps_per_trial": steps,
+        "sandbox_mode": sandbox_mode,
+        "baseline_scores": baseline_scores,
+        "candidate_scores": candidate_scores,
+        "baseline_mean_score": mb,
+        "candidate_mean_score": mc,
+        "score_delta": mc - mb,
+        "welch_t": if t.is_finite() { Some(t) } else { None },
+        "t_threshold": GATE_T_THRESHOLD,
+        "promoted": promoted,
+        "active_model_alias": active_alias,
+        "verdict": if promoted {
+            format!("PROMOTED: '{candidate}' beat '{baseline}' (mean {mc:.4} vs {mb:.4}, t={t:.2})")
+        } else {
+            format!("KEPT BASELINE: '{candidate}' did not clearly beat '{baseline}' (mean {mc:.4} vs {mb:.4}, t={t:.2}, need t>={GATE_T_THRESHOLD})")
+        },
+    }))
+}
 pub fn dispatch(ctx: &mut Ctx, cmd: Command) -> Result<Value, String> {
     match cmd {
         Command::Status => {
@@ -809,31 +1378,46 @@ pub fn dispatch(ctx: &mut Ctx, cmd: Command) -> Result<Value, String> {
             timeout_secs,
         } => {
             let mut results = Vec::new();
-            let schedule = [
-                SearchOperator::Draft,
-                SearchOperator::Improve,
-                SearchOperator::Debug,
-                SearchOperator::Crossover,
-            ];
+            let mut failures = Vec::new();
+            let mut aborted: Option<String> = None;
+            let mut consecutive_failures = 0u32;
             for idx in 0..steps {
-                let bounds = ctx
-                    .reg
-                    .get_task_score_bounds(&task_id)
-                    .map_err(|e| e.to_string())?;
-                let op = if bounds.total_cards == 0 {
-                    SearchOperator::Draft
-                } else {
-                    schedule[(idx as usize) % schedule.len()]
-                };
-                let step_val =
-                    execute_step(ctx, &task_id, op, &provider, &sandbox_mode, timeout_secs)?;
-                results.push(step_val);
+                let op = campaign_operator(ctx, &task_id, idx)?;
+                match execute_step(ctx, &task_id, op, &provider, &sandbox_mode, timeout_secs) {
+                    Ok(step_val) => {
+                        consecutive_failures = 0;
+                        results.push(step_val);
+                    }
+                    Err(e) => {
+                        // A step that produced no card (the model returned nothing
+                        // usable, the endpoint hiccupped) is skipped. Two in a row
+                        // means something is wrong with the setup, so stop there.
+                        consecutive_failures += 1;
+                        failures.push(json!({
+                            "step": idx,
+                            "operator": op.as_str(),
+                            "error": e,
+                        }));
+                        if consecutive_failures >= CAMPAIGN_MAX_CONSECUTIVE_FAILURES {
+                            if results.is_empty() {
+                                return Err(e);
+                            }
+                            aborted = Some(e);
+                            break;
+                        }
+                    }
+                }
             }
             let frontier = ctx.reg.get_frontier(&task_id).map_err(|e| e.to_string())?;
             let best_score = frontier.first().map_or(0.0, |f| f.card.primary_score);
             Ok(json!({
                 "task_id": task_id,
+                "steps_requested": steps,
                 "steps_executed": results.len(),
+                "steps_skipped": failures.len(),
+                "skipped": failures,
+                "aborted": aborted.is_some(),
+                "error": aborted,
                 "best_score": best_score,
                 "steps": results,
             }))
@@ -966,60 +1550,19 @@ pub fn dispatch(ctx: &mut Ctx, cmd: Command) -> Result<Value, String> {
             timeout_secs,
             record,
         } => {
-            let task = ctx
-                .reg
-                .get_task(&task_id)
-                .map_err(|e| e.to_string())?
-                .ok_or_else(|| format!("task '{task_id}' not found"))?;
-            let parent_score = match parent_a_id.as_deref() {
-                Some(pid) => ctx
-                    .reg
-                    .get_card(pid)
-                    .map_err(|e| e.to_string())?
-                    .map(|c| c.primary_score),
-                None => None,
-            };
-            let eval_result = match sandbox_mode.to_ascii_lowercase().as_str() {
-                "docker" | "live" => ctx.sandbox.run_docker_evaluation(
-                    &code,
-                    &task.evaluator_script,
-                    timeout_secs,
-                )?,
-                "local" | "python" => SandboxRunner::run_local_evaluation(
-                    &code,
-                    &task.evaluator_script,
-                    timeout_secs,
-                )?,
-                "demo" => SandboxRunner::run_demo_evaluation(&code, operator, parent_score),
-                other => {
-                    return Err(format!(
-                        "invalid sandbox_mode '{other}'; expected 'demo', 'local', or 'docker'"
-                    ))
-                }
-            };
-            if !record {
-                return serde_json::to_value(eval_result).map_err(|e| e.to_string());
-            }
-            let card_id = uuid::Uuid::new_v4().to_string();
-            let card = ctx
-                .reg
-                .record_experience_card(
-                    &NewCardInput {
-                        card_id: &card_id,
-                        task_id: &task_id,
-                        parent_a_id: parent_a_id.as_deref(),
-                        parent_b_id: parent_b_id.as_deref(),
-                        operator_used: operator.as_str(),
-                        code: &code,
-                        execution_status: &eval_result.status,
-                        raw_output: &eval_result.raw_output,
-                        primary_score: eval_result.primary_score,
-                        execution_time_ms: eval_result.execution_time_ms,
-                    },
-                    &ctx.hyperparams,
-                )
-                .map_err(|e| e.to_string())?;
-            serde_json::to_value(card).map_err(|e| e.to_string())
+            let plan = plan_evaluate(
+                ctx,
+                &task_id,
+                &code,
+                operator,
+                parent_a_id.as_deref(),
+                parent_b_id.as_deref(),
+                &sandbox_mode,
+                timeout_secs,
+                record,
+            )?;
+            let result = run_evaluate(&plan, &ctx.sandbox)?;
+            commit_evaluate(ctx, &plan, &result)
         }
         Command::DemoSeed => {
             let st = ctx.reg.status().map_err(|e| e.to_string())?;
@@ -1131,6 +1674,9 @@ pub fn dispatch(ctx: &mut Ctx, cmd: Command) -> Result<Value, String> {
             if sum <= 0.0 {
                 return Err("sum of hyperparameter weights must be strictly positive".into());
             }
+            ctx.reg
+                .save_hyperparams(&ctx.hyperparams)
+                .map_err(|e| e.to_string())?;
             serde_json::to_value(ctx.hyperparams).map_err(|e| e.to_string())
         }
         Command::TaskDelete { task_id } => {
@@ -1166,11 +1712,71 @@ pub fn dispatch(ctx: &mut Ctx, cmd: Command) -> Result<Value, String> {
         Command::Import { bundle } => {
             let count = ctx
                 .reg
-                .import_task_bundle(&bundle)
+                .import_task_bundle(&bundle, &ctx.hyperparams)
                 .map_err(|e| e.to_string())?;
             Ok(json!({
                 "imported_cards": count,
             }))
         }
+        Command::DatasetExport {
+            task_id,
+            format,
+            min_delta,
+        } => {
+            let summary = ctx
+                .reg
+                .get_dataset_summary(&task_id)
+                .map_err(|e| e.to_string())?;
+            let sft = ctx
+                .reg
+                .export_sft_traces(&task_id, min_delta)
+                .map_err(|e| e.to_string())?;
+            let dpo = ctx
+                .reg
+                .export_dpo_traces(&task_id)
+                .map_err(|e| e.to_string())?;
+            Ok(json!({
+                "task_id": task_id,
+                "format": format,
+                "summary": summary,
+                "sft_traces": sft,
+                "dpo_traces": dpo,
+            }))
+        }
+        Command::BanditStatus { task_id } => {
+            let state = ctx
+                .reg
+                .get_bandit_state(&task_id)
+                .map_err(|e| e.to_string())?;
+            serde_json::to_value(state).map_err(|e| e.to_string())
+        }
+        Command::TrainStep {
+            task_id,
+            epochs,
+            learning_rate,
+            dry_run,
+        } => {
+            let res =
+                trainer::execute_train_step(&ctx.reg, &task_id, epochs, learning_rate, dry_run)?;
+            serde_json::to_value(res).map_err(|e| e.to_string())
+        }
+        Command::PromoteGate {
+            task_id,
+            trials,
+            steps,
+            sandbox_mode,
+            timeout_secs,
+            baseline_alias,
+            candidate_alias,
+        } => execute_promote_gate(
+            ctx,
+            &task_id,
+            trials,
+            steps,
+            &sandbox_mode,
+            timeout_secs,
+            baseline_alias.as_deref(),
+            candidate_alias.as_deref(),
+        ),
     }
 }

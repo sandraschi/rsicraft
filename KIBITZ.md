@@ -1,6 +1,6 @@
 # Kibitz & Architectural Review Notes (`KIBITZ.md`)
 
-## 2026-11-09 — Architectural Audit & Live RTX 4090 Verification
+## 2026-11-09 - Architectural Audit & Live RTX 4090 Verification
 
 - **3-Crate ArtCraft Alignment (`rsicraft-core`, `rsicraft-mcp`, `rsicraft-app`):**
   - Consolidated the Stigmergic SQLite `WAL` store and BLAKE3+Zstd Content-Addressable Storage into `rsicraft_core::store`, keeping the workspace strictly at 3 crates (`L1` Core+Store, `L2` CLI+MCP, `L3` Native `eframe`/`egui 0.37` GPU Desktop Studio).

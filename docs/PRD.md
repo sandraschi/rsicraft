@@ -10,7 +10,7 @@ Build **`rsicraft`**, a pure-Rust, zero-panic sovereign Recursive Self-Improveme
 
 The system manages an open-ended evolutionary search loop over executable code candidate spaces on a single consumer 24 GB GPU (**Goliath**: AMD Ryzen 9 7900X, 64 GB DDR5, NVIDIA GeForce RTX 4090 24 GB VRAM), maintaining persistent stigmergic state in SQLite `WAL` with BLAKE3+Zstd Content-Addressable Storage (CAS), running isolated execution evaluations in sandboxed containers or local Python 3.12 environments, and exposing control via:
 1. **`rsicraft-app` (`L3`)**: A native GPU-rendered `eframe`/`egui 0.37` Desktop Studio with an interactive Bézier Lineage DAG Canvas, 4-operator launchpad, score spark charts, and 9-tab dossier.
-2. **`rsicraft-mcp` (`L2`)**: A unified CLI (`--json` + formatted tables) and MCP `2024-11-05` stdio server exposing 22 tools.
+2. **`rsicraft-mcp` (`L2`)**: A unified CLI (`--json` + formatted tables) and MCP `2024-11-05` stdio server exposing 26 tools.
 3. **`rsicraft-core` (`L1`)**: The deterministic evolutionary state machine, composite utility selector, and store.
 
 ---
@@ -50,6 +50,6 @@ The system manages an open-ended evolutionary search loop over executable code c
    - Gate 1: `cargo clippy --workspace --all-targets --all-features -- -D warnings` (0 warnings, 0 `unwrap`/`expect`/`panic`/`todo`).
    - Gate 2: `cargo test --workspace` (100% green including `glyph_allowlist_no_tofu_chars`).
    - Gate 3: `cargo fmt --all --check`.
-   - Gate 4: MCP `2024-11-05` stdio probe (`initialize`, `tools/list` = 22 tools, `tools/call`).
+   - Gate 4: MCP `2024-11-05` stdio probe (`initialize`, `tools/list` = 26 tools, `tools/call`).
    - Gate 5: Committed `Cargo.lock`.
    - Gate 6: Complete README stack, 9-tab help, and `BookCraft` brochure (`HTML`, `EPUB`, `PDF`).

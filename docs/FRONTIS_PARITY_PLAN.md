@@ -1,0 +1,138 @@
+# Frontis Ladder Parity Plan
+
+**Date:** 2026-11-10 · **Status:** Phase 0 done, Phase 1 next · **Source of truth for "what is real":** the table in section 2.
+
+Reference: Frontis-MA1 / OpenMLE (`arXiv:2607.28568`, `FrontisAI/OpenRSI`).
+
+---
+
+## 1. What the paper claims, and what it does not
+
+The paper's ladder as written has three rungs it defines itself:
+
+| Rung | Definition | Who is there |
+| :--- | :--- | :--- |
+| Evolution | A model repeatedly modifies a candidate program using execution feedback. | AlphaEvolve, AIDE, OpenMLE-Evo, rsicraft |
+| Meta-evolution | The trajectories of that search are used to train the model that proposes the next modifications. | Frontis-MA1 (one generation) |
+| RSI | A sustained loop in which each upgraded system improves the process that builds its successor. | Nobody, including the paper |
+
+Measured results worth copying the method for:
+
+- Same harness, model swapped (Qwen3.6-35B-A3B to Frontis-MA1-35B): 39.39% to 60.61% medal average on MLE-Bench Lite (22 tasks, 12 h per task, 3 runs).
+- Same model, harness swapped (AIRA-Evo to OpenMLE-Evo): 53.03% to 60.61%, with 41.7% fewer tokens.
+- Held-out NatureBench Lite (10 tasks): match-SOTA 50% to 70% from the model swap alone.
+
+What the paper says it has not done: the operators are trained once ("generation 1"), no second generation trained on its own search traces is reported, the evolutionary system itself does not evolve, and parent selection is a fixed three-factor formula the authors call a preliminary prototype.
+
+So "full parity with the ladder" has an exact meaning: reach **meta-evolution with one measured generation**. Anything past that is new research, not parity.
+
+**License constraint:** the OpenRSI code is CC BY-NC 4.0. rsicraft is MIT/Apache. Their code cannot be copied into this repo. The ideas in the paper can be reimplemented, and their released datasets and weights can be used under their own terms (check the model cards before redistributing anything derived).
+
+---
+
+## 2. Honest state of rsicraft (2026-11-10, end of day)
+
+| Capability | State | Evidence |
+| :--- | :--- | :--- |
+| Evolution loop (4 operators, CAS store, lineage, frontier) | **Real** | 33 tests; live run against Ollama `gemma4:12b` with the local sandbox |
+| Docker and local sandboxes, host-side reaper | **Real** | exercised live 2026-11-10 |
+| Multi-trial evaluation (`trials`) | **Real in the sandbox, unused by steps** | steps call `evaluate(..., 1)` |
+| SFT/DPO trace export | **Real but naive** | prompts are re-synthesized, not the prompts the model actually saw; hardcoded `>= 70.0` score threshold |
+| Operator bandit (`rsi_bandit_status`) | **Advisory only, mislabeled** | not Thompson sampling (posterior mean plus hand-set biases) and not wired into campaigns |
+| Model generations on a task | **Real since today** | steps now send the task's promoted alias to the endpoint; before today the generation number was cosmetic |
+| LoRA training (`rsi_train_step`) | **Real code path, never run end to end** | `train_lora.py` is a standard PEFT script, unverified on Goliath |
+| Promotion gate (`rsi_promote_gate`) | **Real** | A/B of two served aliases over fresh searches, Welch t >= 2; refuses the demo sandbox |
+| Serving a trained adapter | **Missing** | no adapter-to-GGUF conversion, no endpoint registration |
+| Held-out task split | **Missing** | the gate currently tests on the task it trained on |
+| Cross-task training data | **Missing** | one task yields tens of traces; the paper used 26,259 |
+| Agentic operators (tool use inside a step) | **Missing** | one completion per step |
+| Desktop app runs off the UI thread | **Real since today** | worker thread, stop button, live timeline |
+
+What was removed today: a training step that printed a hardcoded loss curve and advanced the generation without training, and a promotion gate that awarded every candidate a constant +4.5% and promoted it. Both were reported as "complete, no blockers".
+
+---
+
+## 3. Blockers on a single RTX 4090
+
+1. **VRAM is one pool.** A 35B model at Q4 is about 21.5 GB. That leaves nothing for a GPU task in the sandbox and nothing for a resident model. The paper's "12 GB cap" is the task budget; the model was not sharing that card. *Way through:* CPU-only tasks first (algorithms, tabular ML), or a 9B-class model for anything that must share the card.
+2. **Reasoning models burn the step budget.** Measured today: `gemma4:12b` spends 5,000 to 6,000 tokens thinking per step, 30 to 70 s per step, and sometimes exhausts the budget with no answer. *Done:* 12,288-token default, salvage of the last drafted code block, dedent of nested fences. *Still open:* per-step token accounting.
+3. **Fine-tuning the 35B model locally is not realistic.** 4-bit weights alone fill the card before activations and gradients. *Way through:* run the loop on a model that fits (Qwen 9B class, QLoRA in WSL Ubuntu), which is also faster to iterate on. The claim being tested is the loop, not the model size.
+4. **Data volume.** A generation needs thousands of traces across many tasks. *Way through:* a task pack (section 4, Phase 1) plus overnight campaigns; optionally bootstrap from the released OpenMLE SFT traces.
+5. **Serving the adapter.** llama.cpp loads LoRA adapters converted to GGUF (`convert_lora_to_gguf.py`, `llama-server --lora`); Ollama takes an `ADAPTER` line in a Modelfile. Neither is wired up or tested here.
+6. **Statistics.** One timing is noise. A gate at 5 trials x 6 steps x 2 models is 60 steps, about an hour on the 12B model. Budget for it; do not shortcut it.
+7. **Port and model hygiene on Goliath.** Port 8081 (the default `llama_url`) is held by Docker. Loading the 35B model evicts whatever is resident.
+
+None of these is a wall. 1 and 3 mean the honest local experiment uses a small model and CPU tasks.
+
+---
+
+## 4. Phases
+
+Durations are AI-assisted working days.
+
+### Phase 0 - Honesty reset and plumbing (done 2026-11-10)
+- Fake training and fake promotion removed; real gate; generations drive the model alias.
+- Step pipeline split into `plan_step` / `run_step` / `commit_step`; desktop app runs steps, campaigns and lab evaluations on a worker thread with a live run panel.
+- Live path fixed for reasoning models and verified against Ollama.
+
+### Phase 1 - Evolution rung, properly (1 to 2 days)
+- **Task pack:** 15 to 20 CPU-only tasks with noise-normalized evaluators (score relative to a reference run in the same process), split into `train` and `heldout` sets stored on the task row.
+- **Runs table:** one row per campaign (model, generation, config, tokens, wall time) so curves can be compared across models.
+- **Step budget in tokens and seconds**, recorded per card. Steps use `trials >= 3` for timing-scored tasks.
+- **Operator-conditioned memory:** short lessons distilled from past cards of the same operator, injected into the prompt (the paper's experience-card memory).
+- **Real Thompson sampling** over operators, wired into campaigns; the fixed cycle stays as a selectable baseline so the bandit's gain is measurable.
+- **Baseline replication:** pull `Frontis-MA1-35B-GGUF`, run the task pack with base `qwen3.6-35b-a3b` (already in Ollama) and with Frontis-MA1, same harness. This reproduces the paper's model-swap at small scale and answers "does it work here".
+- *Exit:* a table of best-score-at-N-steps per model per task, with spread.
+
+### Phase 2 - Agentic harness (1 to 2 days) - the improvement over the paper
+The paper lists "operators are composed by an external harness, not by agents" and "fixed expansion policy" as limitations. Both are addressable:
+- **Agentic step:** inside one step the model may call bounded tools (`run_candidate`, `read_card`, `diff_cards`, `search_memory`, `profile`) in a loop before submitting. Budgeted by tokens and tool calls. Every tool call lands in the trace, which makes the trace richer training data.
+- **Policy as an agent:** an orchestrator call picks operator and parent from the frontier summary instead of the fixed 0.50/0.35/0.15 formula. The formula stays as the fallback and the control arm.
+- **External driver mode:** any MCP client can already drive `rsi_*` tools. Add `rsi_next_action` (state summary plus recommended call) so a client agent can run a campaign with its own judgment.
+- *Exit:* agentic vs single-shot on the task pack at equal token budget.
+
+### Phase 3 - Meta-evolution: one measured generation (2 to 3 days)
+- Record the **actual prompts** on each card (new column) so traces are the real exchange.
+- Export traces from all `train` tasks; filter by measured gain, not a score constant.
+- QLoRA a 9B-class model in WSL; convert the adapter to GGUF; serve G1 next to G0.
+- `rsi_promote_gate` on the **held-out** tasks only.
+- *Exit, and the definition of parity:* steps-to-threshold and best-score-at-N for G0 vs G1 on held-out tasks, with trials. If G1 is not better, that is the result and it gets written down.
+
+### Phase 4 - Past parity: the recursive part (open-ended)
+- G1 generates the traces for G2. Track the per-generation gain; expect it to shrink fast.
+- Put the harness itself under search: prompts, memory policy and selection weights become candidates scored by the gate (the paper's "the evolutionary system does not evolve").
+- Guardrails before any unattended run: Docker sandbox only, hard wall-clock and token budgets, promotion requires a human click, every generation's adapter and gate report kept.
+
+### Phase 5 - Run Theater (1 day, can start any time after Phase 1)
+See section 5.
+
+---
+
+## 5. Showing a run
+
+Built today: a live panel with the running operator, elapsed time, a stop button and a per-step timeline (operator color, score bar scaled to the best so far, delta, NEW BEST marker). The lineage canvas and spark chart refresh after every step, so the graph grows while you watch.
+
+Next, in order of value:
+1. **Staircase:** best score against steps, with every failed attempt as a tick on the baseline. One glance shows progress and how much of the search was waste.
+2. **Growing lineage:** the node being evaluated pulses; edges draw in on commit; node size is score, color is operator, a ring marks the frontier.
+3. **Diff on breakthrough:** when a step sets a new best, the diff against its parent slides in beside the graph. This is the moment that explains what the search found.
+4. **Generation lanes:** G0 and G1 curves overlaid on the same axes. The area between them is the whole claim of the project in one picture, and an empty area is equally informative.
+5. **Budget bar:** tokens and seconds spent against the cap.
+
+---
+
+## 6. AICraft and RSICraft
+
+Keep them as two apps; connect them.
+
+- **AICraft** is an operations cockpit (routing, telemetry, prompt evals). It should be safe to leave open all day.
+- **RSICraft** executes model-written code and trains models. Different risk, different dependencies (Docker, a CUDA Python environment), different release rhythm.
+
+Merging puts the riskiest code inside the app meant to be the calm one, and ties a two-day-old scaffold to a research engine that will churn.
+
+The connection:
+- rsicraft uses `aicraft-core`'s router for endpoint discovery, resident-first model choice and token telemetry instead of its own `LlamaClient` probe.
+- aicraft gets an "Improvement Lab" pane that drives rsicraft through its MCP tools and shows the staircase and generation lanes.
+- aicraft's prompt-eval fixtures and rsicraft's task evaluators are the same idea (input plus scorer). One shared task format lets a prompt eval become an rsicraft task.
+
+To a user this reads as one product with a front door and an engine room. Revisit a merge after Phase 3, when there is a result worth putting on the front page.
