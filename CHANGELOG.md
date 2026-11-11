@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.1 - 2026-11-11
+
+### Documentation Synchronization, Pack-v1 Benchmarks & Recompiled Brochure Suite
+
+- **Documentation Parity:** Synchronized architecture and tools reference with the 3-phase execution pipeline (`plan_step`, `run_step`, `commit_step`) that decouples multi-minute LLM completions and sandbox evaluations from SQLite WAL locks.
+- **Desktop Studio Live Run:** Documented the non-blocking background worker thread in `rsicraft-app`, live run dashboard, progress meters, and stop button.
+- **Benchmark Suite (`tasks/pack-v1`):** Added documentation for the 6 standard CPU-only algorithmic tasks (`edit_distance`, `inversions`, `lis`, `matmul`, `primes`, `wordfreq`) implementing noise-normalized speedup evaluation against an in-process unoptimized reference algorithm.
+- **Model-Swap Harness (`scripts/bench-models.ps1`):** Documented the automated, resumable evaluation runner comparing models on equal task splits.
+- **Welch's t-Test Promotion Gate:** Documented the A/B evaluation protocol with interleaved trials across baseline and candidate aliases enforcing $t \ge 2.0$ for promotion.
+- **Configuration Reference:** Documented `RSICRAFT_LLM_TIMEOUT_SECS` (default 600s), `RSICRAFT_MAX_TOKENS` (default 12,288), and `RSICRAFT_REASONING_EFFORT`.
+- **Recompiled Brochure Suite:** PDF, EPUB, and HTML brochures refreshed and synchronized.
+
 ## 0.3.0 - 2026-11-10
 
 ### 4-Rung Frontis Ladder & 26-Tool Surface
