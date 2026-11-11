@@ -189,6 +189,27 @@ rsicraft train --task-id my-task --dataset-path ./traces_task.json
 ### Step 4: Comparative Promotion Gate
 Benchmark candidate generation $G_1$ against baseline $G_0$ on the held-out validation suite over $K=5$ repeated trials:
 ```bash
-rsicraft promote --task-id my-task --candidate-alias frontis-g1 --baseline-alias frontis --trials 5
+rsicraft promote --task-id my-task --candidate-alias frontis-g1 --baseline-alias frontis --trials 5 --steps 4 --sandbox-mode local
 ```
-The system computes the delta, verifies that $\bar{s}_{G_1} > \bar{s}_{G_0} + \epsilon$, and automatically promotes $G_1$ as the default model alias.
+The system interleaves searches between both arms, evaluates Welch's t-statistic ($t \ge 2.0$), and promotes $G_1$ as the task's default model alias only when improvement is statistically significant.
+
+---
+
+## 6. The Standard Benchmark Task Pack (`tasks/pack-v1`)
+
+To eliminate hardware-dependent scoring variance across machines, `tasks/pack-v1` implements **noise-normalized speedup evaluation**: every task executes an in-process unoptimized reference algorithm alongside the synthesized candidate within the exact same process and timing loop:
+
+$$\text{Score} = \text{round}\left(\frac{T_{\text{ref}}}{\max(T_{\text{candidate}}, 10^{-7})}, 2\right)$$
+
+This isolates genuine algorithmic speedups from CPU clock throttling, background thread preemption, and OS scheduler jitter.
+
+### Model-Swap Evaluation (`scripts/bench-models.ps1`)
+Use the automated, resumable harness to run comparative model-swap evaluations:
+```powershell
+pwsh -File scripts\bench-models.ps1 `
+    -Models 'qwen3.6-35b-a3b:latest', 'hf.co/FrontisAI/Frontis-MA1-35B-GGUF:Q4_K_M' `
+    -Steps 12 `
+    -Trials 3 `
+    -TimeoutSecs 60
+```
+Outputs are logged to `results.csv` tracking execution counts, success rates, best speedups, and first-success latencies across all tasks.

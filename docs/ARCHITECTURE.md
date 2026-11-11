@@ -84,10 +84,20 @@ To prevent the evolutionary search loop from selecting measurement noise or tran
   - `ErrorRecovery`: Shifts allocation toward deterministic `DEBUG` repair when sandbox error rates exceed 60%.
   - `AdaptiveBayesian`: Samples posterior distributions to automatically balance exploitation of winning operators against exploration of stalled branches.
 
-### 2.5 Closed-Loop Model Generation and Promotion Gate (`trainer.rs`)
-- **RTX 4090 LoRA Harness:** Orchestrates consumer GPU fine-tuning (`sandboxes/train_lora.py`) utilizing 4-bit NormalFloat base quantization and rank 16 low-rank adapters.
-- **Model Lineage:** Tracks generation transitions ($G_0 \to G_1 \to \dots \to G_t$), updating task state in SQLite WAL.
-- **Hypothesis-Gated Promotion:** Benchmarks candidate generation $G_{t+1}$ against baseline $G_t$ over $K$ repeated evaluation trials. If candidate performance exceeds baseline by threshold $\epsilon$, the model is promoted; otherwise, the system initiates an automated rollback.
+### 2.5 Closed-Loop Model Generation and Promotion Gate (`trainer.rs` & `lib.rs`)
+- **RTX 4090 LoRA Harness:** Orchestrates consumer GPU fine-tuning (`sandboxes/train_lora.py`) utilizing 4-bit NormalFloat base quantization and rank 16 low-rank adapters. Produces candidate adapters without modifying the active generation until passing the promotion gate.
+- **Model Lineage:** Tracks generation transitions ($G_0 \to G_1 \to \dots \to G_t$), updating the task's promoted model alias in SQLite WAL.
+- **Welch's $t$-Test Promotion Gate:** Benchmarks candidate generation $G_{t+1}$ against baseline $G_t$ over $K$ repeated evaluation trials (interleaved to cancel host-side performance drift). If Welch's $t \ge 2.0$, the candidate is promoted; otherwise, rollback is preserved.
+
+### 2.6 The 3-Phase Step Pipeline (`plan_step` / `run_step` / `commit_step`)
+To prevent multi-minute LLM completions or sandbox runs from holding SQLite database locks:
+- **`plan_step` / `plan_evaluate`:** Reads current task frontiers, samples parent candidates, and builds operator prompts in a brief read-only transaction.
+- **`run_step` / `run_evaluate`:** Executes inference against `llama-server` or Ollama and compiles/runs sandbox evaluation completely off the database lock. Handles reasoning models gracefully with a 12,288-token budget, thought-preamble code extraction, and list-nested fence dedenting.
+- **`commit_step` / `commit_evaluate`:** Acquires an exclusive lock only to store the resulting BLAKE3/Zstd experience card, recompute task utility scores, and update the materialized Pareto frontier.
+
+### 2.7 Desktop Studio Worker Thread & Live Run Panel (`rsicraft-app`)
+- **Non-Blocking Architecture:** Evolutionary campaigns and lab evaluations run on a dedicated worker thread communicating via thread-safe channels, keeping the `egui` UI thread rendering at a solid 60 FPS.
+- **Live Run Panel:** Real-time dashboard showing active operator, elapsed seconds, progress bars, per-step score delta markers, and a responsive "Stop after this step" cancellation latch.
 
 ---
 

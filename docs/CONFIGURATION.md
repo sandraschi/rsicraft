@@ -1,6 +1,6 @@
 # Configuration Reference: RSICraft
 
-**Navigation:** [README](../README.md) · [Install](../INSTALL.md) · [Architecture](ARCHITECTURE.md) · [Tools](TOOLS.md)
+**Navigation:** [README](../README.md) · [Install](../INSTALL.md) · [Architecture](ARCHITECTURE.md) · [Tools](TOOLS.md) · [Frontis Parity Plan](FRONTIS_PARITY_PLAN.md)
 
 ---
 
@@ -14,7 +14,9 @@
 | `--docker-image <TAG>` | - | `rsicraft-evaluator:latest` | Container image tag used when `--sandbox-mode docker` is selected. |
 | - | `RSICRAFT_PYTHON` | `python3` (or uv Python 3.12 on Windows) | Custom path to Python executable for local sandbox evaluation. |
 | - | `RSICRAFT_RUSTC` | `rustc` (or `%USERPROFILE%\.cargo\bin\rustc.exe`) | Custom path to `rustc` compiler for local native Rust sandbox evaluation. |
-| - | `RSICRAFT_MAX_TOKENS` | `4096` | Completion budget per LLM synthesis call (64 to 65536). Raise it when a reasoning model spends the budget on its thought preamble and the code block comes back truncated. |
+| - | `RSICRAFT_MAX_TOKENS` | `12288` | Completion token budget per LLM synthesis call (64 to 65,536). A generous budget prevents reasoning models from exhausting their tokens in thought preambles before emitting code blocks. |
+| - | `RSICRAFT_LLM_TIMEOUT_SECS`| `600` | Wall-clock timeout in seconds for a single LLM completion (5 to 7,200). Generous 10-minute default ensures 35B-class reasoning models have adequate time for extended thinking. |
+| - | `RSICRAFT_REASONING_EFFORT`| None (unset) | Optional reasoning effort hint (`"low"`, `"medium"`, `"high"`, `"none"`) passed directly to Ollama and OpenAI-compatible inference servers that support reasoning effort levels. |
 | `--json` | - | `false` | Emit machine-readable pretty-printed JSON on `stdout`. |
 
 ---
@@ -40,6 +42,32 @@ rsicraft hyperparams --w-score 0.60 --w-delta 0.30 --w-novelty 0.10
 
 | Mode | Isolation Mechanism | When to Use |
 | :--- | :--- | :--- |
-| `"demo"` | Deterministic in-memory Rust oracle | Unit tests, CI gates, offline exploration without GPU/Docker. |
-| `"local"` | Ephemeral temporary directory + Python or native Rust (`rustc`) + host-side timeout reaper. **No isolation**: the candidate runs with your user rights, network and filesystem. | Fast local campaigns with code you trust (your own model on your own tasks) when Docker Desktop is stopped. |
-| `"docker"` | Non-root container (`--network none --read-only --user 10000:10001 --cap-drop ALL --security-opt no-new-privileges --pids-limit 256 --memory 4g --cpus 4`). Build the image first: `docker build -f sandboxes/Dockerfile.evaluator -t rsicraft-evaluator:latest sandboxes`. | Untrusted long-horizon synthesis requiring strict kernel/network containment. |
+| `"demo"` | Deterministic in-memory Rust oracle | Fast unit tests, CI gates, and offline smoke tests without GPU or Docker dependencies. |
+| `"local"` | Ephemeral temporary directory + Python 3.12 or native Rust (`rustc`) + host-side watchdog reaper. **Convenience backend**: candidate runs with host user privileges. | Rapid local development and testing with models and tasks you control when Docker Desktop is stopped. |
+| `"docker"` | Non-root container (`--network none --read-only --user 10000:10001 --cap-drop ALL --security-opt no-new-privileges --pids-limit 256 --memory 4g --cpus 4`). Payload delivered over `stdin`. | Production long-horizon evolutionary synthesis requiring strict kernel, filesystem, and network containment. |
+
+---
+
+## 4. Benchmark Task Pack (`tasks/pack-v1`) & Model-Swap Harness
+
+RSICraft bundles a standardized algorithmic benchmark task pack in `tasks/pack-v1/` featuring noise-normalized speedup evaluators:
+
+| Task ID | Name | Split | Description |
+| :--- | :--- | :--- | :--- |
+| `edit_distance` | Levenshtein Distance | `train` | Compute minimum edit distance between sequence pairs; score is speedup over naive matrix recurrence. |
+| `inversions` | Inversion Count | `train` | Count inversion pairs in permutations; score is speedup over $O(N^2)$ brute-force check. |
+| `lis` | Longest Increasing Subseq | `train` | Longest strictly increasing subsequence length; score is speedup over quadratic recursion. |
+| `matmul` | Integer Matrix Multiply | `train` | Dense $N \times N$ integer matrix product; score is speedup over triple-nested loop reference. |
+| `primes` | Prime Sieve Counting | `train` | Count prime numbers strictly less than $N$; score is speedup over naive trial division. |
+| `wordfreq` | Word Frequency Top-K | `heldout` | Tokenize and extract top-K word frequencies; score is speedup over unindexed linear counter. |
+
+### Running the Model-Swap Benchmark (`scripts/bench-models.ps1`)
+Compare two models across identical tasks and trials with automatic resumption and CSV logging:
+```powershell
+pwsh -File scripts\bench-models.ps1 `
+    -Models 'qwen3.6-35b-a3b:latest', 'hf.co/FrontisAI/Frontis-MA1-35B-GGUF:Q4_K_M' `
+    -Steps 12 `
+    -Trials 3 `
+    -TimeoutSecs 60
+```
+Results are appended to `$env:LOCALAPPDATA\rsicraft\bench\<timestamp>\results.csv` recording step counts, success cards, best scores, and wall-clock seconds.

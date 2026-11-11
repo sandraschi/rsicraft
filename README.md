@@ -70,14 +70,19 @@ On **July 30, 2026**, a 24-researcher team from **Tsinghua University**, **Front
 ```text
 rsicraft/
 ├── crates/
-│   ├── rsicraft-core/    # L1 Core & Store: SQLite WAL, BLAKE3+Zstd CAS, U_i Utility, 4-Op Engine, LlamaClient, SandboxRunner, 9-Tab Help
+│   ├── rsicraft-core/    # L1 Core & Store: SQLite WAL, BLAKE3+Zstd CAS, U_i Utility, 4-Rung Ladder, LlamaClient, SandboxRunner
 │   ├── rsicraft-mcp/     # L2 Binary: Unified CLI (--json / table) + MCP 2024-11-05 stdio server (26 tools)
-│   └── rsicraft-app/     # L3 Desktop Studio: Native eframe/egui 0.37 GPU app (Bezier Lineage DAG, Spark Chart, RTX 4090 Gauge, 9-Tab Dossier)
+│   └── rsicraft-app/     # L3 Desktop Studio: Native eframe/egui 0.37 GPU app (Bezier Lineage DAG, Live Run Panel, Worker Thread)
 ├── sandboxes/
-│   └── Dockerfile.evaluator  # Air-gapped rootless Python 3.12 + NumPy/SciPy evaluator image
+│   ├── Dockerfile.evaluator  # Air-gapped rootless Python 3.12 + NumPy/SciPy evaluator image
+│   └── train_lora.py         # Local parameter-efficient LoRA training harness
+├── tasks/
+│   └── pack-v1/              # Standard algorithmic benchmark suite with noise-normalized speedup evaluation
+├── scripts/
+│   └── bench-models.ps1      # Resumable model-swap comparative evaluation harness
 └── docs/
-    ├── brochure/         # rsicraft-brochure.{html,epub,pdf}
-    ├── help/             # 9-tab interactive HTML Help Studio (index.html)
+    ├── brochure/             # rsicraft-brochure.{html,epub,pdf}
+    ├── help/                 # 9-tab interactive HTML Help Studio (index.html)
     ├── RSI_LANDSCAPE_AND_SKYNET_MYTH.md
     └── TSINGHUA_OPENRSI_TEAM.md
 ```
@@ -85,12 +90,14 @@ rsicraft/
 ### Native `eframe` / `egui 0.37` Desktop Studio (`rsicraft-app`)
 
 Launch with `cargo run -p rsicraft-app`:
+- **Responsive Non-Blocking UI:** Evolutionary steps and multi-step campaigns execute off the UI thread on a background worker thread.
+- **Live Run Control Panel:** Real-time dashboard with running operator, elapsed seconds, score progression bars, and a clean "Stop after this step" cancellation latch.
 - **High-Contrast `slate-950` Dark & `slate-50` Light Themes** with a vector-painted Sun / Crescent Moon toggle, `Ctrl + MouseWheel` GPU zoom, and a strict compile-time Tofu Glyph Guard (`glyph_allowlist_no_tofu_chars`).
 - **7 Dedicated Workstation Views:**
   1. **Evolutionary Studio:** One-click `DRAFT`, `IMPROVE`, `DEBUG`, `CROSSOVER`, and `Run 4-Step Campaign` launchpad, live **Evolutionary Score Trajectory Spark Chart** with hover crosshairs, and Materialized Top-K Pareto Frontier cards.
   2. **Lineage DAG Canvas:** Interactive GPU-painted **Cubic Bézier Node Graph** with animated pulse particles connecting `parent_a` and `parent_b` nodes to child experience cards.
   3. **Experience Cards & CAS:** Switchable **Cards (Default) | Table | JSON** browser with side-by-side **BLAKE3 + Zstd Decompressed Source Code & Stack Trace Inspector**.
-  4. **Task & Sandbox Lab:** Interactive task editor and live Python candidate sandbox benchmarker (`demo`, `local`, `docker`).
+  4. **Task & Sandbox Lab:** Interactive task editor and live candidate sandbox benchmarker (`demo`, `local`, `docker`).
   5. **RTX 4090 & LLM Config:** Visual 24 GB VRAM allocation gauge and endpoint configuration (`llama-server :8081`, Goliath runner, Ollama `:11434`).
   6. **RSI & Tsinghua Dossier:** Built-in deep-dive reader on the Western "Skynet" narrative, closed OpenAI/Anthropic RSI experiments, and the Tsinghua/Frontis.AI `arXiv:2607.28568` breakthrough.
   7. **9-Tab Help & 26 Tools:** Searchable operator manual with one-click PDF/EPUB brochure launchers.

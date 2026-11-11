@@ -43,7 +43,7 @@ rsicraft help-tabs --search "Bowen Zhou"
 
 1. **`rsicraft-core` (`L1 Core + Store`)**: Transactional SQLite `WAL` store (`tasks`, `experience_cards`, `task_frontiers`), 256-bit **BLAKE3** content-addressable hashing, **Zstd** (level 3) source code compression, 3-term composite utility parent selection, 4-operator evolutionary loop (`DRAFT`, `IMPROVE`, `DEBUG`, `CROSSOVER`), `llama-server` OpenAI-compatible inference client, and multi-backend sandbox runner (`docker`, `local`, `demo`).
 2. **`rsicraft-mcp` (`L2 CLI + MCP Binary`)**: Single binary exposing 26 MCP tools over `stdio` (`2024-11-05`) and 1:1 CLI subcommands.
-3. **`rsicraft-app` (`L3 Native GPU Desktop Studio`)**: High-contrast `slate-950` `eframe`/`egui 0.37` desktop workstation featuring an interactive GPU-painted **Cubic Bézier Lineage DAG Canvas**, **Evolutionary Score Trajectory Spark Chart**, **4-Operator Launchpad**, **BLAKE3+Zstd CAS Inspector**, **RTX 4090 VRAM Gauge**, and **9-Tab Dossier**.
+3. **`rsicraft-app` (`L3 Native GPU Desktop Studio`)**: High-contrast `slate-950` `eframe`/`egui 0.37` desktop workstation featuring a non-blocking background worker thread, **Live Run Control Panel**, interactive GPU-painted **Cubic Bézier Lineage DAG Canvas**, **Evolutionary Score Trajectory Spark Chart**, **4-Operator Launchpad**, **BLAKE3+Zstd CAS Inspector**, **RTX 4090 VRAM Gauge**, and **9-Tab Dossier**.
 
 ---
 
