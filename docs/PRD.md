@@ -53,3 +53,23 @@ The system manages an open-ended evolutionary search loop over executable code c
    - Gate 4: MCP `2024-11-05` stdio probe (`initialize`, `tools/list` = 26 tools, `tools/call`).
    - Gate 5: Committed `Cargo.lock`.
    - Gate 6: Complete README stack, 9-tab help, and `BookCraft` brochure (`HTML`, `EPUB`, `PDF`).
+
+---
+
+## 4. UI/UX Architecture & Menu Bar Standard
+
+In accordance with [`CRAFT_MENU_BAR_STANDARD.md`](../../mcp-central-docs/standards/rust-artcraft/CRAFT_MENU_BAR_STANDARD.md):
+- **Pattern 2 (Viewport-Centric Craft Workstation):** Persistent Bézier Lineage DAG canvas and candidate code evaluation stage. Top quick button row acts as accelerators into the `View` menu. To add a new search operator or telemetry dock:
+  1. Register a visibility toggle in the `View` or `Window` menu.
+  2. Add an entry in the sidebar Operator / Candidate toolbox.
+  3. Wire the action directly into the universal `Command::dispatch` bus.
+- **Top Menu Bar Hierarchy:**
+  - `File`: New Task (`Ctrl+N`), Open Task DAG (`Ctrl+O`), Open Recent ▸, Save Task (`Ctrl+S`), Save As... (`Ctrl+Shift+S`), Export Lineage (`Ctrl+E`), Close Task (`Ctrl+W`), Quit (`Ctrl+Q`).
+  - `Edit`: Undo (`Ctrl+Z`), Redo (`Ctrl+Y`), Cut, Copy, Paste, Select All, Preferences (`Ctrl+,`).
+  - `View`: Lineage DAG Canvas, Candidate Code Inspector, Evaluation Log, Score Sparkline HUD, Theme (`Dark`/`Light`).
+  - `Insert`: Add Seed Candidate, Insert Problem Specification, Add Evaluation Metric.
+  - `Modify`: Mutate Candidate, Cross Parents, Prune Frontier, Tune Hyperparameters.
+  - `Commands`: Run Evolutionary Loop, Probe LLM Endpoint, Evaluate Candidate Sandboxes, Calculate Pareto Frontier.
+  - `Window`: Reset Layout, Lineage DAG Viewport, Candidate Diff Inspector, Terminal Output.
+  - `Help` (Mandatory 5-Dialog Suite): `Command Palette...` (`Ctrl+K`), `Keyboard Shortcuts...` (`F1`), `Project Files & Docs...`, `Licenses & Notices...`, `About RSICraft`.
+- **Behavioral Mechanics:** Smooth `switch_on_hover` between top-level menus, zero-unsafe immediate-mode rendering, and headless `--smoke` parity.
