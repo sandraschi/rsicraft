@@ -1,0 +1,137 @@
+{
+  "manifest_version": "0.2",
+  "name": "rsicraft",
+  "display_name": "RsiCraft",
+  "version": "__VERSION__",
+  "description": "rsicraft L3: Native eframe/egui 0.37 GPU Desktop Studio for Sovereign Recursive Self-Improvement on RTX 4090.",
+  "author": {
+    "name": "Sandra Schipal",
+    "url": "https://github.com/sandraschi"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sandraschi/rsicraft"
+  },
+  "license": "MIT OR Apache-2.0",
+  "server": {
+    "type": "binary",
+    "entry_point": "rsicraft.exe",
+    "mcp_config": {
+      "command": "${__dirname}/rsicraft.exe",
+      "args": [
+        "mcp"
+      ]
+    }
+  },
+  "compatibility": {
+    "platforms": [
+      "win32"
+    ]
+  },
+  "tools": [
+    {
+      "name": "rsi_status",
+      "description": "Return stigmergic SQLite store statistics, card counts, and Goliath RTX 4090 summary."
+    },
+    {
+      "name": "rsi_hardware_profile",
+      "description": "Return the Goliath RTX 4090 (24 GB VRAM) + Frontis-MA1 30B/35B MoE hardware profile and llama-server launch command."
+    },
+    {
+      "name": "rsi_task_upsert",
+      "description": "Create or update an evolutionary optimization task and its sandbox evaluator script."
+    },
+    {
+      "name": "rsi_task_list",
+      "description": "List all registered optimization tasks."
+    },
+    {
+      "name": "rsi_task_show",
+      "description": "Show a task, its score/delta bounds, and its current top frontier."
+    },
+    {
+      "name": "rsi_step",
+      "description": "Execute a single evolutionary step (DRAFT, IMPROVE, DEBUG, or CROSSOVER) with composite-utility parent selection, LLM synthesis, sandbox evaluation, and BLAKE3+Zstd CAS persistence."
+    },
+    {
+      "name": "rsi_campaign",
+      "description": "Run a multi-step autonomous evolutionary campaign cycling across DRAFT, IMPROVE, DEBUG, and CROSSOVER."
+    },
+    {
+      "name": "rsi_get_frontier",
+      "description": "Get the top-K materialized frontier experience cards for a task."
+    },
+    {
+      "name": "rsi_card_list",
+      "description": "List experience cards for a task ordered by composite utility, optionally filtered by operator or execution status."
+    },
+    {
+      "name": "rsi_card_show",
+      "description": "Show full details of one experience card including decompressed source code, BLAKE3 hash, execution logs, and lineage."
+    },
+    {
+      "name": "rsi_lineage",
+      "description": "Return the evolutionary lineage DAG (nodes and parent->child edges) for a task."
+    },
+    {
+      "name": "rsi_evaluate",
+      "description": "Directly evaluate a candidate Python code snippet against a task's evaluator and optionally record it as an experience card."
+    },
+    {
+      "name": "rsi_demo_seed",
+      "description": "Seed an empty database with the spec's 'opt-synth' (Vector Max) benchmark task and a 4-card evolutionary progression."
+    },
+    {
+      "name": "rsi_help",
+      "description": "Query the 9-tab RSICraft Operator Manual, RSI Geopolitics ('Skynet' vs Closed Labs), Tsinghua/Frontis.AI OpenRSI Dossier, and Competitive Matrix (tabs: overview, rsi_landscape, tsinghua_openrsi, wrappee, operators, compare, api, troubleshoot, faq, all) with op..."
+    },
+    {
+      "name": "rsi_diff",
+      "description": "Generate a unified text diff comparing decompressed source codes between two experience cards (e.g. parent vs child)."
+    },
+    {
+      "name": "rsi_llm_probe",
+      "description": "Actively ping the configured LLM endpoint (/v1/models), returning reachability status, latency in ms, and active model alias."
+    },
+    {
+      "name": "rsi_hyperparams_get",
+      "description": "Get current composite utility weights (w_score, w_delta, w_novelty) used for stochastic parent selection."
+    },
+    {
+      "name": "rsi_hyperparams_set",
+      "description": "Set composite utility weights (w_score, w_delta, w_novelty). The weights are persisted in the store and every task is re-ranked immediately."
+    },
+    {
+      "name": "rsi_task_delete",
+      "description": "Delete a task and cascade delete all its associated experience cards and frontier records."
+    },
+    {
+      "name": "rsi_cards_prune",
+      "description": "Prune low-utility non-frontier experience cards for a task, keeping at least keep_frontier top cards."
+    },
+    {
+      "name": "rsi_export",
+      "description": "Export a complete task lineage bundle (task definition, decompressed CAS cards, and Pareto frontier) to JSON."
+    },
+    {
+      "name": "rsi_import",
+      "description": "Import a complete task lineage bundle from JSON into the stigmergic SQLite store."
+    },
+    {
+      "name": "rsi_dataset_export",
+      "description": "Rung 2 Self-Evolution: Export curated SFT trajectories (positive deltas, error repairs) and DPO contrastive preference pairs from the task DAG."
+    },
+    {
+      "name": "rsi_bandit_status",
+      "description": "Advisory operator statistics for a task: per-operator pulls, wins, Beta posterior parameters and a recommended next operator. Not Thompson sampling yet and not used by campaigns."
+    },
+    {
+      "name": "rsi_train_step",
+      "description": "Post-train a LoRA adapter on the task's curated SFT traces with sandboxes/train_lora.py (needs RSICRAFT_TRAIN_BASE_MODEL and a CUDA Python environment). Produces a candidate adapter only; the active model changes only through rsi_promote_gate."
+    },
+    {
+      "name": "rsi_promote_gate",
+      "description": "A/B gate between two model aliases served by the LLM endpoint: runs `trials` fresh searches of `steps` steps per model on scratch copies of the task and promotes the candidate only if its best scores are clearly higher (Welch t >= 2)."
+    }
+  ]
+}
