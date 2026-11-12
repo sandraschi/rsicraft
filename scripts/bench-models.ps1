@@ -23,6 +23,10 @@ param(
 
 $ErrorActionPreference = 'Continue'
 
+# powershell -File passes 'a,b' as one string; accept that form too.
+$Models = @($Models | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+$OnlyTasks = @($OnlyTasks | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+
 if (-not $OutDir) {
     $OutDir = Join-Path $env:LOCALAPPDATA ('rsicraft\bench\' + (Get-Date -Format 'yyyyMMdd-HHmm'))
 }
