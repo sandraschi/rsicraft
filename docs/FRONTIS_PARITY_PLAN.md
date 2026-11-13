@@ -1,6 +1,6 @@
 # Frontis Ladder Parity Plan
 
-**Date:** 2026-11-10 · **Status:** Phase 0 done, Phase 1 next · **Source of truth for "what is real":** the table in section 2.
+**Date:** 2026-11-10, revised 2026-11-12 after the first benchmark | **Status:** Phase 0 done, Phase 1 re-scoped (see section 1a) | **Source of truth for "what is real":** the table in section 2.
 
 Reference: Frontis-MA1 / OpenMLE (`arXiv:2607.28568`, `FrontisAI/OpenRSI`).
 
@@ -30,7 +30,29 @@ So "full parity with the ladder" has an exact meaning: reach **meta-evolution wi
 
 ---
 
-## 2. Honest state of rsicraft (2026-11-10, end of day)
+## 1a. First measurements and what they changed (2026-11-12)
+
+Full report: [BENCH_MODELSWAP_V2.md](BENCH_MODELSWAP_V2.md).
+
+- **Model swap on pack-v1:** Frontis-MA1-35B showed no advantage over its base model on rsicraft's six algorithm tasks (one complete trial; inside or below the base range on five of six tasks). The tasks are outside its training domain, so this does not contradict the paper, and it does not reproduce it.
+- **Search amplification on pack-v1 is 1.18 (median):** the final best is barely better than the first working candidate, inside the 20 to 30% trial-to-trial noise. In 9 of 25 runs the best card was a fresh DRAFT. Only one task (primes) showed real amplification.
+- **Consequence:** a loop that distills search results into the model has nothing to distill on tasks like these. Before any training, a task pack must pass an **amplification gate**.
+
+Current estimates of success (judgment, not measurement):
+
+| Goal | Estimate |
+| :--- | :--- |
+| A solid, honest evolutionary-search craft app | about 90% |
+| Reproduce the paper's model-swap gain on pack-v1 | about 15% |
+| One generation G1 clearly better than G0 on held-out tasks, trained only on its own traces | about 25%, rising to 40 to 50% if pack-v2 passes the amplification gate |
+| The same with a small model trained on a larger model's traces (distillation, must be labelled as such) | about 60% |
+| Sustained recursion (G2 better than G1 better than G0) | under 5% |
+
+The most achievable real result is narrower than "RSI": a fine-tuned small model that wastes fewer steps (higher share of valid candidates, fewer steps to a threshold).
+
+---
+
+## 2. Honest state of rsicraft
 
 | Capability | State | Evidence |
 | :--- | :--- | :--- |
@@ -41,9 +63,10 @@ So "full parity with the ladder" has an exact meaning: reach **meta-evolution wi
 | Operator bandit (`rsi_bandit_status`) | **Advisory only, mislabeled** | not Thompson sampling (posterior mean plus hand-set biases) and not wired into campaigns |
 | Model generations on a task | **Real since today** | steps now send the task's promoted alias to the endpoint; before today the generation number was cosmetic |
 | LoRA training (`rsi_train_step`) | **Real code path, never run end to end** | `train_lora.py` is a standard PEFT script, unverified on Goliath |
+| Task packs and model-swap benchmark | **Real** | `tasks/pack-v1`, `tasks/pack-v2`, `scripts/bench-models.ps1`, `scripts/bench-analyze.ps1`; first run reported in `BENCH_MODELSWAP_V2.md` |
 | Promotion gate (`rsi_promote_gate`) | **Real** | A/B of two served aliases over fresh searches, Welch t >= 2; refuses the demo sandbox |
 | Serving a trained adapter | **Missing** | no adapter-to-GGUF conversion, no endpoint registration |
-| Held-out task split | **Missing** | the gate currently tests on the task it trained on |
+| Held-out task split | **In the pack files only** | each task file declares `split`; the store and the gate do not use it yet |
 | Cross-task training data | **Missing** | one task yields tens of traces; the paper used 26,259 |
 | Agentic operators (tool use inside a step) | **Missing** | one completion per step |
 | Desktop app runs off the UI thread | **Real since today** | worker thread, stop button, live timeline |
@@ -75,15 +98,25 @@ Durations are AI-assisted working days.
 - Step pipeline split into `plan_step` / `run_step` / `commit_step`; desktop app runs steps, campaigns and lab evaluations on a worker thread with a live run panel.
 - Live path fixed for reasoning models and verified against Ollama.
 
-### Phase 1 - Evolution rung, properly (1 to 2 days)
-- **Task pack:** 15 to 20 CPU-only tasks with noise-normalized evaluators (score relative to a reference run in the same process), split into `train` and `heldout` sets stored on the task row.
-- **Runs table:** one row per campaign (model, generation, config, tokens, wall time) so curves can be compared across models.
-- **Step budget in tokens and seconds**, recorded per card. Steps use `trials >= 3` for timing-scored tasks.
-- **Operator-conditioned memory:** short lessons distilled from past cards of the same operator, injected into the prompt (the paper's experience-card memory).
-- **Real Thompson sampling** over operators, wired into campaigns; the fixed cycle stays as a selectable baseline so the bandit's gain is measurable.
-- **Baseline replication:** pull `Frontis-MA1-35B-GGUF`, run the task pack with base `qwen3.6-35b-a3b` (already in Ollama) and with Frontis-MA1, same harness. This reproduces the paper's model-swap at small scale and answers "does it work here".
-- *Exit:* a table of best-score-at-N-steps per model per task, with spread.
+### Phase 1 - Find a task regime where search works (re-scoped 2026-11-12, 1 to 2 days)
 
+Done:
+- `tasks/pack-v1` (six algorithm speed tasks) and `scripts/bench-models.ps1`, a resumable model x task x trial runner that keeps every run database.
+- First model-swap run and report. Outcome: pack-v1 fails the amplification gate.
+- `scripts/bench-analyze.ps1`: per-run first / best / amplification table.
+- `tasks/pack-v2`: five quality-scored tasks without a textbook optimum (tsp, maxcut, regression as train; schedule, classify as held-out). Evaluators validated with weak and medium candidates.
+
+**Amplification gate (new, mandatory):** a pack qualifies for training only if, on a majority of its tasks, the final best beats the first working candidate by more than the spread between repeat trials. Target: median amplification of 1.5 or more with at least 3 trials.
+
+To do, in this order:
+1. Measure amplification on pack-v2 with a 9B-class model and with the 35B base model.
+2. Diagnose the 25 to 33% of steps that produce no card (campaign reports are now saved per run) and fix it; make the two 35B aliases identical.
+3. Record tokens and seconds per card; add a `runs` table so curves can be compared across models and variants.
+4. Real Thompson sampling over operators, wired into campaigns, with the fixed cycle kept as the control arm.
+5. Harness ablations on the train tasks only (drop CROSSOVER, drop DEBUG, utility vs greedy vs random parent choice, one vs three scoring trials), on the 9B model, at equal token budget.
+6. If pack-v2 passes: rerun the Frontis-MA1 vs base comparison on it. The two ML tasks are in Frontis-MA1's home domain, which makes this the fair test.
+
+*Exit:* a pack that passes the gate, with amplification and best-score tables per model. If no pack passes, the project stops at "search tool" and says so.
 ### Phase 2 - Agentic harness (1 to 2 days) - the improvement over the paper
 The paper lists "operators are composed by an external harness, not by agents" and "fixed expansion policy" as limitations. Both are addressable:
 - **Agentic step:** inside one step the model may call bounded tools (`run_candidate`, `read_card`, `diff_cards`, `search_memory`, `profile`) in a loop before submitting. Budgeted by tokens and tool calls. Every tool call lands in the trace, which makes the trace richer training data.
