@@ -55,8 +55,16 @@ impl Ctx {
         model_alias: Option<&str>,
         docker_image: Option<&str>,
     ) -> Self {
-        let url = llama_url.unwrap_or(DEFAULT_LLAMA_URL);
-        let model = model_alias.unwrap_or(DEFAULT_MODEL_ALIAS);
+        // Explicit arguments win, then RSICRAFT_LLM_URL / RSICRAFT_MODEL, then defaults.
+        let env = |key: &str| std::env::var(key).ok().filter(|v| !v.trim().is_empty());
+        let url = llama_url
+            .map(str::to_string)
+            .or_else(|| env("RSICRAFT_LLM_URL"))
+            .unwrap_or_else(|| DEFAULT_LLAMA_URL.to_string());
+        let model = model_alias
+            .map(str::to_string)
+            .or_else(|| env("RSICRAFT_MODEL"))
+            .unwrap_or_else(|| DEFAULT_MODEL_ALIAS.to_string());
         let img = docker_image.unwrap_or(DEFAULT_DOCKER_IMAGE);
         let hyperparams = reg.load_hyperparams();
         Self {
@@ -602,11 +610,11 @@ pub fn tools() -> Vec<Value> {
         ),
         tool_def(
             "rsi_help",
-            "Query the 9-tab RSICraft Operator Manual, RSI Geopolitics ('Skynet' vs Closed Labs), Tsinghua/Frontis.AI OpenRSI Dossier, and Competitive Matrix (tabs: overview, rsi_landscape, tsinghua_openrsi, wrappee, operators, compare, api, troubleshoot, faq, all) with optional substring search.",
+            "Read the rsicraft manual: start (what this is), rsi (what recursive self-improvement is and where rsicraft stands), based_on (Frontis-MA1/OpenRSI and prior work), quickstart, providers (Ollama, LM Studio, llama-server, hosted), tasks (evaluator contract), concepts (operators, selection, sandboxes), api (all tools and CLI verbs), troubleshoot (every [llm:<class>] error with its fix), faq. Optional substring search.",
             json!({
                 "tab": {
                     "type": "string",
-                    "enum": ["all", "overview", "rsi_landscape", "tsinghua_openrsi", "wrappee", "operators", "compare", "api", "troubleshoot", "faq"],
+                    "enum": ["all", "start", "rsi", "based_on", "quickstart", "providers", "tasks", "concepts", "api", "troubleshoot", "faq"],
                     "description": "Help tab to display (default: 'all')."
                 },
                 "search": {
@@ -925,6 +933,26 @@ pub fn run_step(
         LlamaClient::demo_synthesize(plan.operator, &plan.task_id, plan.demo_step_index)
     };
     let candidate_code = PromptBuilder::extract_code_block(&raw_llm_text);
+    if plan.provider == "llama" {
+        // Never evaluate prose or fragments as if they were a candidate: report
+        // the step as producing no code, with the reason.
+        let lang =
+            CodeLanguage::from_evaluator(&plan.evaluator_script).unwrap_or(CodeLanguage::Python);
+        if !PromptBuilder::looks_like_program(&candidate_code, lang) {
+            let preview: String = candidate_code.chars().take(80).collect();
+            return Err(llm::LlmError::new(
+                llm::LlmFailure::NoCode,
+                format!(
+                    "the answer has no top-level {} function ({} characters, starting '{}')",
+                    lang.name(),
+                    candidate_code.len(),
+                    preview.replace('\n', " ")
+                ),
+                "the model may be too weak for this task, or it ran out of budget mid-answer: try a stronger model or a larger RSICRAFT_MAX_TOKENS",
+            )
+            .into());
+        }
+    }
     let eval = sandbox.evaluate(
         &plan.sandbox_mode,
         &candidate_code,
@@ -1377,8 +1405,23 @@ pub fn dispatch(ctx: &mut Ctx, cmd: Command) -> Result<Value, String> {
             sandbox_mode,
             timeout_secs,
         } => {
+            // Check the provider once before spending any steps: a wrong address,
+            // an unknown model or a missing key fails here with a fix, not as a
+            // string of skipped steps.
+            let mut provider_report = Value::Null;
+            if normalize_provider(&provider)? == "llama" {
+                let task = ctx
+                    .reg
+                    .get_task(&task_id)
+                    .map_err(|e| e.to_string())?
+                    .ok_or_else(|| format!("task '{task_id}' not found"))?;
+                let mut client = ctx.llm.clone();
+                client.model_alias = effective_model_alias(ctx, &task);
+                provider_report = client.preflight().map_err(String::from)?;
+            }
             let mut results = Vec::new();
             let mut failures = Vec::new();
+            let mut failures_by_kind = serde_json::Map::new();
             let mut aborted: Option<String> = None;
             let mut consecutive_failures = 0u32;
             for idx in 0..steps {
@@ -1389,16 +1432,25 @@ pub fn dispatch(ctx: &mut Ctx, cmd: Command) -> Result<Value, String> {
                         results.push(step_val);
                     }
                     Err(e) => {
-                        // A step that produced no card (the model returned nothing
-                        // usable, the endpoint hiccupped) is skipped. Two in a row
-                        // means something is wrong with the setup, so stop there.
+                        // A step that produced no card is recorded with its class.
+                        // A setup failure (fatal class) stops the campaign at once;
+                        // otherwise two failed steps in a row stop it.
+                        let kind = llm::failure_kind_of(&e);
+                        let kind_name = kind.map_or("other", llm::LlmFailure::as_str);
+                        let count = failures_by_kind
+                            .get(kind_name)
+                            .and_then(Value::as_u64)
+                            .unwrap_or(0);
+                        failures_by_kind.insert(kind_name.to_string(), json!(count + 1));
                         consecutive_failures += 1;
                         failures.push(json!({
                             "step": idx,
                             "operator": op.as_str(),
+                            "kind": kind_name,
                             "error": e,
                         }));
-                        if consecutive_failures >= CAMPAIGN_MAX_CONSECUTIVE_FAILURES {
+                        let fatal = kind.is_some_and(llm::LlmFailure::is_fatal);
+                        if fatal || consecutive_failures >= CAMPAIGN_MAX_CONSECUTIVE_FAILURES {
                             if results.is_empty() {
                                 return Err(e);
                             }
@@ -1414,7 +1466,8 @@ pub fn dispatch(ctx: &mut Ctx, cmd: Command) -> Result<Value, String> {
                 "task_id": task_id,
                 "steps_requested": steps,
                 "steps_executed": results.len(),
-                "steps_skipped": failures.len(),
+                "failures_by_kind": failures_by_kind,
+                "provider": provider_report,                "steps_skipped": failures.len(),
                 "skipped": failures,
                 "aborted": aborted.is_some(),
                 "error": aborted,
@@ -1643,7 +1696,7 @@ pub fn dispatch(ctx: &mut Ctx, cmd: Command) -> Result<Value, String> {
                 Some(u) => LlamaClient::new(u, &ctx.llm.model_alias),
                 None => ctx.llm.clone(),
             };
-            client.probe()
+            Ok(client.diagnose())
         }
         Command::HyperparamsGet => serde_json::to_value(ctx.hyperparams).map_err(|e| e.to_string()),
         Command::HyperparamsSet {

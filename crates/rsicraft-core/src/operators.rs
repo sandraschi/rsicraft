@@ -124,12 +124,30 @@ impl PromptBuilder {
             }
         };
         format!(
-            "{}{} Output ONLY the complete executable {} code inside one standard ```{} markdown block.",
+            "{}{} Answer with the complete {} program only, as a single fenced code block tagged {}. Put nothing outside the block.",
             role.replace("%LANG%", lang.name()),
             lang.contract(),
             lang.name(),
             lang.fence()
         )
+    }
+
+    /// True when `code` defines at least one top-level function (Python `def` /
+    /// `async def` / `class`, Rust `fn`). Every rsicraft task asks for a
+    /// function, so text without one is prose or a fragment, not a candidate.
+    #[must_use]
+    pub fn looks_like_program(code: &str, lang: CodeLanguage) -> bool {
+        code.lines().any(|line| match lang {
+            CodeLanguage::Python => {
+                line.starts_with("def ")
+                    || line.starts_with("async def ")
+                    || line.starts_with("class ")
+            }
+            CodeLanguage::Rust => {
+                let t = line.trim_start();
+                t.starts_with("fn ") || t.starts_with("pub fn ")
+            }
+        })
     }
 
     #[must_use]

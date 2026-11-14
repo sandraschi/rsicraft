@@ -137,28 +137,65 @@ fn multitab_help_supports_all_tabs_and_substring_search() {
         },
     )
     .unwrap();
-    assert_eq!(all["matched_tabs_count"], 9);
+    assert_eq!(all["matched_tabs_count"], 10);
 
-    let tsinghua = dispatch(
+    let based_on = dispatch(
         &mut ctx,
         Command::Help {
-            tab: Some("tsinghua_openrsi".into()),
+            tab: Some("based_on".into()),
             search: None,
         },
     )
     .unwrap();
-    assert_eq!(tsinghua["matched_tabs_count"], 1);
-    assert_eq!(tsinghua["tabs"][0]["id"], "tsinghua_openrsi");
+    assert_eq!(based_on["matched_tabs_count"], 1);
+    assert_eq!(based_on["tabs"][0]["id"], "based_on");
 
     let filtered = dispatch(
         &mut ctx,
         Command::Help {
             tab: None,
-            search: Some("Kadane".into()),
+            search: Some("context_overflow".into()),
         },
     )
     .unwrap();
     assert!(filtered["matched_tabs_count"].as_u64().unwrap() >= 1);
+
+    // The MCP schema enum and the help content must list the same tabs.
+    let catalog = crate::tools();
+    let help_tool = catalog.iter().find(|t| t["name"] == "rsi_help").unwrap();
+    let mut schema_ids: Vec<String> = help_tool["inputSchema"]["properties"]["tab"]["enum"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|v| v.as_str().map(str::to_string))
+        .filter(|s| s != "all")
+        .collect();
+    let mut help_ids = crate::help::tab_ids();
+    schema_ids.sort();
+    help_ids.sort();
+    assert_eq!(schema_ids, help_ids);
+
+    // Every provider failure class has its own troubleshooting entry.
+    let trouble = crate::help::all_help_tabs()
+        .into_iter()
+        .find(|t| t.id == "troubleshoot")
+        .unwrap();
+    let text: String = trouble
+        .sections
+        .iter()
+        .map(|s| format!("{} {}", s.heading, s.body))
+        .collect();
+    for kind in crate::llm::LlmFailure::ALL {
+        assert!(
+            text.contains(kind.as_str()),
+            "troubleshoot misses {}",
+            kind.as_str()
+        );
+    }
+
+    // No em dash anywhere in the help text (house style).
+    let dump = serde_json::to_string(&crate::help::all_help_tabs()).unwrap();
+    assert!(!dump.contains('\u{2014}'));
 
     let bad = dispatch(
         &mut ctx,
@@ -370,7 +407,11 @@ fn prompts_follow_the_task_language() {
     assert_eq!(CodeLanguage::from_evaluator("  "), None);
 
     let sys = PromptBuilder::build_system_prompt(SearchOperator::Draft, CodeLanguage::Rust);
-    assert!(sys.contains("```rust"));
+    assert!(sys.contains("tagged rust"));
+    assert!(
+        !sys.contains("```"),
+        "a literal fence in the prompt gets echoed back as fake code"
+    );
     assert!(sys.contains("`pub`"));
     assert!(!sys.contains("Python"));
     assert!(!sys.contains("%LANG%"));

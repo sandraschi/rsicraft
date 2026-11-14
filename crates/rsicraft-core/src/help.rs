@@ -1,11 +1,10 @@
-//! Multi-tab help and operator manual for `rsicraft` (`rsi_help` / `rsicraft help-tabs`).
+//! Built-in help for `rsicraft` (`rsi_help` over MCP, `rsicraft help-tabs` on
+//! the CLI, and the Help page of the desktop studio). One source for all three.
 //!
-//! Implements 9 tabs covering the 5 mandatory tabs from `WEBAPP_HELP_STANDARD.md`
-//! (`overview`, `wrappee`, `api`, `troubleshoot`, `faq`), two technical domain tabs
-//! (`operators`, `compare`), and two deep-dive context tabs (`rsi_landscape` on the
-//! Western corporate/political "Skynet" narrative and closed OpenAI/Anthropic RSI
-//! experiments, and `tsinghua_openrsi` on the Tsinghua University & Frontis.AI team,
-//! `arXiv:2607.28568`, and `FrontisAI/OpenRSI`).
+//! Written for a newcomer: what the program does, what recursive
+//! self-improvement is and is not, what the work is based on, how to get a
+//! first search running, how to connect a model server, how to write a task,
+//! and what each error means. Status claims follow `docs/FRONTIS_PARITY_PLAN.md`.
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -26,251 +25,954 @@ pub struct HelpTab {
     pub sections: Vec<HelpSection>,
 }
 
+/// Turn prose written with source indentation and hard wraps into clean text:
+/// wrapped lines are joined with spaces, blank lines stay paragraph breaks,
+/// and list items ("- " or "1. ") start on their own line.
+fn tidy(text: &str) -> String {
+    let is_item = |l: &str| {
+        l.starts_with("- ")
+            || l.split_once(". ").is_some_and(|(n, _)| {
+                !n.is_empty() && n.len() <= 2 && n.chars().all(|c| c.is_ascii_digit())
+            })
+    };
+    let mut out = String::new();
+    let mut at_line_start = true;
+    for raw in text.lines() {
+        let line = raw.trim();
+        if line.is_empty() {
+            if !out.is_empty() && !out.ends_with("\n\n") {
+                out.truncate(out.trim_end().len());
+                out.push_str("\n\n");
+            }
+            at_line_start = true;
+            continue;
+        }
+        if !at_line_start {
+            if is_item(line) {
+                out.push('\n');
+            } else {
+                out.push(' ');
+            }
+        }
+        out.push_str(line);
+        at_line_start = false;
+    }
+    out.trim().to_string()
+}
+
+/// Remove the indentation shared by all non-blank lines (for code examples).
+fn dedent(text: &str) -> String {
+    let indent = text
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .map(|l| l.len() - l.trim_start().len())
+        .min()
+        .unwrap_or(0);
+    text.lines()
+        .map(|l| l.get(indent..).unwrap_or_else(|| l.trim_start()))
+        .collect::<Vec<_>>()
+        .join("\n")
+        .trim_matches('\n')
+        .trim_end()
+        .to_string()
+}
+
+fn sec(heading: &str, body: &str, code: Option<&str>) -> HelpSection {
+    HelpSection {
+        heading: heading.to_string(),
+        body: tidy(body),
+        code_example: code.map(dedent),
+    }
+}
+
+fn tab(id: &str, title: &str, badge: &str, summary: &str, sections: Vec<HelpSection>) -> HelpTab {
+    HelpTab {
+        id: id.to_string(),
+        title: title.to_string(),
+        badge: badge.to_string(),
+        summary: tidy(summary),
+        sections,
+    }
+}
+
 #[must_use]
+#[allow(clippy::too_many_lines)]
 pub fn all_help_tabs() -> Vec<HelpTab> {
     vec![
-        HelpTab {
-            id: "overview".into(),
-            title: "1. Overview & 3-Crate Architecture".into(),
-            badge: "ArtCraft 3-Tier".into(),
-            summary: "Sovereign Recursive Self-Improvement (RSI) Engine for Goliath (RTX 4090 24 GB VRAM) combining Frontis-MA1 MoE synthesis, 4-operator evolutionary search, Stigmergic SQLite WAL + BLAKE3/Zstd CAS, and a native eframe/egui GPU desktop studio.".into(),
-            sections: vec![
-                HelpSection {
-                    heading: "Why RSICraft Exists".into(),
-                    body: "Existing evolutionary code-search harnesses (FunSearch, OpenMLE-Evo, Python/Aider loops) orchestrate LLM loops in stateful Python daemons that lose lineage on crash, store uncompressed duplicate source files, and select parents greedily by raw score alone. RSICraft compiles the entire evolutionary state machine, BLAKE3+Zstd Content-Addressable Store (CAS), composite utility parent selector, MCP 2024-11-05 stdio server, and native eframe/egui 0.37 desktop studio into a single zero-panic Rust workspace.".into(),
-                    code_example: Some("rsicraft status --json\nrsicraft hardware --json\ncargo run -p rsicraft-app".into()),
-                },
-                HelpSection {
-                    heading: "3-Crate Pure-Rust ArtCraft Architecture (L1 / L2 / L3)".into(),
-                    body: "1. rsicraft-core (L1 Core + Store): SQLite WAL database (tasks, experience_cards, task_frontiers), BLAKE3 content hashing, Zstd (level 3) source compression, composite utility calculator, 4-operator action space (DRAFT, IMPROVE, DEBUG, CROSSOVER), llama-server inference client, and isolated Docker / Python 3.12 / demo sandbox runner.\n2. rsicraft-mcp (L2 CLI + MCP Binary): Single binary exposing 26 MCP tools over stdio and 1:1 matching CLI subcommands.\n3. rsicraft-app (L3 Desktop Studio): Native GPU-rendered eframe/egui 0.37 workstation with interactive Bezier lineage DAG canvas, 4-operator launchpad, score spark charts, RTX 4090 VRAM gauge, and 9-tab documentation reader.".into(),
-                    code_example: Some("cargo test --workspace\ncargo clippy --workspace --all-targets --all-features -- -D warnings".into()),
-                },
-                HelpSection {
-                    heading: "Live RTX 4090 Verification (Kadane 25k Subarray Benchmark)".into(),
-                    body: "Verified on Goliath (AMD Ryzen 9 7900X, 64 GB DDR5, NVIDIA GeForce RTX 4090 24 GB VRAM) against live llama-server inference and Python 3.12 sandbox evaluation: DRAFT synthesized an O(N) Kadane baseline scoring 96.5207 (1.391 ms); CROSSOVER recombined parent_a and parent_b by replacing inner-loop Python max() calls with inline conditional branching, advancing the Pareto frontier to 96.6028 (1.359 ms, Rank 1, composite_utility = 1.0000).".into(),
-                    code_example: Some("rsicraft --llama-url http://127.0.0.1:8081 campaign --task-id kadane-4090 --steps 4 --provider llama --sandbox-mode local".into()),
-                },
-                HelpSection {
-                    heading: "Explain Like I'm 10 (8-Panel Cartoon Explainer)".into(),
-                    body: "For clever 10-year-olds (and curious humans): Little Timmy dumps 1,000,000 Lego bricks on the carpet, but his sorting robot takes 10 minutes with slow bubble sort. Frontis, a 3B MoE AI kitten living on Goliath's RTX 4090 GPU, rewrites the code using DRAFT (Quicksort, 65%), tests it inside an air-gapped Docker Sandbox Playpen (no Skynet!), patches errors with DEBUG (82%), breeds code via CROSSOVER & IMPROVE (snipping slow max() calls), saves recipes in the BLAKE3/SQLite Memory Vault, and delivers a 1.35ms speed demon result on the Pareto frontier (96.6%)!".into(),
-                    code_example: Some("docs/assets/rsicraft-timmy-8panel-comic.jpg\ndocs/LITTLE_TIMMY_EXPLAINS_RSI.md".into()),
-                },
+        tab(
+            "start",
+            "1. Start here",
+            "New users",
+            r##"rsicraft lets a language model running on your own machine write, test and
+            improve small programs in a loop, and records every attempt. Read this tab
+            first, then Quickstart."##,
+            vec![
+                sec(
+                    "What rsicraft does, in one minute",
+                    r##"You give rsicraft a task: a short description such as "write solve(n)
+                    that counts the primes below n, as fast as possible", and an evaluator,
+                    a small script that runs a candidate solution and prints a score.
+
+                    rsicraft then asks a language model (served by Ollama, LM Studio,
+                    llama-server or any OpenAI-compatible server) to write a candidate,
+                    runs it in a sandbox, and records the score. Then it repeats: it improves
+                    the best candidates, repairs broken ones, and combines two good ones.
+
+                    Every candidate is stored with its parents, so you can see how the best
+                    solution came about and what each step changed."##,
+                    None,
+                ),
+                sec(
+                    "What it is not",
+                    r##"It does not make the model smarter. The model is the same at the end of
+                    a search as at the start; only the archive of programs grows.
+
+                    It is not recursive self-improvement in the strong sense. The tab "What
+                    is RSI?" explains the difference and where this project stands. rsicraft
+                    contains tools for training a next model generation from search results,
+                    but that loop has not yet produced a measured improvement."##,
+                    None,
+                ),
+                sec(
+                    "Who it is for",
+                    r##"- People running local models who want better code than a single answer
+                    gives, on problems where the result can be scored automatically.
+                    - People who want to see how evolutionary search with language models
+                    behaves: what helps, what is wasted, where it stalls.
+                    - People who want to test the self-improvement ladder of the Frontis-MA1
+                    paper on one consumer GPU, with honest measurements."##,
+                    None,
+                ),
+                sec(
+                    "Three ways to use it",
+                    r##"- Desktop studio (rsicraft-app): visual. Start runs, watch each step in the
+                    Live Run panel, explore the lineage graph and the code of every candidate.
+                    - Command line (rsicraft): for scripts and benchmarks. Every command
+                    accepts --json.
+                    - MCP server (rsicraft mcp): lets Claude or another agent drive searches
+                    through 26 tools.
+
+                    All three use the same engine and the same database file."##,
+                    Some(
+                        r##"
+                        rsicraft --smoke              # check that the binary works
+                        rsicraft-app                  # open the desktop studio
+                        rsicraft help-tabs --tab quickstart"##,
+                    ),
+                ),
+                sec(
+                    "Words you will see",
+                    r##"- Task: description + evaluator script.
+                    - Evaluator: script that imports the candidate, checks it, prints a score.
+                    - Candidate: one program written by the model.
+                    - Card (experience card): a recorded candidate with code, score, status,
+                    log and parents.
+                    - Step: one round of choosing parents, asking the model, evaluating,
+                    recording.
+                    - Operator: the kind of step: DRAFT (new), IMPROVE, DEBUG (repair),
+                    CROSSOVER (combine two).
+                    - Campaign: a series of steps.
+                    - Frontier: the best working cards of a task.
+                    - Lineage: the graph of which card came from which.
+                    - Amplification: best score divided by the first working score; how much
+                    the search added over the model's first good answer."##,
+                    None,
+                ),
+                sec(
+                    "Where to go next",
+                    r##"- Quickstart: a first run in about ten minutes.
+                    - Connecting a model: Ollama, LM Studio, llama-server, hosted APIs.
+                    - Writing a task: the evaluator contract and how to make scores
+                    trustworthy.
+                    - Troubleshooting: every error message rsicraft prints, with its fix.
+
+                    The long-form guide is docs/GUIDE.md in the repository."##,
+                    None,
+                ),
             ],
-        },
-        HelpTab {
-            id: "rsi_landscape".into(),
-            title: "2. What is RSI? The 'Skynet' Myth & Closed Frontier Labs".into(),
-            badge: "Geopolitics & Myth".into(),
-            summary: "From I.J. Good's 1965 'Intelligence Explosion' to Western political panic ('Will it be Skynet?') and the closed-door RSI experiments inside OpenAI and Anthropic.".into(),
-            sections: vec![
-                HelpSection {
-                    heading: "What Recursive Self-Improvement (RSI) Actually Is".into(),
-                    body: "Recursive Self-Improvement (RSI) is a closed-loop computational process in which an AI system generates, evaluates, debugs, and recombines candidate algorithms or training pipelines, using objective execution feedback from generation N to produce a stronger generation N+1. In concrete engineering terms, RSI is not magic sentient consciousness; it is evolutionary search coupled with execution-grounded verification over executable program spaces.".into(),
-                    code_example: None,
-                },
-                HelpSection {
-                    heading: "Ominous Undertones in Western Politics & Media ('Will It Be Skynet?')".into(),
-                    body: "Since I.J. Good's 1965 speculation on an 'ultraintelligent machine' and Nick Bostrom's Superintelligence (2014), Western policy circles in Washington, London, Brussels, and Sacramento have treated the phrase 'Recursive Self-Improvement' with apocalyptic dread ('Will it become Skynet?', 'uncontrollable foom', 'rogue takeoff'). Senate hearings, Executive Orders, and safety summit communiques routinely frame RSI as an existential red line where an AI rewrites its own weights in secret and escapes human control. That sci-fi framing served a convenient political purpose: convincing lawmakers that RSI research is too dangerous for open-weights academia or independent developers to possess.".into(),
-                    code_example: None,
-                },
-                HelpSection {
-                    heading: "Bostrom, Yudkowsky & The Philosophical Roots of the Foom Myth".into(),
-                    body: "Nick Bostrom (Superintelligence, 2014) and Eliezer Yudkowsky (MIRI) formulated the canonical theory of recursive takeoff: an intelligence metric I(t+1) = I(t) + g(I(t)), where an AI self-improves at an accelerating rate proportional to I(t)^(1+alpha). Yudkowsky argued this leads to an unconstrained fast takeoff ('foom') governed by the Orthogonality Thesis and Instrumental Convergence (resource acquisition, self-preservation). In popular media, this was popularized as the 'Paperclip Maximizer' or 'Skynet' archetype. However, modern empirical AI research reveals that this thought experiment ignored the physical realities of computation: memory bandwidth, thermal TDP dissipation, and the non-zero latency of sandbox verification.".into(),
-                    code_example: None,
-                },
-                HelpSection {
-                    heading: "Why Real-World RSI Does Not Produce Skynet (Physics, Complexity & Containment)".into(),
-                    body: "Real RSI in 2026 (Frontis-MA1, RSICraft) breaks the Skynet myth through five fundamental physical realities:\n1. Execution-Grounded Reality: An AI cannot arbitrarily declare itself smarter; it must produce verifiable source code tested against deterministic compilers, test suites, and hardware clocks.\n2. Algorithmic Complexity Lower Bounds: No amount of recursive optimization can turn an Omega(N log N) sorting problem into O(1). Mathematics imposes hard ceilings on optimization.\n3. Thermodynamic & VRAM Limits: Computation is physical. A 24 GB RTX 4090 consumes 450W and will crash with a deterministic CUDA OOM if an allocation exceeds memory. There is no mystical escape from physical hardware.\n4. Stigmergic Externalization: Lineage is not an opaque ghost in the neural weights; all mutations are explicitly serialized in SQLite WAL and BLAKE3-hashed CAS.\n5. Air-Gapped Sandboxing: Evaluators run in rootless, network-disabled containers (--network none) with strict timeouts and memory caps.".into(),
-                    code_example: None,
-                },
-                HelpSection {
-                    heading: "OpenAI & Anthropic's Closed-Door RSI Experiments".into(),
-                    body: "Both OpenAI and Anthropic have spoken publicly about internal RSI and automated AI R&D while keeping every weight, dataset, and harness strictly proprietary:\n- OpenAI Preparedness Framework: Defines 'AI Self-Improvement' (automated ML research and engineering) as a High/Critical risk category. OpenAI executives frequently reference internal o1/o3/o4 reinforcement-learning self-play and automated research-engineer loops, yet publish zero reproducible code or operator weights.\n- Anthropic Responsible Scaling Policy (RSP / ASL-4): Explicitly defines Autonomy & Automated AI R&D (Claude autonomously optimizing kernels, training loops, and post-training pipelines) as the trigger for ASL-4 containment. Anthropic discusses internal self-improvement evaluations in system cards to justify regulatory moats, while keeping the entire evolutionary harness locked behind closed cloud APIs.".into(),
-                    code_example: None,
-                },
+        ),
+        tab(
+            "rsi",
+            "2. What is RSI?",
+            "Concepts",
+            r##"Recursive self-improvement explained plainly, the three-rung ladder used in
+            this project, and where rsicraft actually stands."##,
+            vec![
+                sec(
+                    "The idea",
+                    r##"Recursive self-improvement (RSI) means a system that improves the process
+                    that produces its own improvements, so that each round makes the next
+                    round better or faster. I. J. Good described the idea in 1965; Nick
+                    Bostrom and Eliezer Yudkowsky later made it central to discussions of AI
+                    risk, because such a loop could in principle accelerate.
+
+                    In 2026 the term is used loosely, often for any AI that helps build AI.
+                    A useful test for any claim: what exactly gets better, and does that make
+                    the next improvement easier?"##,
+                    None,
+                ),
+                sec(
+                    "The ladder used here",
+                    r##"The Frontis-MA1 paper (see "What this is based on") describes these rungs:
+
+                    1. Evolution. A model repeatedly modifies candidate programs using
+                    execution feedback. The model itself stays the same. This is what
+                    FunSearch, AlphaEvolve and rsicraft's search loop do.
+                    2. Meta-evolution. The records of those searches are used to train the
+                    model that proposes the next modifications. Now the improver improves.
+                    3. RSI. A sustained loop in which each upgraded system improves the
+                    process that builds its successor, generation after generation.
+
+                    No published system has shown rung 3, and the paper does not claim it."##,
+                    None,
+                ),
+                sec(
+                    "Where rsicraft stands (November 2026)",
+                    r##"- Rung 1 works and has been verified with live local models.
+                    - Rung 2: the tools exist (trace export, a LoRA training harness, an A/B
+                    promotion gate) but no model generation has been trained yet. The
+                    training harness has not been run end to end.
+                    - Rung 3: not attempted.
+
+                    The detailed, dated state is in docs/FRONTIS_PARITY_PLAN.md."##,
+                    None,
+                ),
+                sec(
+                    "Why search gain decides whether training can work",
+                    r##"A training loop learns from what search found beyond the model's own
+                    first answer. If the best candidate is about as good as the first
+                    working one, there is nothing new to learn from.
+
+                    That is what the first benchmark showed: on six algorithm tasks that a
+                    35B model already knows, the median gain of the final best over the first
+                    working candidate was 1.18x, within the variation between repeated runs.
+                    rsicraft therefore requires an amplification of 1.5 or more on a task
+                    pack before any training (the "amplification gate")."##,
+                    None,
+                ),
+                sec(
+                    "Is this dangerous?",
+                    r##"What runs here is a fixed model writing small programs that your
+                    evaluator scores. The model cannot change its own weights, its prompts or
+                    the search rules during a search.
+
+                    The real risk is ordinary: model-written code is untrusted code. In
+                    docker mode it runs with no network, a read-only file system, no
+                    privileges and memory and CPU limits. In local mode it runs as you, with
+                    your files and network: use local mode only with tasks and models you
+                    trust.
+
+                    For the wider debate, docs/BOSTROM_YUDKOWSKY_AND_RSI_REALITY.md is an
+                    opinion essay, not documentation."##,
+                    None,
+                ),
             ],
-        },
-        HelpTab {
-            id: "tsinghua_openrsi".into(),
-            title: "3. The Expectation Flip: Tsinghua & Frontis.AI (OpenRSI)".into(),
-            badge: "arXiv:2607.28568".into(),
-            summary: "How researchers from Tsinghua University and Frontis.AI flipped the script by publishing arXiv:2607.28568 and open-sourcing FrontisAI/OpenRSI for a single consumer RTX 4090.".into(),
-            sections: vec![
-                HelpSection {
-                    heading: "The Total Expectation Flip: Open-Source RSI on a 24 GB RTX 4090".into(),
-                    body: "While Western frontier labs mystified RSI as a classified H100-cluster doomsday project, a collaborative team from Tsinghua University, Frontis.AI, and Horizon Research did the exact opposite. On July 30, 2026, they published 'Frontis-MA1: Training an AI4AI Model towards Recursive Self-Improvement in Machine Learning Engineering' (arXiv:2607.28568) and released the complete code stack and model weights on GitHub (https://github.com/FrontisAI/OpenRSI). Even more remarkably, they explicitly benchmarked their system onMLE-Bench Lite under a strict consumer hardware constraint: a single NVIDIA RTX 4090 with a 12-hour budget.".into(),
-                    code_example: Some("# Upstream Paper: https://arxiv.org/abs/2607.28568\n# Upstream Repo:  https://github.com/FrontisAI/OpenRSI".into()),
-                },
-                HelpSection {
-                    heading: "The Tsinghua University & Frontis.AI Research Team".into(),
-                    body: "The 24-author team on arXiv:2607.28568 bridges Tsinghua University's premier NLP/Agent laboratories and Frontis.AI:\n- Lead & Core Contributors: Junlin Yang, Che Jiang, Yu Fu, Tianwei Luo, Can Ren, Weizhi Wang, Kaikai Zhao, Hongyi Liu, Yuxin Zuo, Yuru Wang, Yuchen Fan, Kai Tian, Zhenzhao Yuan, Xiaojian Lin, Li Sheng, Rushi Qiang, Guoli Jia, Xingtai Lv, Ermo Hua, Dianqiao Lei, and Youbang Sun.\n- Senior Principal Investigators (Tsinghua University / Frontis.AI): Prof. Bowen Zhou (Chair Professor in the Department of Electronic Engineering at Tsinghua University, Dean of Shanghai AI Lab, former Head of AI Foundations at IBM Research Watson and JD AI), Dr. Ning Ding (Tsinghua NLP / OpenBMB co-founder, creator of UltraFeedback & MiniCPM), and Kaiyan Zhang (Tsinghua University).\n- Related Tsinghua Foundation Work: Che Jiang and Bowen Zhou also co-authored the June 2026 landmark taxonomy 'Self-Improving Agents in the Era of Experience: A Survey of Self- to Meta-Evolution' alongside Tsinghua's EvoAgent and MaD-RSI initiatives.".into(),
-                    code_example: None,
-                },
-                HelpSection {
-                    heading: "Their Core Objectives & The 3-Layer OpenMLE Architecture".into(),
-                    body: "The Tsinghua / Frontis.AI team set out to strip the mysticism from RSI and turn 'AI4AI' (AI systems that improve AI engineering) into an executable, measurable, reproducible science built on three pillars:\n1. OpenMLE-Gym: Thousands of quality-gated, verifiable ML and algorithmic task environments with deterministic sandbox execution feedback.\n2. OpenMLE-ERL (Execution-Grounded RL & SFT): Post-training the 35B/30B MoE model (Frontis-MA1) specifically around four atomic program-evolution operators (Draft, Improve, Debug, Crossover) using real sandbox execution rewards rather than synthetic chat preferences.\n3. OpenMLE-Evo & OpenMLE-Evo-Max: Long-horizon population search using a 3-term composite utility (Score + Improvement Delta + Exploration Novelty Decay) and stigmergic experience cards so the search tree never collapses into a single greedy trajectory.\n\nRSICraft takes Tsinghua and Frontis.AI's exact mathematical and architectural blueprint and re-engineers the host runtime into a single zero-panic Pure-Rust ArtCraft studio + MCP server.".into(),
-                    code_example: None,
-                },
+        ),
+        tab(
+            "based_on",
+            "3. What this is based on",
+            "Sources",
+            r##"The Frontis-MA1 / OpenRSI paper, the evolutionary-search work it builds on,
+            and exactly what rsicraft reimplements."##,
+            vec![
+                sec(
+                    "Frontis-MA1 and OpenRSI",
+                    r##"Paper: "Frontis-MA1: Training an AI4AI Model towards Recursive
+                    Self-Improvement in Machine Learning Engineering", arXiv:2607.28568
+                    (July 2026), by Horizon Research, Frontis.AI and Tsinghua University.
+                    Code: github.com/FrontisAI/OpenRSI.
+
+                    It has three parts:
+                    - OpenMLE-Gym: 5,758 executable machine-learning-engineering tasks run in
+                    Docker sandboxes.
+                    - OpenMLE-ERL: trains four operators (Draft, Improve, Debug, Crossover)
+                    with supervised fine-tuning on execution-checked examples, then
+                    reinforcement learning.
+                    - OpenMLE-Evo: a long-horizon search harness that stores experience cards
+                    and selects parents by score, gain and novelty.
+
+                    The trained models, Frontis-MA1-35B and Frontis-MA1-30B, are open weights
+                    with GGUF versions for local use."##,
+                    None,
+                ),
+                sec(
+                    "What the paper measured",
+                    r##"On MLE-Bench Lite (22 tasks, 12 hours each on one RTX 4090, three runs):
+                    - Same search harness, base model swapped for Frontis-MA1-35B: medal
+                    average 39.39% to 60.61%.
+                    - Frontis-MA1-35B with the larger OpenMLE-Evo-Max harness: 71.21%.
+                    On ten held-out NatureBench tasks, the model swap alone raised the share
+                    matching the state of the art from 50% to 70%."##,
+                    None,
+                ),
+                sec(
+                    "What the paper says it did not do",
+                    r##"- The operators were trained once ("generation 1"). No second generation
+                    trained on its own search traces is reported.
+                    - The evolutionary system itself does not evolve.
+                    - Parent selection is a fixed three-factor formula the authors call a
+                    preliminary prototype.
+                    - The authors state that they do not claim general recursive
+                    self-improvement."##,
+                    None,
+                ),
+                sec(
+                    "The older lineage: LLM-guided program search",
+                    r##"The search loop follows a line of work in which a language model proposes
+                    programs, an automatic evaluator scores them, and an archive decides what
+                    to build on next:
+                    - FunSearch (Google DeepMind, 2023): new results in combinatorics by
+                    evolving programs with an LLM.
+                    - AlphaEvolve (Google DeepMind, 2025): the same idea applied to algorithms
+                    and infrastructure code at scale.
+                    - AIDE and similar agents: tree search over solutions to machine-learning
+                    engineering tasks.
+
+                    rsicraft is a small, local member of this family."##,
+                    None,
+                ),
+                sec(
+                    "What rsicraft takes, and what it does not",
+                    r##"Taken from the paper as ideas, reimplemented in Rust:
+                    - the four operators and their sampling temperatures (0.70, 0.40, 0.20,
+                    0.50);
+                    - experience cards with lineage;
+                    - parent selection by utility = 0.50 x score + 0.35 x gain + 0.15 x novelty;
+                    - the idea of model generations and a promotion test.
+
+                    rsicraft's own: a single Rust binary, a SQLite store with compressed,
+                    content-addressed code, Docker and local sandboxes, the CLI, MCP server
+                    and desktop studio, provider failure handling, and the benchmark tooling.
+
+                    Not taken: OpenRSI code (licensed CC BY-NC 4.0, non-commercial; rsicraft
+                    is MIT or Apache-2.0), the task gym, and the reinforcement-learning
+                    training. The Frontis-MA1 weights can be used locally under their own
+                    CC BY-NC 4.0 licence."##,
+                    None,
+                ),
+                sec(
+                    "Our own measurements so far",
+                    r##"On rsicraft's six algorithm tasks (pack-v1), Frontis-MA1-35B showed no
+                    advantage over its base model in one complete trial. These tasks are
+                    outside its training domain, so this neither confirms nor contradicts the
+                    paper. Search added little on these tasks (median amplification 1.18).
+                    Details: docs/BENCH_MODELSWAP_V2.md."##,
+                    None,
+                ),
             ],
-        },
-        HelpTab {
-            id: "wrappee".into(),
-            title: "4. Wrapped Backends (LLM & Sandbox)".into(),
-            badge: "RTX 4090 + Sandbox".into(),
-            summary: "How RSICraft orchestrates llama.cpp (llama-server.exe) / Ollama on the RTX 4090 and evaluates candidate artifacts inside air-gapped Docker or isolated Python 3.12 sandboxes.".into(),
-            sections: vec![
-                HelpSection {
-                    heading: "Goliath RTX 4090 + Frontis-MA1 / Reasoning Model Inference".into(),
-                    body: "RSICraft connects to any OpenAI-compatible /v1/chat/completions endpoint (default http://127.0.0.1:8081 for llama-server, or custom port via --llama-url). On a 24 GB RTX 4090, Frontis-MA1 30B/35B MoE (~3B active parameters per token) in Q4_K_M / Q5_K_M with a 16,384-token context window and q4_0 KV cache quantization occupies 18.0-19.5 GB VRAM at ~120 tok/s.".into(),
-                    code_example: Some("llama-server --model models/frontis-ma1-30b-a3b-q4_k_m.gguf --alias frontis --ctx-size 16384 --n-gpu-layers 99 --cache-type-k q4_0 --cache-type-v q4_0 --flash-attn --parallel 2 --port 8081".into()),
-                },
-                HelpSection {
-                    heading: "Automatic Reasoning-Block Stripping (<|channel>thought & <think>)".into(),
-                    body: "Modern reasoning models (Gemma-4, Qwen3, DeepSeek-R1) emit chain-of-thought blocks before the final Python code fence. PromptBuilder::extract_code_block automatically strips everything up to the closing <|channel>...<channel|> or </think> delimiter before extracting the ```python block, preventing thought prose from polluting candidate.py.".into(),
-                    code_example: None,
-                },
-                HelpSection {
-                    heading: "Three Sandbox Execution Modes (docker, local, demo)".into(),
-                    body: "- docker: Hardened rootless container (--network none --memory 4g --cpus 4.0 --pids-limit 64 --security-opt no-new-privileges --cap-drop ALL --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m) with candidate.py and evaluator.py bind-mounted read-only.\n- local: Isolated temporary workspace directory evaluated via local Python 3.12 subprocess with strict wall-clock polling timeout and automatic tempdir cleanup.\n- demo: Deterministic offline oracle for instant unit tests, CI gates, and schema demonstrations without GPU or container dependencies.".into(),
-                    code_example: Some("docker build -t rsicraft-evaluator:latest -f sandboxes/Dockerfile.evaluator sandboxes/".into()),
-                },
+        ),
+        tab(
+            "quickstart",
+            "4. Quickstart",
+            "10 minutes",
+            r##"From nothing to a real search: first without a model, then with a local
+            model server, then in the studio and through an agent."##,
+            vec![
+                sec(
+                    "1. Try it without a model (2 minutes)",
+                    r##"The demo provider and demo sandbox need no GPU, no model and no network.
+                    The "model" is a fixed script and the scores are invented: this only shows
+                    how a search flows and what it records."##,
+                    Some(
+                        r##"
+                        rsicraft --db demo.db demo-seed
+                        rsicraft --db demo.db campaign --task-id opt-synth --steps 4 --provider demo --sandbox-mode demo
+                        rsicraft --db demo.db frontier --task-id opt-synth
+                        rsicraft --db demo.db lineage --task-id opt-synth"##,
+                    ),
+                ),
+                sec(
+                    "2. Connect a real model",
+                    r##"Start a model server (see the tab "Connecting a model") and tell
+                    rsicraft where it is. Then run the provider check. It must say OK before
+                    anything else will work; if it does not, it says what is wrong and how to
+                    fix it.
+
+                    Set RSICRAFT_LLM_URL and RSICRAFT_MODEL once instead of passing
+                    --llama-url and --model every time."##,
+                    Some(
+                        r##"
+                        ollama pull qwen2.5-coder:7b
+                        rsicraft --llama-url http://127.0.0.1:11434 --model qwen2.5-coder:7b probe
+
+                        # PowerShell, for this session:
+                        $env:RSICRAFT_LLM_URL = 'http://127.0.0.1:11434'
+                        $env:RSICRAFT_MODEL = 'qwen2.5-coder:7b'
+                        rsicraft probe"##,
+                    ),
+                ),
+                sec(
+                    "3. Run a real search",
+                    r##"Register a task (here one from the bundled task pack), run a campaign
+                    with the real model and the local sandbox, and look at the result.
+
+                    The local sandbox runs model-written Python as you. Use the docker
+                    sandbox for anything you would not run yourself (see "How the search
+                    works")."##,
+                    Some(
+                        r##"
+                        rsicraft task upsert --task-id primes --name "Prime count" `
+                          --description "Write solve(n) returning the number of primes below n, as fast as possible. Standard library only." `
+                          --evaluator-file tasks\pack-v1\primes.py
+                        rsicraft campaign --task-id primes --steps 8 --provider llama --sandbox-mode local
+                        rsicraft frontier --task-id primes
+                        rsicraft card <card-id-from-the-frontier>"##,
+                    ),
+                ),
+                sec(
+                    "4. Watch it in the studio",
+                    r##"Start rsicraft-app. Without RSICRAFT_DB it opens a throwaway in-memory
+                    database with a demo task; set RSICRAFT_DB to the database you used on the
+                    command line to see your runs.
+
+                    On the Evolutionary Studio page pick the task, choose provider "llama"
+                    and a sandbox, set the endpoint on the LLM page, and press Check provider.
+                    Then start a step or a campaign. The Live Run panel shows each step as it
+                    finishes, and any problem with its fix. The Lineage page draws how
+                    candidates descend from each other."##,
+                    Some(
+                        r##"
+                        $env:RSICRAFT_DB = "$env:LOCALAPPDATA\rsicraft\rsicraft.db"
+                        rsicraft-app"##,
+                    ),
+                ),
+                sec(
+                    "5. Let an agent drive it (MCP)",
+                    r##"Add rsicraft to an MCP client such as Claude Desktop. The environment
+                    variables configure the model server for the agent's searches. Then ask,
+                    for example: "Check the LLM provider with rsi_llm_probe, then run a
+                    6-step campaign on task primes and show me the diff between the first and
+                    the best card.""##,
+                    Some(
+                        r##"
+                        {
+                          "mcpServers": {
+                            "rsicraft": {
+                              "command": "C:\\path\\to\\rsicraft.exe",
+                              "args": ["mcp"],
+                              "env": {
+                                "RSICRAFT_LLM_URL": "http://127.0.0.1:11434",
+                                "RSICRAFT_MODEL": "qwen2.5-coder:7b"
+                              }
+                            }
+                          }
+                        }"##,
+                    ),
+                ),
             ],
-        },
-        HelpTab {
-            id: "operators".into(),
-            title: "5. 4-Operator Action Space & Utility Math".into(),
-            badge: "Math & Prompts".into(),
-            summary: "Exact formulas for composite utility parent selection and temperature-calibrated prompt contracts for DRAFT, IMPROVE, DEBUG, and CROSSOVER.".into(),
-            sections: vec![
-                HelpSection {
-                    heading: "Composite Utility Formula (U_i)".into(),
-                    body: "Instead of greedy top-1 selection (which collapses evolutionary diversity into a local optimum), RSICraft ranks and samples parents using a 3-term composite utility:\n\nU_i = w_s * s_norm_i + w_d * delta_norm_i + w_n * nu_i\n\nDefault hyperparameters: w_s = 0.50 (normalized primary score), w_d = 0.35 (normalized improvement over parent_a), w_n = 0.15 (exploration novelty bonus nu_i = 1 / (1 + children_count_i)). Every time a parent is sampled to spawn a child, its children_count increments and its novelty bonus decays, naturally steering search toward under-explored high-performing branches.".into(),
-                    code_example: Some("s_norm_i = clamp((s_i - s_min) / (s_max - s_min), 0.0, 1.0)\ndelta_norm_i = clamp((delta_i - delta_min) / (delta_max - delta_min), 0.0, 1.0)\nnu_i = 1.0 / (1.0 + children_count_i)".into()),
-                },
-                HelpSection {
-                    heading: "4-Operator Evolutionary Action Space".into(),
-                    body: "1. DRAFT (T = 0.70): High-entropy architectural exploration. Synthesizes an initial candidate from the task specification alone.\n2. IMPROVE (T = 0.40): Samples one functional parent (status = SUCCESS) via composite-utility roulette and refactors inner loops, vectorization, or algorithmic complexity.\n3. DEBUG (T = 0.20): Samples one broken parent (COMPILE_ERROR, RUNTIME_ERROR, TIMEOUT) and injects its sandbox stack trace to synthesize a targeted fix.\n4. CROSSOVER (T = 0.50): Samples two distinct functional parents (parent_a != parent_b) and recombines their strongest algorithmic mechanisms into a single hybrid child.".into(),
-                    code_example: Some("rsicraft step --task-id opt-synth --operator DRAFT --provider demo --sandbox-mode demo\nrsicraft step --task-id opt-synth --operator CROSSOVER --provider demo --sandbox-mode demo".into()),
-                },
-                HelpSection {
-                    heading: "Limits of Current RSI & 4-Stage Future Trajectory".into(),
-                    body: "Current RSI faces 5 hard ceilings: (1) Sandbox evaluation latency is the primary bottleneck (generation is ~1.2s; test execution takes 0.2s-60s); (2) Context degradation in long lineage histories; (3) Goodhart reward hacking if tests are incomplete; (4) Frozen model weights (code evolves, but neural weights remain static); and (5) 24 GB VRAM caps batch parallelism.\n\nFuture 4-Stage Trajectory:\n- Stage 1 (Today): Program & Prompt Search (RSICraft + Frontis-MA1 on RTX 4090)\n- Stage 2 (6-12 Mo): In-The-Loop Adapter Self-Updating (Test-time LoRA/DPO on Pareto frontier cards)\n- Stage 3 (12-24 Mo): Heterogeneous Multi-Agent Co-Evolution (Architect, Synthesizer, and Adversary agents)\n- Stage 4 (2-3 Yr): Self-Compiling Hardware/Kernel Co-Optimization (Synthesizing custom Triton/CUDA kernels).".into(),
-                    code_example: None,
-                },
-                HelpSection {
-                    heading: "Model Feeding Compatibility & Generation Time Budgets (RTX 4090)".into(),
-                    body: "Any LLM outputting structured Python/Rust code can be fed into RSICraft. Recommended models on Goliath:\n- Frontis-MA1 30B/35B MoE (~3B active, Q4_K_M): 16.8 GB VRAM, ~118 tok/s (Gold Standard)\n- Qwen2.5-Coder-14B-Instruct (Q5_K_M): 11.2 GB VRAM, ~85 tok/s (High Precision)\n- DeepSeek-Coder-V2-Lite (16B MoE, Q4_K_M): 10.5 GB VRAM, ~135 tok/s (High Velocity)\n- Llama-3.1-8B-Instruct (Q8_0): 8.6 GB VRAM, ~140 tok/s (Budget Workhorse)\n- Minimal Viable Model: 3B models (Qwen2.5-Coder-3B) with strict DEBUG fallback.\n\nExecution Timings (RTX 4090 @ ~2.5s per candidate):\n- N = 10 Generations: ~25-30 seconds (Baseline validation)\n- N = 100 Generations: ~4.0-4.5 minutes (+38.6% score gain)\n- N = 1,000 Generations: ~42-45 minutes (+72.4% score gain)\n- N = 10,000 Generations: ~7.2-7.5 hours (Plateau near theoretical optimum).".into(),
-                    code_example: Some("rsicraft campaign --task-id kadane-4090 --steps 100 --provider llama --sandbox-mode local".into()),
-                },
-                HelpSection {
-                    heading: "Expected Improvement Percentages & Before/After Benchmarking Protocol".into(),
-                    body: "Empirical improvements (Frontis-MA1 arXiv:2607.28568 & RSICraft):\n- Zero-Shot Baseline (Gen 0): 14.2% - 32.0% passing/optimality score\n- Gen 100: +38.6% relative gain (O(N^2) -> O(N) loop optimization via IMPROVE)\n- Gen 1,000: +72.4% relative gain (recombination of branchless tricks via CROSSOVER)\n- Gen 10,000: Asymptotic plateau approaching within 2-4% of hand-tuned assembly.\n\n4-Stage Benchmarking Protocol:\n1. Pre-RSI Baseline: Run 5 zero-shot seeds to record median score S0, latency T0, and error rate E0.\n2. Evolutionary Campaign: Run 100 or 1,000 steps with utility-weighted parent selection.\n3. Holdout Verification: Evaluate frontier winner against Hidden Holdout Test Suite.\n4. Delta Calculation: Score Delta = (S_frontier - S0) / S0 * 100%; Latency Delta = (T0 - T_frontier) / T0 * 100%.".into(),
-                    code_example: Some("# Measure baseline:\nrsicraft campaign --task-id my-task --steps 5 --json\n# Run evolutionary improvement:\nrsicraft campaign --task-id my-task --steps 100 --json\n# Inspect frontier delta:\nrsicraft frontier --task-id my-task --limit 1 --json".into()),
-                },
+        ),
+        tab(
+            "providers",
+            "5. Connecting a model",
+            "Ollama, LM Studio, llama-server",
+            r##"rsicraft works with any OpenAI-compatible chat server. Setup for the common
+            local servers, the settings that matter, and what happens when the server
+            fails."##,
+            vec![
+                sec(
+                    "How rsicraft talks to a model",
+                    r##"It sends POST <server>/v1/chat/completions and lists models with
+                    GET <server>/v1/models. Configure the server with --llama-url (or
+                    RSICRAFT_LLM_URL) and the model with --model (or RSICRAFT_MODEL).
+
+                    The address is the server root. If you paste a full endpoint ending in
+                    /v1 or /v1/chat/completions, rsicraft shortens it. After any change, run
+                    rsicraft probe: it reports the server type, the models it serves, whether
+                    your model is among them, and risky context settings."##,
+                    Some("rsicraft probe\nrsicraft probe --json"),
+                ),
+                sec(
+                    "Ollama",
+                    r##"Address http://127.0.0.1:11434. Model names are what `ollama list` shows;
+                    a name without a tag means ":latest".
+
+                    Watch the context window. Some models default to a very large context
+                    (one 9B model was loaded with 262,144 tokens), which fills GPU memory and
+                    pushes the model onto the CPU, making it many times slower. Create an
+                    alias with a fixed context and use the alias. rsicraft probe warns when a
+                    model has no num_ctx or a num_ctx smaller than the completion budget."##,
+                    Some(
+                        r##"
+                        # Modelfile
+                        FROM qwen2.5-coder:7b
+                        PARAMETER num_ctx 16384
+
+                        ollama create rsi-coder -f Modelfile
+                        rsicraft --model rsi-coder probe"##,
+                    ),
+                ),
+                sec(
+                    "LM Studio",
+                    r##"Start the server in the Developer tab (address http://127.0.0.1:1234).
+                    The model name is the id shown there or by `lms ls`. Models load on the
+                    first request when just-in-time loading is on (the default); otherwise
+                    load the model first.
+
+                    When loading, set Context Length to at least the completion budget plus
+                    about 4,000 tokens (16,384 or more with the default budget). rsicraft
+                    probe warns when the model is not loaded or its context is too small."##,
+                    Some("lms server start\nlms load qwen2.5-coder-7b-instruct --context-length 16384\nrsicraft --llama-url http://127.0.0.1:1234 --model qwen2.5-coder-7b-instruct probe"),
+                ),
+                sec(
+                    "llama-server (llama.cpp)",
+                    r##"Serves one model per process and ignores the model name in requests, so
+                    probe only warns if the name does not match. Give it a context large
+                    enough for the budget."##,
+                    Some("llama-server -m model.gguf --port 8080 --ctx-size 16384 -ngl 99\nrsicraft --llama-url http://127.0.0.1:8080 probe"),
+                ),
+                sec(
+                    "Hosted and other servers (vLLM, OpenRouter, ...)",
+                    r##"Any server with the OpenAI chat API works. Put the API key in
+                    RSICRAFT_LLM_API_KEY; it is sent as a Bearer token and never written to
+                    the database or logs.
+
+                    Mind the cost: each step can use up to the full completion budget
+                    (12,288 tokens by default), and a campaign has many steps."##,
+                    None,
+                ),
+                sec(
+                    "Budget and time limits",
+                    r##"- RSICRAFT_MAX_TOKENS (default 12288): completion budget per step.
+                    Reasoning models think before they answer; when they run out of budget
+                    the step fails as budget_exhausted.
+                    - RSICRAFT_LLM_TIMEOUT_SECS (default 600): wall-clock limit per request.
+                    - RSICRAFT_REASONING_EFFORT (low, medium, high): passed to servers that
+                    support it, to shorten thinking.
+
+                    Rule of thumb: the model's context must be at least the budget plus about
+                    4,000 tokens for the prompt."##,
+                    None,
+                ),
+                sec(
+                    "When the server fails: nothing is silent",
+                    r##"Every failure gets a class and a fix, in the form
+                    "[llm:<class>] what happened | fix: what to do" (see Troubleshooting).
+
+                    - Retries: if the server is not up yet, one retry after 2 seconds. A
+                    server error that comes back quickly is retried up to twice. A server
+                    error after a long generation, and a timeout, are not retried, because
+                    repeating them costs minutes and usually fails the same way.
+                    - Campaigns run a provider check first and stop immediately on a setup
+                    problem: unreachable server, unknown model, missing API key, bad
+                    address. Nothing is spent on steps that cannot work.
+                    - Problems with a single step (budget, empty answer, no code, server
+                    error, timeout, context) are recorded with their class and the campaign
+                    continues; two failed steps in a row stop it.
+                    - The command line prints every skipped step and the reason to stderr.
+                    It exits with code 1 when a run could not start (the error and its fix
+                    are printed) and 2 when a campaign stopped early or probe found a
+                    problem. The studio shows the
+                    last problem and its fix in the Live Run panel. Over MCP the result lists
+                    them under "skipped" and "failures_by_kind"."##,
+                    None,
+                ),
             ],
-        },
-        HelpTab {
-            id: "compare".into(),
-            title: "6. Competitive Architecture Matrix".into(),
-            badge: "vs FunSearch / OpenMLE".into(),
-            summary: "Architectural comparison of RSICraft against DeepMind FunSearch, OpenMLE-Evo (Python), and closed OpenAI/Anthropic internal harnesses.".into(),
-            sections: vec![
-                HelpSection {
-                    heading: "RSICraft vs OpenAI/Anthropic Closed RSI vs FunSearch vs OpenMLE-Evo (Python)".into(),
-                    body: "- Openness & Sovereignty: OpenAI/Anthropic keep RSI harnesses 100% closed; FrontisAI/OpenRSI open-sourced the research in Python; RSICraft compiles it into a sovereign zero-panic Rust binary + native egui desktop studio.\n- Runtime & Memory Tax: RSICraft is a single static Rust binary (<15 ms startup, ~22 MB GPU UI RAM, 0 MB idle daemon tax) vs multi-hundred-MB Python/Ray virtual environments.\n- Source Deduplication: RSICraft uses BLAKE3 content hashing + Zstd (level 3) compression in SQLite WAL vs uncompressed duplicate Python files on disk.\n- Parent Selection: RSICraft combines score (0.50), positive improvement delta (0.35), and exploration novelty decay 1/(1+children) (0.15) vs greedy top-K island sampling.\n- Broken-Candidate Recovery: Dedicated DEBUG (T=0.20) operator feeds sandbox stack traces back into synthesis vs discarding failed mutations.".into(),
-                    code_example: None,
-                },
+        ),
+        tab(
+            "tasks",
+            "6. Writing a task",
+            "Evaluator contract",
+            r##"A task is a description for the model and an evaluator script that scores
+            what the model wrote. How to write both so the scores mean something."##,
+            vec![
+                sec(
+                    "What a task consists of",
+                    r##"- task_id and name.
+                    - description: the only thing the model sees about the problem. State the
+                    function name and signature, the inputs, the constraints (time limits,
+                    standard library only) and what is scored.
+                    - evaluator_script: never shown to the model. It runs the candidate and
+                    prints the verdict."##,
+                    None,
+                ),
+                sec(
+                    "The evaluator contract",
+                    r##"- The evaluator runs in a fresh directory with the candidate saved next to
+                    it as candidate.py, so `import candidate` works.
+                    - It must print one line RSI_METRIC_JSON={"status": ..., "score": ...}
+                    on standard output. If it prints several, the last one counts. Standard
+                    error is never read for the verdict.
+                    - status is one of SUCCESS, COMPILE_ERROR, RUNTIME_ERROR, TIMEOUT,
+                    METRIC_PARSE_ERROR. Higher scores are better.
+                    - A wrong answer should print RUNTIME_ERROR with score 0, so that a fast
+                    wrong program can never win.
+                    - If the evaluator crashes without a verdict line, rsicraft classifies the
+                    crash itself (syntax errors as COMPILE_ERROR, others as RUNTIME_ERROR)."##,
+                    Some(
+                        r##"
+                        import json
+                        import time
+
+                        import candidate
+
+                        cases = [(10, 4), (100, 25), (1000, 168)]
+                        if any(candidate.solve(n) != want for n, want in cases):
+                            print("wrong answer")
+                            print("RSI_METRIC_JSON=" + json.dumps({"status": "RUNTIME_ERROR", "score": 0.0}))
+                            raise SystemExit(0)
+
+                        t = time.perf_counter()
+                        candidate.solve(60000)
+                        ms = (time.perf_counter() - t) * 1000
+                        print("RSI_METRIC_JSON=" + json.dumps({"status": "SUCCESS", "score": round(1000 / max(ms, 0.001), 2)}))"##,
+                    ),
+                ),
+                sec(
+                    "Make scores trustworthy",
+                    r##"- Check correctness before measuring anything.
+                    - For speed, time a reference implementation in the same process and score
+                    the ratio, and take the best of several runs. Single timings vary by
+                    20 to 30% between runs.
+                    - Prefer quality scores (tour length, accuracy, cost) over timing where
+                    you can: they do not vary from run to run.
+                    - Use fixed random seeds, and give heuristics an explicit time limit that
+                    the evaluator enforces.
+                    - Keep the evaluator fast. It runs once per step."##,
+                    None,
+                ),
+                sec(
+                    "Pick tasks where search can win",
+                    r##"If a strong model writes the textbook answer at the first try, the search
+                    has nothing to add; that is what happened on pack-v1. Good tasks have no
+                    known best answer, a large design space and a score that rewards small
+                    improvements: heuristics for hard optimization problems, small
+                    machine-learning problems without libraries, game strategies,
+                    compression."##,
+                    None,
+                ),
+                sec(
+                    "Rust tasks",
+                    r##"If the evaluator contains `extern crate candidate` or `fn main`, the task
+                    is a Rust task. The candidate is compiled as a library crate named
+                    candidate, so every function the evaluator calls must be `pub`. Prompts
+                    ask the model for Rust automatically."##,
+                    Some(
+                        r##"
+                        extern crate candidate;
+                        fn main() {
+                            let ok = candidate::solve(21) == 42;
+                            println!("RSI_METRIC_JSON={{\"status\":\"{}\",\"score\":{}}}",
+                                if ok { "SUCCESS" } else { "RUNTIME_ERROR" },
+                                if ok { 100.0 } else { 0.0 });
+                        }"##,
+                    ),
+                ),
+                sec(
+                    "Task packs and benchmarks",
+                    r##"Task packs live in tasks/<pack>/<task>.py. Header comments carry id, name,
+                    split (train or heldout) and description; the rest of the file is the
+                    evaluator. scripts/bench-models.ps1 runs every model x task x trial in its
+                    own database and can be resumed; scripts/bench-analyze.ps1 reports the
+                    first working score, the best score and the amplification per run."##,
+                    Some("powershell -File scripts\\bench-models.ps1 -Models rsi-coder -Pack tasks\\pack-v2 -Steps 12 -Trials 3\npowershell -File scripts\\bench-analyze.ps1 -Dir <output directory>"),
+                ),
             ],
-        },
-        HelpTab {
-            id: "api".into(),
-            title: "7. 26 MCP Tools & CLI Reference".into(),
-            badge: "MCP 2024-11-05".into(),
-            summary: "Complete reference for all 26 MCP tools (accepting both rsi_* and dotted rsi.* names) and their 1:1 CLI subcommands.".into(),
-            sections: vec![
-                HelpSection {
-                    heading: "System, Hardware, Probe & Help Tools".into(),
-                    body: "- rsi_status (CLI: status): SQLite WAL store metrics, card counts, unique BLAKE3 hashes, and RTX 4090 endpoint summary.\n- rsi_hardware_profile (CLI: hardware): Full Goliath RTX 4090 24 GB VRAM budget, Frontis-MA1 MoE architecture, and llama-server launch flags.\n- rsi_llm_probe (CLI: probe): Actively pings the LLM /v1/models endpoint, returning latency in ms, reachability status, and model alias.\n- rsi_help (CLI: help-tabs): 9-tab operator manual with tab selection (--tab) and live substring search (--search).".into(),
-                    code_example: Some("rsicraft status\nrsicraft hardware --json\nrsicraft probe --url http://127.0.0.1:8081\nrsicraft help-tabs --tab tsinghua_openrsi\nrsicraft help-tabs --search \"Bowen Zhou\"".into()),
-                },
-                HelpSection {
-                    heading: "Task Management, Export/Import & Delete Tools".into(),
-                    body: "- rsi_task_upsert (CLI: task upsert): Register or update an optimization task and its Python evaluator script.\n- rsi_task_list (CLI: task list): List all registered tasks.\n- rsi_task_show (CLI: task show <id>): Inspect task metadata, score/delta bounds, and current top frontier.\n- rsi_task_delete (CLI: task delete <id>): Permanently delete a task and cascade delete its experience cards and frontier records.\n- rsi_export (CLI: export): Export complete task lineage (task, CAS cards, and Pareto frontier) to JSON.\n- rsi_import (CLI: import --file <path>): Import complete task lineage from JSON into SQLite WAL store.".into(),
-                    code_example: Some("rsicraft task list\nrsicraft task delete old-task\nrsicraft export --task-id opt-synth --out opt-synth.json\nrsicraft import --file opt-synth.json".into()),
-                },
-                HelpSection {
-                    heading: "Evolutionary Execution & Sandbox Tools".into(),
-                    body: "- rsi_step (CLI: step): Run one evolutionary step (DRAFT, IMPROVE, DEBUG, CROSSOVER) with composite-utility parent selection.\n- rsi_campaign (CLI: campaign): Run a multi-step autonomous evolutionary campaign.\n- rsi_evaluate (CLI: evaluate): Directly benchmark candidate code in the sandbox (supports Python 3.12 and native Rust compilation) and optionally record an experience card.\n- rsi_demo_seed (CLI: demo-seed): Seed an empty database with the opt-synth benchmark and a 4-card trajectory.".into(),
-                    code_example: Some("rsicraft demo-seed\nrsicraft campaign --task-id opt-synth --steps 4 --provider demo --sandbox-mode demo\nrsicraft evaluate --task-id opt-synth --code \"def solve(arr): return max(arr)\"".into()),
-                },
-                HelpSection {
-                    heading: "Frontier, Experience Cards, Diff & Prune Tools".into(),
-                    body: "- rsi_get_frontier (CLI: frontier): Query materialized top-K Pareto frontier for a task.\n- rsi_card_list (CLI: cards): List experience cards ordered by composite utility with optional operator/status filters.\n- rsi_card_show (CLI: card <id>): Decompress and display full candidate source code, BLAKE3 hash, execution logs, and parent IDs.\n- rsi_diff (CLI: diff --card-a <id> --card-b <id>): Generate line-by-line unified diff comparing decompressed source code between two experience cards.\n- rsi_cards_prune (CLI: prune --task-id <id> --keep-frontier 10): Prune low-utility non-frontier cards while preserving top Pareto performers.\n- rsi_lineage (CLI: lineage): Export the full evolutionary DAG (nodes and parent_a/parent_b edges) for visualization.\n- rsi_hyperparams_get (CLI: hyperparams): Inspect current composite utility weights (w_score, w_delta, w_novelty).\n- rsi_hyperparams_set (CLI: hyperparams --w-score <val> ...): Dynamically tune composite utility weights at runtime.".into(),
-                    code_example: Some("rsicraft frontier --task-id opt-synth\nrsicraft cards --task-id opt-synth --status SUCCESS\nrsicraft diff --card-a card-001 --card-b card-002\nrsicraft prune --task-id opt-synth --keep-frontier 10\nrsicraft hyperparams --w-score 0.6 --w-delta 0.3 --w-novelty 0.1\nrsicraft lineage --task-id opt-synth --json".into()),
-                },
-                HelpSection {
-                    heading: "Trace export, operator statistics, training harness, promotion gate".into(),
-                    body: "- rsi_dataset_export (CLI: dataset-export): Export SFT trajectories and DPO pairs from the task DAG. Prompts are rebuilt from the task, not the prompts the model saw.\n- rsi_bandit_status (CLI: bandit): Advisory per-operator statistics (pulls, wins, Beta posterior means, a recommended operator). It does not draw samples, and campaigns do not use it.\n- rsi_train_step (CLI: train): Export chat JSONL and run sandboxes/train_lora.py. Produces a candidate adapter or fails. A dry run changes nothing. Training does not change the active model. The harness has not been run end to end.\n- rsi_promote_gate (CLI: promote): A/B gate between two model aliases already served by the endpoint. Promotes the candidate alias only when Welch t >= 2. Refuses the demo sandbox. Does not load an adapter and does not roll weights back.".into(),
-                    code_example: Some("rsicraft dataset-export --task-id opt-synth --format all\nrsicraft bandit --task-id opt-synth\nrsicraft train --task-id opt-synth --epochs 3 --dry-run\nrsicraft promote --task-id opt-synth --trials 5".into()),
-                },
+        ),
+        tab(
+            "concepts",
+            "7. How the search works",
+            "Operators and selection",
+            r##"What happens in one step, how parents are chosen, what is stored, and the
+            sandbox modes."##,
+            vec![
+                sec(
+                    "One step",
+                    r##"1. Plan: pick an operator and parent cards, build the prompt.
+                    2. Generate: ask the model. The answer must contain a complete program
+                    with a top-level function, otherwise the step is recorded as no_code.
+                    3. Evaluate: run the program with the task's evaluator in the sandbox.
+                    4. Record: store a card, update the scores used for selection and the
+                    frontier.
+
+                    In the studio, steps 2 and 3 run in the background, so the window stays
+                    responsive."##,
+                    None,
+                ),
+                sec(
+                    "The four operators",
+                    r##"- DRAFT (temperature 0.70): a new solution from the description alone.
+                    - IMPROVE (0.40): make a working parent better.
+                    - DEBUG (0.20): repair a failed parent, given its error log.
+                    - CROSSOVER (0.50): combine two different working parents.
+                    A campaign cycles DRAFT, IMPROVE, DEBUG, CROSSOVER. DEBUG becomes IMPROVE
+                    when there is nothing to repair, and CROSSOVER becomes IMPROVE when there
+                    are fewer than two cards."##,
+                    None,
+                ),
+                sec(
+                    "How parents are chosen",
+                    r##"Each card gets a utility U = 0.50 x score + 0.35 x gain over its parent +
+                    0.15 x novelty, where score and gain are scaled to 0..1 among the task's
+                    working cards and novelty = 1 / (1 + number of children). Parents are
+                    drawn with probability proportional to U, so good cards are used often
+                    but not exclusively, and cards that already have many children are used
+                    less. Change the weights with rsicraft hyperparams; they are saved in the
+                    database."##,
+                    Some("rsicraft hyperparams\nrsicraft hyperparams --w-score 0.6 --w-delta 0.3 --w-novelty 0.1"),
+                ),
+                sec(
+                    "Cards, frontier, lineage",
+                    r##"- A card stores the code (compressed, identified by its BLAKE3 hash),
+                    status, score, evaluator log, timing and its one or two parents.
+                    - The frontier is the top 10 working cards of a task.
+                    - The lineage is the graph of parent to child edges. rsicraft diff shows
+                    what changed between two cards."##,
+                    Some("rsicraft cards --task-id primes\nrsicraft diff --card-a <parent-id> --card-b <child-id>"),
+                ),
+                sec(
+                    "Sandbox modes",
+                    r##"- demo: nothing is executed; a fixed oracle invents scores. For trying
+                    the program and for tests.
+                    - local: runs Python or compiles Rust on your machine, with a time limit.
+                    Not isolated: the code has your rights, files and network.
+                    - docker: runs in a container with no network, a read-only file system,
+                    a non-root user, no capabilities, 4 GB memory and 4 CPUs. Build the image
+                    once before using it."##,
+                    Some("docker build -f sandboxes\\Dockerfile.evaluator -t rsicraft-evaluator:latest sandboxes\nrsicraft campaign --task-id primes --steps 8 --provider llama --sandbox-mode docker"),
+                ),
+                sec(
+                    "Reading the results of a campaign",
+                    r##"- best_score: the best working card.
+                    - Amplification (best divided by the first working score): how much the
+                    search added. Close to 1 means the model's first good answer was about
+                    as good as it got.
+                    - steps_executed and steps_skipped, and failures_by_kind: where steps
+                    were lost. Many budget_exhausted or no_code failures mean the model or
+                    its settings are the bottleneck, not the search."##,
+                    None,
+                ),
+                sec(
+                    "Training and promotion (experimental)",
+                    r##"- rsicraft dataset-export: training examples from successful steps.
+                    - rsicraft train: runs sandboxes/train_lora.py (needs
+                    RSICRAFT_TRAIN_BASE_MODEL and a CUDA Python environment). Produces a
+                    candidate adapter or fails. Not yet run end to end.
+                    - rsicraft promote: compares two models served by the endpoint over fresh
+                    searches and switches the task to the candidate only if it wins clearly
+                    (Welch t of 2 or more).
+
+                    None of this is needed for normal searches."##,
+                    None,
+                ),
             ],
-        },
-        HelpTab {
-            id: "troubleshoot".into(),
-            title: "8. Incident-Grounded Troubleshooting".into(),
-            badge: "5 Real Fixes".into(),
-            summary: "Production runbook grounded in real incidents encountered and resolved on Goliath (RTX 4090) during 2026-11-09 verification.".into(),
-            sections: vec![
-                HelpSection {
-                    heading: "Incident 1: Ollama (:11434) Model-Swap Timeout vs Direct llama-server".into(),
-                    body: "Symptom: LLM completion requests to http://127.0.0.1:11434 time out after 90-180s on Goliath.\nRoot Cause: Background fleet jobs polling Ollama (:11434) trigger repeated reloads of heavy 262k-context models, evicting the active coding model from VRAM.\nFix: Point RSICraft directly at the dedicated llama-server.exe process via --llama-url http://127.0.0.1:8081 (or active dynamic port) where the model stays pinned in VRAM.".into(),
-                    code_example: Some("rsicraft --llama-url http://127.0.0.1:8081 step --task-id kadane-4090 --operator DRAFT --provider llama --sandbox-mode local".into()),
-                },
-                HelpSection {
-                    heading: "Incident 2: Reasoning Model <|channel>thought Prefix in Synthesized Code".into(),
-                    body: "Symptom: Reasoning models emit <|channel>thought ... <channel|>```python ... ```, and naive first-fence extraction captures internal thought blocks if they contain backticks.\nFix: PromptBuilder::extract_code_block strips all text through the last <channel|> or </think> tag before extracting the Python code block.".into(),
-                    code_example: None,
-                },
-                HelpSection {
-                    heading: "Incident 3: Docker Desktop Engine Stopped on Windows Host".into(),
-                    body: "Symptom: sandbox_mode='docker' returns 'failed to spawn docker run' or daemon pipe error when Docker Desktop is not running.\nFix: Start Docker Desktop and build sandboxes/Dockerfile.evaluator, or pass --sandbox-mode local to execute inside an isolated local Python 3.12 tempdir with strict wall-clock timeout enforcement.".into(),
-                    code_example: Some("rsicraft step --task-id kadane-4090 --operator IMPROVE --provider llama --sandbox-mode local".into()),
-                },
-                HelpSection {
-                    heading: "Incident 4: Evaluator Script Missing RSI_METRIC_JSON= Sentinel".into(),
-                    body: "Symptom: Candidate executes with exit code 0, but card status is recorded as METRIC_PARSE_ERROR.\nFix: Ensure your task evaluator_script prints a line matching RSI_METRIC_JSON={\"status\": \"SUCCESS\", \"score\": <float>} to stdout.".into(),
-                    code_example: Some("print(f'RSI_METRIC_JSON={json.dumps({\"status\": \"SUCCESS\", \"score\": 96.6028})}')".into()),
-                },
+        ),
+        tab(
+            "api",
+            "8. Tools and commands",
+            "MCP + CLI",
+            r##"All 26 MCP tools (rsi_* or dotted rsi.* names) and the matching command-line
+            verbs. Every CLI verb accepts --json."##,
+            vec![
+                sec(
+                    "System, provider and help",
+                    r##"- rsi_status (status): database counts and the configured endpoint.
+                    - rsi_hardware_profile (hardware): the reference hardware profile (static
+                    text, not detected).
+                    - rsi_llm_probe (probe): checks the LLM server and model: reachable,
+                    server type, served models, context warnings; scans the usual local
+                    addresses when nothing answers.
+                    - rsi_help (help-tabs): this help, by tab (--tab) or search (--search)."##,
+                    Some("rsicraft status\nrsicraft probe\nrsicraft probe --url http://127.0.0.1:1234\nrsicraft help-tabs --tab providers\nrsicraft help-tabs --search budget"),
+                ),
+                sec(
+                    "Tasks",
+                    r##"- rsi_task_upsert (task upsert), rsi_task_list (task list),
+                    rsi_task_show (task show <id>), rsi_task_delete (task delete <id>).
+                    - rsi_export (export) and rsi_import (import --file): a task with all its
+                    cards as one JSON file."##,
+                    Some("rsicraft task list\nrsicraft export --task-id primes --out primes.json\nrsicraft import --file primes.json"),
+                ),
+                sec(
+                    "Running searches",
+                    r##"- rsi_step (step): one step with a chosen operator.
+                    - rsi_campaign (campaign): several steps; checks the provider first.
+                    - rsi_evaluate (evaluate): score code you supply, optionally recording it.
+                    - rsi_demo_seed (demo-seed): a demo task with four cards, on an empty
+                    database."##,
+                    Some("rsicraft step --task-id primes --operator IMPROVE --provider llama --sandbox-mode local\nrsicraft campaign --task-id primes --steps 8 --provider llama --sandbox-mode local\nrsicraft evaluate --task-id primes --code \"def solve(n): return 0\" --sandbox-mode local --no-record"),
+                ),
+                sec(
+                    "Results",
+                    r##"- rsi_get_frontier (frontier), rsi_card_list (cards), rsi_card_show
+                    (card <id>), rsi_diff (diff), rsi_lineage (lineage).
+                    - rsi_cards_prune (prune): delete low-utility cards outside the frontier.
+                    - rsi_hyperparams_get / rsi_hyperparams_set (hyperparams): selection
+                    weights."##,
+                    Some("rsicraft frontier --task-id primes\nrsicraft cards --task-id primes --status SUCCESS\nrsicraft lineage --task-id primes --json"),
+                ),
+                sec(
+                    "Experimental: training and promotion",
+                    r##"- rsi_dataset_export (dataset-export): training examples and preference
+                    pairs. Prompts are rebuilt from the task, not the exact prompts the model
+                    saw.
+                    - rsi_bandit_status (bandit): per-operator statistics and a suggested
+                    operator. Advisory only; campaigns do not use it.
+                    - rsi_train_step (train): LoRA training on the exported examples. Writes
+                    a candidate adapter; it does not change the active model.
+                    - rsi_promote_gate (promote): A/B test of two served models."##,
+                    Some("rsicraft dataset-export --task-id primes\nrsicraft train --task-id primes --dry-run\nrsicraft promote --task-id primes --candidate-alias my-tuned-model --trials 5"),
+                ),
             ],
-        },
-        HelpTab {
-            id: "faq".into(),
-            title: "9. FAQ & Safety Invariants".into(),
-            badge: "5 Guards".into(),
-            summary: "Frequently asked questions and non-bypassable safety invariants enforced across rsicraft-core, rsicraft-mcp, and rsicraft-app.".into(),
-            sections: vec![
-                HelpSection {
-                    heading: "Q1: Does RSICraft require a GPU or Docker to run tests and explore the Studio/CLI/MCP?".into(),
-                    body: "No. Both provider='demo' and sandbox_mode='demo' are built into rsicraft-core, allowing deterministic offline campaigns, unit tests, and interactive egui Studio exploration in milliseconds with zero GPU or container dependencies.".into(),
-                    code_example: Some("rsicraft --db :memory: demo-seed".into()),
-                },
-                HelpSection {
-                    heading: "Q2: Why is RSI in RSICraft safe against the 'Skynet' runaway scenario?".into(),
-                    body: "Because candidate programs never execute with host privileges or network access, never modify the Rust supervisor binary (#![deny(unwrap, panic)]), and are scored strictly by a deterministic benchmark oracle inside an air-gapped sandbox (--network none, --read-only, 4 GB RAM cap, 30s wall-clock kill timer).".into(),
-                    code_example: None,
-                },
-                HelpSection {
-                    heading: "Q3: How does BLAKE3 + Zstd CAS handle identical code generated across steps?".into(),
-                    body: "Every candidate's source code is hashed with BLAKE3 (64-char hex digest) and compressed with Zstd level 3. Each evolutionary step records its own lineage card (parent_a_id, parent_b_id, operator, timestamp) while indexing code_hash so identical artifacts are immediately identifiable.".into(),
-                    code_example: None,
-                },
-                HelpSection {
-                    heading: "Q4: What are the 5 Non-Bypassable Safety Invariants in RSICraft?".into(),
-                    body: "1. Zero-Panic Rust: #![deny(clippy::unwrap_used, expect_used, panic, todo, unimplemented)] across all 3 crates.\n2. Air-Gapped Container Sandbox: --network none, --read-only rootfs, --cap-drop ALL, --security-opt no-new-privileges, --user 10000:10001, --pids-limit 256, --memory 4g, --cpus 4.\n3. Wall-Clock Timeout Reaping: Subprocess polling kills runaway candidates after timeout_secs and records TIMEOUT.\n4. Transactional SQLite WAL: Foreign keys, WAL journaling, and atomic frontier materialization.\n5. Pure Stdio MCP: stdout carries 100% JSON-RPC 2.0 in mcp mode; all diagnostics go to stderr.".into(),
-                    code_example: None,
-                },
+        ),
+        tab(
+            "troubleshoot",
+            "9. Troubleshooting",
+            "Every error, with its fix",
+            r##"Model server errors are printed as "[llm:<class>] what happened | fix: what to
+            do". Look up the class here. Sandbox and studio problems follow."##,
+            vec![
+                sec(
+                    "The failure classes at a glance",
+                    r##"Stop a campaign immediately (setup problems):
+                    - unreachable: nothing answers at the address.
+                    - model_not_found: the server does not serve the model.
+                    - auth_required: the server wants an API key.
+                    - config: the address is malformed or not an OpenAI-compatible server.
+
+                    Recorded per step, campaign continues (two in a row stop it):
+                    - budget_exhausted, empty_answer, no_code: the model did not deliver a
+                    program.
+                    - context_overflow: prompt and budget do not fit the context.
+                    - server_error, timeout: the server failed or was too slow.
+                    - bad_request, bad_response: the server rejected the request or answered
+                    oddly."##,
+                    None,
+                ),
+                sec(
+                    "unreachable",
+                    r##"Nothing answers at the configured address. Is the server running, and is
+                    it the right port? rsicraft probe scans the usual addresses (Ollama 11434,
+                    LM Studio 1234, llama-server 8080 and 8081, 8000) and names any it finds.
+                    The default address is http://127.0.0.1:8081; most people need to set
+                    RSICRAFT_LLM_URL. LM Studio only listens after you start its server."##,
+                    Some("rsicraft probe\nollama serve\nlms server start"),
+                ),
+                sec(
+                    "model_not_found",
+                    r##"The server is up but does not know the model name. probe lists the names
+                    it serves. Ollama: `ollama list`, then `ollama pull <name>`; names without
+                    a tag mean ":latest". LM Studio: download the model, and load it unless
+                    just-in-time loading is on."##,
+                    Some("rsicraft probe\nollama list"),
+                ),
+                sec(
+                    "budget_exhausted, empty_answer, no_code",
+                    r##"The model used its whole budget thinking, returned nothing, or returned
+                    text without a complete program. Common with reasoning models and with
+                    small models on hard tasks.
+                    - Raise RSICRAFT_MAX_TOKENS, and the model's context with it.
+                    - Set RSICRAFT_REASONING_EFFORT=low if the server supports it.
+                    - Use a stronger or less talkative model.
+
+                    rsicraft never evaluates fragments as if they were programs: a step
+                    without a function in the answer is recorded as no_code."##,
+                    None,
+                ),
+                sec(
+                    "context_overflow",
+                    r##"Prompt plus completion budget exceed the context window. Give the model a
+                    larger context (Ollama: alias with PARAMETER num_ctx; LM Studio: Context
+                    Length; llama-server: --ctx-size) or lower RSICRAFT_MAX_TOKENS. Prompts
+                    grow with parent code and error logs, so IMPROVE and DEBUG steps hit this
+                    first."##,
+                    None,
+                ),
+                sec(
+                    "server_error",
+                    r##"The server failed while handling the request. If it failed quickly,
+                    rsicraft has already retried. If it failed after minutes of generation,
+                    the model runner usually crashed at the completion budget or ran out of
+                    memory: look at the server log (Ollama: %LOCALAPPDATA%\Ollama\server.log),
+                    lower RSICRAFT_MAX_TOKENS, or use a smaller context. Another program
+                    loading a large model at the same time can also cause it."##,
+                    None,
+                ),
+                sec(
+                    "timeout",
+                    r##"The model did not finish within RSICRAFT_LLM_TIMEOUT_SECS (600 by
+                    default). A 35B model on one RTX 4090 needed 4 to 5 minutes per step in
+                    our runs. Raise the timeout, lower the budget, or use a smaller model. A
+                    model that spilled onto the CPU (see Ollama context) is much slower."##,
+                    None,
+                ),
+                sec(
+                    "Sandbox problems",
+                    r##"- "docker run failed": Docker Desktop is not running, or the image was
+                    not built. Start Docker and build the image (see How the search works).
+                    - Every candidate is METRIC_PARSE_ERROR: the evaluator does not print the
+                    RSI_METRIC_JSON line on standard output.
+                    - Every candidate is TIMEOUT: the evaluator or the task is too slow for
+                    --timeout-secs, or the candidates loop forever.
+                    - Local Python not found: set RSICRAFT_PYTHON to a python.exe. Rust tasks
+                    need rustc on the PATH or RSICRAFT_RUSTC."##,
+                    None,
+                ),
+                sec(
+                    "Studio problems",
+                    r##"- My runs are missing: without RSICRAFT_DB the studio uses a throwaway
+                    in-memory database. Set RSICRAFT_DB to your database file.
+                    - Nothing happens when I start a step: read the Live Run panel; the last
+                    problem and its fix are shown there.
+                    - Text too small or too large: Ctrl and mouse wheel zoom."##,
+                    None,
+                ),
             ],
-        },
+        ),
+        tab(
+            "faq",
+            "10. FAQ",
+            "Short answers",
+            "Short answers to the questions people ask first.",
+            vec![
+                sec(
+                    "Does rsicraft improve the model?",
+                    r##"Not during a search. A search improves programs; the model stays the
+                    same. Training a new model generation from search results is possible
+                    with the experimental tools, but has not produced a measured improvement
+                    yet."##,
+                    None,
+                ),
+                sec(
+                    "Do I need a GPU?",
+                    r##"Not for the demo mode. For real searches you need a model server; a GPU
+                    makes it practical. Frontis-MA1-35B needs about 21 GB of GPU memory;
+                    7B to 14B coder models run on much less."##,
+                    None,
+                ),
+                sec(
+                    "Which model should I use?",
+                    r##"Coder models of 7B to 14B are a good start. Reasoning models often write
+                    better code but need a large budget and context, and time out more
+                    often. Run rsicraft probe for every new model."##,
+                    None,
+                ),
+                sec(
+                    "Is the local sandbox safe?",
+                    r##"No. It is a convenience mode: model-written code runs as you. Use the
+                    docker sandbox for anything you would not run yourself."##,
+                    None,
+                ),
+                sec(
+                    "How long does a campaign take?",
+                    r##"Mostly model time. In our runs a 35B model on an RTX 4090 needed 4 to 5
+                    minutes per step; 7B to 9B models are several times faster. Evaluation
+                    usually takes seconds."##,
+                    None,
+                ),
+                sec(
+                    "Where is my data?",
+                    r##"In one SQLite file: %LOCALAPPDATA%\rsicraft\rsicraft.db by default, or
+                    the path in --db or RSICRAFT_DB. Export a task with rsicraft export."##,
+                    None,
+                ),
+                sec(
+                    "Why is it called RSICraft if it does not do RSI?",
+                    r##"The name states the question the project investigates, not a result.
+                    The tab "What is RSI?" says how far it gets."##,
+                    None,
+                ),
+            ],
+        ),
     ]
 }
 
@@ -293,13 +995,15 @@ pub fn query_help(tab: Option<&str>, search: Option<&str>) -> Result<Value, Stri
     let filtered_by_tab: Vec<HelpTab> = match requested_tab {
         None | Some("all") => tabs,
         Some(slug) => {
+            let ids: Vec<String> = tabs.iter().map(|t| t.id.clone()).collect();
             let found: Vec<HelpTab> = tabs
                 .into_iter()
                 .filter(|t| t.id.eq_ignore_ascii_case(slug))
                 .collect();
             if found.is_empty() {
                 return Err(format!(
-                    "unknown help tab '{slug}'; valid tabs: overview, rsi_landscape, tsinghua_openrsi, wrappee, operators, compare, api, troubleshoot, faq, all"
+                    "unknown help tab '{slug}'; valid tabs: {}, all",
+                    ids.join(", ")
                 ));
             }
             found
@@ -344,4 +1048,10 @@ pub fn query_help(tab: Option<&str>, search: Option<&str>) -> Result<Value, Stri
         "matched_tabs_count": final_tabs.len(),
         "tabs": final_tabs,
     }))
+}
+
+/// Ids of all help tabs, in display order.
+#[must_use]
+pub fn tab_ids() -> Vec<String> {
+    all_help_tabs().into_iter().map(|t| t.id).collect()
 }

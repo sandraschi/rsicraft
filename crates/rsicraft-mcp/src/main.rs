@@ -30,10 +30,10 @@ struct Cli {
     /// SQLite database path. Default: $RSICRAFT_DB or %LOCALAPPDATA%\rsicraft\rsicraft.db
     #[arg(long, global = true)]
     db: Option<PathBuf>,
-    /// llama-server or Ollama base URL (default: http://127.0.0.1:8081).
+    /// OpenAI-compatible server root: Ollama http://127.0.0.1:11434, LM Studio http://127.0.0.1:1234, llama-server http://127.0.0.1:8080. Default: $RSICRAFT_LLM_URL or http://127.0.0.1:8081.
     #[arg(long, global = true)]
     llama_url: Option<String>,
-    /// Model alias passed to /v1/chat/completions (default: frontis).
+    /// Model name as the server knows it (`ollama list`, LM Studio model id). Default: $RSICRAFT_MODEL or frontis.
     #[arg(long, global = true)]
     model: Option<String>,
     /// Docker evaluator image tag (default: rsicraft-evaluator:latest).
@@ -135,7 +135,7 @@ enum Cmd {
         #[arg(long)]
         card_b: String,
     },
-    /// Actively probe the LLM endpoint (/v1/models) for reachability and latency.
+    /// Check the LLM server and model: reachability, server type, served models, context settings. Scans the usual local addresses when nothing answers.
     Probe {
         #[arg(long)]
         url: Option<String>,
@@ -212,7 +212,7 @@ enum Cmd {
         #[arg(long)]
         candidate: Option<String>,
     },
-    /// Query the 9-tab Operator Manual, Geopolitical Dossier & Competitive Matrix.
+    /// Read the 10-tab manual (start, rsi, based_on, quickstart, providers, tasks, concepts, api, troubleshoot, faq).
     HelpTabs {
         #[arg(long, default_value = "all")]
         tab: String,
@@ -239,8 +239,16 @@ enum TaskOp {
         name: String,
         #[arg(long)]
         description: String,
+        /// Evaluator source as text (awkward in shells; prefer --evaluator-file).
+        #[arg(
+            long,
+            conflicts_with = "evaluator_file",
+            required_unless_present = "evaluator_file"
+        )]
+        evaluator_script: Option<String>,
+        /// Read the evaluator from a file, e.g. tasks/pack-v1/primes.py.
         #[arg(long)]
-        evaluator_script: String,
+        evaluator_file: Option<PathBuf>,
     },
     /// Delete a task and cascade delete its experience cards and frontier.
     Delete { task_id: String },
@@ -286,16 +294,27 @@ fn to_tool(cmd: Cmd) -> Result<(&'static str, Value), String> {
                     name,
                     description,
                     evaluator_script,
+                    evaluator_file,
                 },
-        } => (
-            "rsi_task_upsert",
-            json!({
-                "task_id": task_id,
-                "name": name,
-                "description": description,
-                "evaluator_script": evaluator_script,
-            }),
-        ),
+        } => {
+            let evaluator_script = match (evaluator_script, evaluator_file) {
+                (_, Some(path)) => std::fs::read_to_string(&path)
+                    .map_err(|e| format!("cannot read evaluator file {}: {e}", path.display()))?,
+                (Some(s), None) => s,
+                (None, None) => {
+                    return Err("give --evaluator-file <path> or --evaluator-script <text>".into())
+                }
+            };
+            (
+                "rsi_task_upsert",
+                json!({
+                    "task_id": task_id,
+                    "name": name,
+                    "description": description,
+                    "evaluator_script": evaluator_script,
+                }),
+            )
+        }
         Cmd::Step {
             task_id,
             operator,
@@ -565,15 +584,25 @@ fn render(v: &Value) -> String {
     let Some(obj) = v.as_object() else {
         return scalar(v);
     };
+    if obj.contains_key("configured_model") && obj.contains_key("ok") {
+        return render_probe(obj);
+    }
     if let Some(diff) = obj.get("diff_text").and_then(Value::as_str) {
         return diff.to_string();
     }
     if let Some(tabs) = obj.get("tabs").and_then(Value::as_array) {
         let mut out = String::new();
-        out.push_str("=== RSICraft 7-Tab Operator Manual & Architecture Guide ===\n");
-        out.push_str(
-            "Tabs: [overview] [wrappee] [operators] [compare] [api] [troubleshoot] [faq]\n\n",
-        );
+        out.push_str("=== rsicraft help ===\n");
+        if let Some(index) = obj.get("tabs_available").and_then(Value::as_array) {
+            let ids: Vec<&str> = index
+                .iter()
+                .filter_map(|t| t.get("id").and_then(Value::as_str))
+                .collect();
+            out.push_str(&format!(
+                "Tabs: {} (rsicraft help-tabs --tab <id>, or --search <word>)\n\n",
+                ids.join(", ")
+            ));
+        }
         for t in tabs {
             let id = t.get("id").and_then(Value::as_str).unwrap_or("");
             let title = t.get("title").and_then(Value::as_str).unwrap_or("");
@@ -584,7 +613,7 @@ fn render(v: &Value) -> String {
                 for s in sections {
                     let h = s.get("heading").and_then(Value::as_str).unwrap_or("");
                     let b = s.get("body").and_then(Value::as_str).unwrap_or("");
-                    out.push_str(&format!("  ### {h}\n  {b}\n"));
+                    out.push_str(&format!("  ### {h}\n{}\n", wrap_indent(b, 2, 88)));
                     if let Some(code) = s.get("code_example").and_then(Value::as_str) {
                         out.push_str(&format!(
                             "  Example:\n    {}\n",
@@ -680,6 +709,134 @@ fn run_cli_smoke(db: Option<PathBuf>) -> Result<(), String> {
     Ok(())
 }
 
+/// Print what went wrong in a result that is otherwise a success (skipped
+/// campaign steps, an aborted campaign, a failed provider check) to stderr,
+/// so it is never silent. Exit code 2 means "ran, but stopped early or found
+/// a problem"; stdout stays parseable either way.
+fn report_problems(v: &Value) -> ExitCode {
+    let mut code = ExitCode::SUCCESS;
+    if let Some(warnings) = v
+        .get("provider")
+        .and_then(|p| p.get("warnings"))
+        .and_then(Value::as_array)
+    {
+        for w in warnings.iter().filter_map(Value::as_str) {
+            eprintln!("rsicraft: warning: {w}");
+        }
+    }
+    if let Some(skipped) = v.get("skipped").and_then(Value::as_array) {
+        if !skipped.is_empty() {
+            eprintln!("rsicraft: {} step(s) produced no card:", skipped.len());
+            for s in skipped {
+                eprintln!(
+                    "  step {} {} [{}]: {}",
+                    s.get("step").and_then(Value::as_u64).unwrap_or(0),
+                    s.get("operator").and_then(Value::as_str).unwrap_or("?"),
+                    s.get("kind").and_then(Value::as_str).unwrap_or("other"),
+                    s.get("error").and_then(Value::as_str).unwrap_or("")
+                );
+            }
+        }
+    }
+    if v.get("aborted").and_then(Value::as_bool) == Some(true) {
+        eprintln!(
+            "rsicraft: campaign stopped early: {}",
+            v.get("error")
+                .and_then(Value::as_str)
+                .unwrap_or("unknown reason")
+        );
+        code = ExitCode::from(2);
+    }
+    if v.get("configured_model").is_some() && v.get("ok").and_then(Value::as_bool) == Some(false) {
+        code = ExitCode::from(2);
+    }
+    code
+}
+
+/// Human-readable form of an `rsi_llm_probe` report.
+/// Word-wrap `text` to `width` columns with `indent` leading spaces, keeping
+/// its own line breaks. List items get a hanging indent.
+fn wrap_indent(text: &str, indent: usize, width: usize) -> String {
+    let pad = " ".repeat(indent);
+    let mut out: Vec<String> = Vec::new();
+    for line in text.lines() {
+        if line.trim().is_empty() {
+            out.push(String::new());
+            continue;
+        }
+        let hang = if line.starts_with("- ") {
+            2
+        } else {
+            match line.split_once(". ") {
+                Some((n, _)) if !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()) => {
+                    n.len() + 2
+                }
+                _ => 0,
+            }
+        };
+        let mut cur = pad.clone();
+        for word in line.split_whitespace() {
+            let fresh = cur.trim().is_empty();
+            if !fresh && cur.len() + 1 + word.len() > width {
+                out.push(cur);
+                cur = format!("{pad}{}", " ".repeat(hang));
+            } else if !fresh {
+                cur.push(' ');
+            }
+            cur.push_str(word);
+        }
+        out.push(cur);
+    }
+    out.join("\n")
+}
+
+fn render_probe(obj: &Map<String, Value>) -> String {
+    let s = |k: &str| obj.get(k).map(scalar).unwrap_or_else(|| "-".into());
+    let mut out = String::new();
+    let ok = obj.get("ok").and_then(Value::as_bool) == Some(true);
+    out.push_str(&format!(
+        "LLM provider check: {}\n",
+        if ok { "OK" } else { "PROBLEM" }
+    ));
+    out.push_str(&format!("  address        {}\n", s("base_url")));
+    out.push_str(&format!("  server         {}\n", s("provider")));
+    out.push_str(&format!(
+        "  model          {} (served: {})\n",
+        s("configured_model"),
+        s("model_available")
+    ));
+    out.push_str(&format!(
+        "  budget         {} tokens, {}s timeout, API key {}\n",
+        s("max_tokens"),
+        s("timeout_secs"),
+        if obj.get("api_key_set").and_then(Value::as_bool) == Some(true) {
+            "set"
+        } else {
+            "not set"
+        }
+    ));
+    if let Some(models) = obj.get("available_models").and_then(Value::as_array) {
+        if !models.is_empty() {
+            let names: Vec<&str> = models.iter().filter_map(Value::as_str).take(20).collect();
+            out.push_str(&format!("  served models  {}\n", names.join(", ")));
+        }
+    }
+    if let Some(f) = obj.get("failure").filter(|f| !f.is_null()) {
+        out.push_str(&format!(
+            "\nProblem [{}]: {}\nFix: {}\n",
+            f.get("kind").and_then(Value::as_str).unwrap_or("?"),
+            f.get("message").and_then(Value::as_str).unwrap_or(""),
+            f.get("remedy").and_then(Value::as_str).unwrap_or("")
+        ));
+    }
+    if let Some(ws) = obj.get("warnings").and_then(Value::as_array) {
+        for w in ws.iter().filter_map(Value::as_str) {
+            out.push_str(&format!("\nWarning: {w}\n"));
+        }
+    }
+    out
+}
+
 fn main() -> ExitCode {
     let cli = Cli::parse();
     if cli.smoke {
@@ -752,7 +909,7 @@ fn main() -> ExitCode {
             } else {
                 print!("{}", render(&v));
             }
-            ExitCode::SUCCESS
+            report_problems(&v)
         }
         Err(e) => {
             if json_out {

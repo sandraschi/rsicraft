@@ -6,7 +6,7 @@
 //! - Zero non-ASCII tofu glyphs (verified by `glyph_allowlist_no_tofu_chars` test)
 //! - Interactive GPU-painted Bezier Lineage DAG Canvas and Score Trajectory Spark Chart
 //! - Full 4-Operator Evolutionary Launchpad, BLAKE3+Zstd CAS Inspector, RTX 4090 Gauge,
-//!   RSI Geopolitics & Tsinghua/Frontis.AI Dossier, and 9-Tab Searchable Help Manual.
+//!   "What is RSI?" page, and the searchable 10-tab help (same source as the CLI and MCP help).
 #![deny(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -16,6 +16,7 @@
 )]
 
 use eframe::egui::{self, Color32, CornerRadius, FontFamily, FontId, Pos2, RichText, Stroke, Vec2};
+use rsicraft_core::llm::failure_kind_of;
 use rsicraft_core::operators::SearchOperator;
 use rsicraft_core::sandbox::{SandboxExecutionResult, SandboxRunner};
 use rsicraft_core::{
@@ -68,8 +69,8 @@ impl StudioPage {
             Self::ExperienceCards => "3. Experience Cards & CAS",
             Self::TaskAndSandboxLab => "4. Task & Sandbox Lab",
             Self::Goliath4090AndLlm => "5. RTX 4090 & LLM Config",
-            Self::RsiAndTsinghuaDossier => "6. RSI & Tsinghua Dossier",
-            Self::MultitabHelpAndTools => "7. 9-Tab Help & 26 Tools",
+            Self::RsiAndTsinghuaDossier => "6. What is RSI?",
+            Self::MultitabHelpAndTools => "7. Help",
         }
     }
 }
@@ -213,6 +214,14 @@ pub struct RsiCraftApp {
     pub job: Option<ActiveJob>,
     pub run_feed: Vec<RunEvent>,
     pub repaint_ctx: Option<egui::Context>,
+
+    /// Last result of "Check provider" (the `rsi_llm_probe` report).
+    pub provider_report: Option<Value>,
+    /// Last step failure: (class, full message with fix). Shown until the next
+    /// successful step so a failed run is never silent.
+    pub last_failure: Option<(String, String)>,
+    /// A provider check running in the background.
+    provider_check: Option<Receiver<Value>>,
 }
 
 /// One finished step as shown in the live run timeline.
@@ -279,6 +288,8 @@ impl RsiCraftApp {
             let _ = dispatch(&mut ctx, Command::DemoSeed);
         }
 
+        let llm_url_init = ctx.llm.base_url.clone();
+        let llm_model_init = ctx.llm.model_alias.clone();
         let mut app = Self {
             ctx,
             page: StudioPage::EvolutionaryStudio,
@@ -291,8 +302,11 @@ impl RsiCraftApp {
             sandbox_pick: "demo".to_string(),
             campaign_steps: 4,
             timeout_secs: 30,
-            llama_url_edit: "http://127.0.0.1:8081".to_string(),
-            model_alias_edit: "frontis".to_string(),
+            llama_url_edit: llm_url_init,
+            model_alias_edit: llm_model_init,
+            provider_report: None,
+            last_failure: None,
+            provider_check: None,
             status_json: json!({}),
             hw_json: json!({}),
             frontier_json: json!({}),
@@ -317,7 +331,7 @@ impl RsiCraftApp {
             lab_last_eval: None,
             card_diff_output: None,
             status_banner: format!(
-                "RSICraft v{VERSION} Sovereign Studio Online (Goliath RTX 4090 Profile Ready)"
+                "rsicraft v{VERSION} ready. New here? Press [? New here] or open the Help page."
             ),
             repo_root: default_repo_root(),
             active_dialog: None,
@@ -405,6 +419,71 @@ impl RsiCraftApp {
         self.refresh_help();
     }
 
+    /// Point the engine at the server address and model typed on the LLM page.
+    pub fn apply_endpoint(&mut self) {
+        self.ctx.llm = rsicraft_core::llm::LlamaClient::new(
+            self.llama_url_edit.trim(),
+            self.model_alias_edit.trim(),
+        );
+        self.llama_url_edit.clone_from(&self.ctx.llm.base_url);
+        self.status_banner = format!(
+            "Model server set to {} (model {})",
+            self.ctx.llm.base_url, self.ctx.llm.model_alias
+        );
+        self.refresh_all();
+    }
+
+    /// Check the configured server and model in the background; the report
+    /// appears on the LLM page and a summary in the status line.
+    pub fn check_provider(&mut self) {
+        let client = self.ctx.llm.clone();
+        let (tx, rx) = channel();
+        let repaint = self.repaint_ctx.clone();
+        std::thread::spawn(move || {
+            let _ = tx.send(client.diagnose());
+            if let Some(c) = repaint {
+                c.request_repaint();
+            }
+        });
+        self.provider_check = Some(rx);
+        self.status_banner = format!("Checking {} ...", self.ctx.llm.base_url);
+    }
+
+    fn poll_provider_check(&mut self) {
+        let Some(rx) = &self.provider_check else {
+            return;
+        };
+        let report = match rx.try_recv() {
+            Err(TryRecvError::Empty) => return,
+            Err(TryRecvError::Disconnected) => json!({
+                "ok": false,
+                "failure": {"kind": "config", "message": "the provider check ended without a result", "remedy": "try again"}
+            }),
+            Ok(v) => v,
+        };
+        self.provider_check = None;
+        self.status_banner = if report.get("ok").and_then(Value::as_bool) == Some(true) {
+            format!(
+                "Provider OK: {} serves {}",
+                report
+                    .get("base_url")
+                    .and_then(Value::as_str)
+                    .unwrap_or("?"),
+                report
+                    .get("configured_model")
+                    .and_then(Value::as_str)
+                    .unwrap_or("?")
+            )
+        } else {
+            let kind = report
+                .pointer("/failure/kind")
+                .and_then(Value::as_str)
+                .unwrap_or("error");
+            format!("Provider NOT usable ({kind}); see the LLM page for the fix")
+        };
+        self.provider_report = Some(report);
+    }
+
     pub fn refresh_help(&mut self) {
         let tab = Some(self.selected_help_tab.clone());
         let search = if self.help_search.trim().is_empty() {
@@ -440,6 +519,7 @@ impl RsiCraftApp {
         provider: &str,
         sandbox_mode: &str,
         timeout_secs: u64,
+        preflight: bool,
     ) -> Option<Receiver<WorkerMsg>> {
         let plan = match plan_step(&self.ctx, task_id, op, provider, sandbox_mode, timeout_secs) {
             Ok(p) => p,
@@ -453,7 +533,17 @@ impl RsiCraftApp {
         let sandbox = SandboxRunner::new(self.ctx.sandbox.image_tag.clone());
         let repaint = self.repaint_ctx.clone();
         std::thread::spawn(move || {
-            let res = run_step(&plan, &llm, &sandbox);
+            // First step of a run against a real model: check the server and
+            // model first, so a setup problem stops the run with its fix
+            // instead of failing step after step.
+            let checked = if preflight && plan.provider == "llama" {
+                let mut client = llm.clone();
+                client.model_alias.clone_from(&plan.model_alias);
+                client.preflight().map(|_| ()).map_err(String::from)
+            } else {
+                Ok(())
+            };
+            let res = checked.and_then(|()| run_step(&plan, &llm, &sandbox));
             let _ = tx.send(WorkerMsg::Step(Box::new(plan), res));
             if let Some(c) = repaint {
                 c.request_repaint();
@@ -492,7 +582,7 @@ impl RsiCraftApp {
         let tid = self.active_task_id.clone();
         let prov = self.provider_pick.clone();
         let sb = self.sandbox_pick.clone();
-        if let Some(rx) = self.spawn_step(&tid, op, &prov, &sb, self.timeout_secs) {
+        if let Some(rx) = self.spawn_step(&tid, op, &prov, &sb, self.timeout_secs, true) {
             self.job = Some(Self::new_job(
                 rx,
                 format!("Step {}", op.as_str()),
@@ -529,6 +619,7 @@ impl RsiCraftApp {
             &spec.provider,
             &spec.sandbox_mode,
             spec.timeout_secs,
+            true,
         ) {
             self.job = Some(Self::new_job(
                 rx,
@@ -627,6 +718,7 @@ impl RsiCraftApp {
     /// thread, and start the next campaign step if there is one. Called once
     /// per frame; returns immediately when nothing has finished.
     pub fn poll_job(&mut self) {
+        self.poll_provider_check();
         let msg = match self.job.as_ref().map(|j| j.rx.try_recv()) {
             None | Some(Err(TryRecvError::Empty)) => return,
             Some(Err(TryRecvError::Disconnected)) => {
@@ -658,6 +750,7 @@ impl RsiCraftApp {
                     Ok(step) => {
                         job.done += 1;
                         job.consecutive_failures = 0;
+                        self.last_failure = None;
                         self.refresh_all();
                         self.push_run_event(&step, secs);
                         let cid = step.get("card_id").and_then(Value::as_str).unwrap_or("?");
@@ -680,30 +773,39 @@ impl RsiCraftApp {
                         }
                     }
                     Err(e) => {
-                        // No card came out of this step. A campaign skips one such
-                        // step and carries on; two in a row end it.
+                        // No card came out of this step. Setup problems (server
+                        // unreachable, unknown model, missing key, bad address)
+                        // end the run at once; otherwise a campaign skips one
+                        // such step and carries on, and two in a row end it.
+                        let kind = failure_kind_of(&e);
+                        let class = kind.map_or("error", |k| k.as_str()).to_string();
+                        self.last_failure = Some((class.clone(), e.clone()));
                         job.consecutive_failures += 1;
-                        let give_up = job.campaign.is_none()
+                        let fatal = kind.is_some_and(|k| k.is_fatal());
+                        let give_up = fatal
+                            || job.campaign.is_none()
                             || job.consecutive_failures >= CAMPAIGN_MAX_CONSECUTIVE_FAILURES;
-                        if give_up {
-                            self.status_banner = format!(
-                                "{} stopped after {} of {} steps: {e}",
-                                job.label, job.done, job.total
-                            );
-                            return;
-                        }
-                        job.done += 1;
                         self.run_feed.push(RunEvent {
                             operator: plan.operator.as_str().to_string(),
-                            status: "NO_CARD".to_string(),
+                            status: class.to_ascii_uppercase(),
                             score: 0.0,
                             delta: 0.0,
                             secs,
                             card_id: String::new(),
                             new_best: false,
                         });
-                        self.status_banner =
-                            format!("{}: step {} skipped: {e}", job.label, job.done);
+                        if give_up {
+                            self.status_banner = format!(
+                                "{} stopped after {} of {} steps ({class}); see Live Run for the fix",
+                                job.label, job.done, job.total
+                            );
+                            return;
+                        }
+                        job.done += 1;
+                        self.status_banner = format!(
+                            "{}: step {} skipped ({class}); see Live Run for the fix",
+                            job.label, job.done
+                        );
                     }
                 }
                 let more = job.done < job.total && !job.stop_requested;
@@ -722,6 +824,7 @@ impl RsiCraftApp {
                         &spec.provider,
                         &spec.sandbox_mode,
                         spec.timeout_secs,
+                        false,
                     ) {
                         job.rx = rx;
                         job.current = next.as_str().to_string();
@@ -807,6 +910,9 @@ impl RsiCraftApp {
             if let Some(job) = &self.job {
                 let frac = job.done as f32 / job.total.max(1) as f32;
                 ui.add(egui::ProgressBar::new(frac).desired_height(6.0));
+            }
+            if let Some((class, text)) = &self.last_failure {
+                render_failure_box(ui, class, text);
             }
 
             let max_score = self
@@ -1201,7 +1307,7 @@ impl RsiCraftApp {
                         self.menu_item(ui, "view_cards", "Experience Cards");
                         self.menu_item(ui, "view_lab", "Task and Sandbox Lab");
                         self.menu_item(ui, "view_gpu", "RTX 4090 and LLM");
-                        self.menu_item(ui, "view_dossier", "RSI and Tsinghua Dossier");
+                        self.menu_item(ui, "view_dossier", "What is RSI?");
                         self.menu_item(ui, "view_help", "Help and Tools");
                         ui.separator();
                         self.menu_item(ui, "theme_dark", "Theme: Dark");
@@ -3423,133 +3529,111 @@ impl RsiCraftApp {
 
         ui.add_space(8.0);
         accent_card(ui, ACCENT_AMBER, |ui| {
-            ui.heading("LLM Inference Endpoint & Model Configuration");
+            ui.heading("Model server (provider \"llama\")");
+            ui.label(
+                "Any OpenAI-compatible server: Ollama, LM Studio, llama-server, vLLM or a hosted API. \
+                 Enter the server address (not the full /v1/chat/completions path) and the model name \
+                 exactly as the server lists it, apply, then check. Help page, tab \"Connecting a model\", \
+                 has the details.",
+            );
             ui.horizontal_wrapped(|ui| {
-                ui.label("Base URL (/v1/chat/completions):");
+                ui.label("Server address:");
                 ui.add(egui::TextEdit::singleline(&mut self.llama_url_edit).desired_width(260.0));
-                ui.label("Model Alias:");
-                ui.add(egui::TextEdit::singleline(&mut self.model_alias_edit).desired_width(140.0));
-                if ui.button("[Apply Endpoint to Engine]").clicked() {
-                    self.ctx.llm = rsicraft_core::llm::LlamaClient::new(
-                        &self.llama_url_edit,
-                        &self.model_alias_edit,
-                    );
-                    self.status_banner = format!(
-                        "Updated LLM client -> {} (model={})",
-                        self.llama_url_edit, self.model_alias_edit
-                    );
-                    self.refresh_all();
+                ui.label("Model:");
+                ui.add(egui::TextEdit::singleline(&mut self.model_alias_edit).desired_width(200.0));
+            });
+            ui.horizontal_wrapped(|ui| {
+                ui.label("Presets (address only; keep or type the model name):");
+                for (label, url) in [
+                    ("Ollama :11434", "http://127.0.0.1:11434"),
+                    ("LM Studio :1234", "http://127.0.0.1:1234"),
+                    ("llama-server :8080", "http://127.0.0.1:8080"),
+                ] {
+                    if ui.small_button(label).clicked() {
+                        self.llama_url_edit = url.to_string();
+                    }
                 }
             });
             ui.horizontal_wrapped(|ui| {
-                if ui.small_button("Preset: llama-server (:8081)").clicked() {
-                    self.llama_url_edit = "http://127.0.0.1:8081".to_string();
-                    self.model_alias_edit = "frontis".to_string();
+                if ui.button("[Apply]").clicked() {
+                    self.apply_endpoint();
                 }
-                if ui
-                    .small_button("Preset: Goliath Active Runner (:51907)")
-                    .clicked()
-                {
-                    self.llama_url_edit = "http://127.0.0.1:51907".to_string();
-                    self.model_alias_edit = "frontis".to_string();
-                }
-                if ui.small_button("Preset: Ollama (:11434)").clicked() {
-                    self.llama_url_edit = "http://127.0.0.1:11434".to_string();
-                    self.model_alias_edit = "qwen2.5-coder:7b".to_string();
+                if ui.button("[Apply and check provider]").clicked() {
+                    self.apply_endpoint();
+                    self.check_provider();
                 }
             });
+            if let Some(report) = &self.provider_report {
+                ui.add_space(4.0);
+                render_provider_report(ui, report);
+            }
         });
     }
 
+    /// "What is RSI?" page: the rsi and based_on help tabs, from the same
+    /// source as the CLI and MCP help.
     fn render_rsi_and_tsinghua_dossier(&mut self, ui: &mut egui::Ui) {
-        accent_card(ui, ACCENT_ROSE, |ui| {
-            ui.heading("1. The Western 'Skynet' Narrative & Closed-Door Frontier Labs");
-            ui.label("Since I.J. Good's 1965 'intelligence explosion' hypothesis and Nick Bostrom's Superintelligence (2014), Western policy circles in Washington, London, and Brussels have framed Recursive Self-Improvement (RSI) with ominous apocalyptic undertones: 'Will it become Skynet? Will a self-improving model rewrite its own code in secret and trigger an unstoppable rogue takeoff?'");
-            ui.add_space(4.0);
-            ui.label(
-                RichText::new("How OpenAI & Anthropic Use RSI Rhetoric Behind Closed Doors:")
-                    .strong()
-                    .color(ACCENT_AMBER),
-            );
-            ui.label("- OpenAI Preparedness Framework: Classifies 'AI Self-Improvement' (autonomous ML R&D) as a High/Critical risk threshold. OpenAI executives frequently reference internal o1/o3/o4 self-play and automated researcher loops in Senate testimony and system cards, while keeping every weight, operator prompt, and evaluation harness 100% proprietary.");
-            ui.label("- Anthropic Responsible Scaling Policy (RSP / ASL-4): Explicitly defines 'Autonomy & Automated AI R&D' (Claude autonomously optimizing kernels, training loops, and post-training pipelines) as the trigger for ASL-4 containment. The message to the public is always the same: 'We are running RSI experiments internally, but RSI is far too dangerous and compute-intensive for open-source researchers to touch.'");
-        });
-
-        ui.add_space(8.0);
-        accent_card(ui, ACCENT_CYAN, |ui| {
-            ui.heading("2. The Total Expectation Flip: Tsinghua University & Frontis.AI (arXiv:2607.28568)");
-            ui.label("On July 30, 2026, a 24-researcher team from Tsinghua University, Frontis.AI, and Horizon Research shattered that narrative by publishing 'Frontis-MA1: Training an AI4AI Model towards Recursive Self-Improvement in Machine Learning Engineering' (arXiv:2607.28568) and open-sourcing the entire code stack and weights at https://github.com/FrontisAI/OpenRSI.");
-            ui.add_space(4.0);
-            ui.label(
-                RichText::new("Why It Flipped Every Expectation:")
-                    .strong()
-                    .color(ACCENT_EMERALD),
-            );
-            ui.label("1. Consumer 24 GB GPU Target: Instead of demanding a 10,000-H100 cluster, they explicitly proved and benchmarked their evolutionary loop on MLE-Bench Lite under a strict consumer constraint: a single NVIDIA RTX 4090 over a 12-hour budget.");
-            ui.label("2. Execution-Grounded Science Over Sci-Fi Mysticism: They defined RSI ('AI4AI') not as spooky sentient self-awareness, but as verifiable program evolution governed by four explicit atomic operators (Draft, Improve, Debug, Crossover) and a 3-term composite utility function that prevents search collapse.");
-        });
-
-        ui.add_space(8.0);
-        accent_card(ui, ACCENT_PURPLE, |ui| {
-            ui.heading("3. Meet the Tsinghua University & Frontis.AI Team & Their Objectives");
-            ui.label(
-                RichText::new("Principal Investigators & Senior Architects:")
-                    .strong()
-                    .color(ACCENT_PURPLE),
-            );
-            ui.label("- Prof. Bowen Zhou (Tsinghua University / Shanghai AI Lab): Chair Professor in the Department of Electronic Engineering at Tsinghua University, Dean of Shanghai AI Lab, and former Head of AI Foundations at IBM Research Watson and JD AI. Co-author of the landmark June 2026 survey 'Self-Improving Agents in the Era of Experience: A Survey of Self- to Meta-Evolution'.");
-            ui.label("- Dr. Ning Ding (Tsinghua NLP / OpenBMB / Frontis.AI): Leading Tsinghua researcher behind OpenBMB, UltraFeedback, and MiniCPM, focused on efficient open-weights alignment and agentic post-training.");
-            ui.label("- Kaiyan Zhang (Tsinghua University): Core research lead on execution-grounded reinforcement learning and self-evolving agent harnesses.");
-            ui.label("- Lead & Core Authors (24-Member Team): Junlin Yang, Che Jiang, Yu Fu, Tianwei Luo, Can Ren, Weizhi Wang, Kaikai Zhao, Hongyi Liu, Yuxin Zuo, Yuru Wang, Yuchen Fan, Kai Tian, Zhenzhao Yuan, Xiaojian Lin, Li Sheng, Rushi Qiang, Guoli Jia, Xingtai Lv, Ermo Hua, Dianqiao Lei, Youbang Sun, Ning Ding, Bowen Zhou, and Kaiyan Zhang.");
-            ui.add_space(4.0);
-            ui.label(
-                RichText::new(
-                    "Their 3-Pillar OpenMLE Stack (Subsumed into Pure Rust by RSICraft):",
-                )
-                .strong()
-                .color(ACCENT_CYAN),
-            );
-            ui.label("- OpenMLE-Gym -> RSICraft Task & Sandbox Evaluator (air-gapped Docker / Python 3.12 with RSI_METRIC_JSON feedback).");
-            ui.label("- OpenMLE-ERL & Frontis-MA1 -> RSICraft LlamaClient & 4-Operator Prompt Builder (DRAFT 0.70, IMPROVE 0.40, DEBUG 0.20, CROSSOVER 0.50).");
-            ui.label("- OpenMLE-Evo -> RSICraft Stigmergic SQLite WAL Store + BLAKE3/Zstd CAS + Composite Utility Selector (U_i = 0.50*s + 0.35*d + 0.15*nu).");
-        });
+        ui.heading("What is RSI, and what is rsicraft based on?");
+        ui.label(
+            "The same text is available as `rsicraft help-tabs --tab rsi` and `--tab based_on`, \
+             and over MCP as rsi_help.",
+        );
+        for id in ["rsi", "based_on"] {
+            if let Ok(v) = rsicraft_core::help::query_help(Some(id), None) {
+                render_help_tabs(ui, &v);
+            }
+        }
     }
 
     fn render_multitab_help_and_tools(&mut self, ui: &mut egui::Ui) {
         ui.horizontal_wrapped(|ui| {
-            ui.heading("9-Tab Operator Manual, Geopolitical Dossier & 26 MCP Tools");
+            ui.heading("Help");
             ui.separator();
-            if ui.button("[Open PDF Brochure]").clicked() {
-                self.open_external("docs/brochure/rsicraft-brochure.pdf");
-            }
-            if ui.button("[Open EPUB Handbook]").clicked() {
-                self.open_external("docs/brochure/rsicraft-brochure.epub");
-            }
-            if ui.button("[Open HTML Help Studio]").clicked() {
+            if ui.button("[Open HTML help]").clicked() {
                 self.open_external("docs/help/index.html");
             }
+            if ui.button("[Open the guide (docs/GUIDE.md)]").clicked() {
+                self.open_external("docs/GUIDE.md");
+            }
         });
+        ui.label(
+            "New here? Read 1. Start here, then 4. Quickstart. When something fails, the Live Run \
+             panel names a problem class; 9. Troubleshooting explains each one.",
+        );
 
+        let index: Vec<(String, String)> = self
+            .help_json
+            .get("tabs_available")
+            .and_then(Value::as_array)
+            .map(|a| {
+                a.iter()
+                    .map(|t| {
+                        let s =
+                            |k: &str| t.get(k).and_then(Value::as_str).unwrap_or("").to_string();
+                        (s("id"), s("title"))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
         ui.horizontal_wrapped(|ui| {
-            for (slug, label) in [
-                ("all", "All 9 Tabs"),
-                ("overview", "1. Overview"),
-                ("rsi_landscape", "2. Skynet vs Closed Labs"),
-                ("tsinghua_openrsi", "3. Tsinghua & OpenRSI"),
-                ("wrappee", "4. RTX 4090 & Sandbox"),
-                ("operators", "5. Operators & Math"),
-                ("compare", "6. Competitive Matrix"),
-                ("api", "7. 26 MCP Tools"),
-                ("troubleshoot", "8. Troubleshooting"),
-                ("faq", "9. FAQ & Safety"),
-            ] {
+            let mut pick: Option<String> = None;
+            if ui
+                .selectable_label(self.selected_help_tab == "all", "All")
+                .clicked()
+            {
+                pick = Some("all".to_string());
+            }
+            for (id, title) in &index {
                 if ui
-                    .selectable_label(self.selected_help_tab == slug, label)
+                    .selectable_label(&self.selected_help_tab == id, title)
                     .clicked()
                 {
-                    self.selected_help_tab = slug.to_string();
-                    self.refresh_help();
+                    pick = Some(id.clone());
                 }
+            }
+            if let Some(p) = pick {
+                self.selected_help_tab = p;
+                self.refresh_help();
             }
             ui.separator();
             ui.label("Search:");
@@ -3561,31 +3645,121 @@ impl RsiCraftApp {
             }
         });
 
-        if let Some(tabs) = self.help_json.get("tabs").and_then(Value::as_array) {
-            for t in tabs {
-                let title = t.get("title").and_then(Value::as_str).unwrap_or("");
-                let badge = t.get("badge").and_then(Value::as_str).unwrap_or("");
-                let summary = t.get("summary").and_then(Value::as_str).unwrap_or("");
-                accent_card(ui, ACCENT_CYAN, |ui| {
-                    ui.horizontal_wrapped(|ui| {
-                        ui.heading(title);
-                        ui.label(RichText::new(format!("[{badge}]")).color(ACCENT_EMERALD));
-                    });
-                    ui.label(RichText::new(summary).italics());
-                    if let Some(sections) = t.get("sections").and_then(Value::as_array) {
-                        for s in sections {
-                            ui.separator();
-                            let h = s.get("heading").and_then(Value::as_str).unwrap_or("");
-                            let b = s.get("body").and_then(Value::as_str).unwrap_or("");
-                            ui.label(RichText::new(h).color(ACCENT_AMBER).strong());
-                            ui.label(b);
-                            if let Some(code) = s.get("code_example").and_then(Value::as_str) {
-                                ui.code(code);
-                            }
-                        }
+        if self
+            .help_json
+            .get("matched_tabs_count")
+            .and_then(Value::as_u64)
+            == Some(0)
+        {
+            ui.label("Nothing matches this search.");
+        }
+        render_help_tabs(ui, &self.help_json);
+    }
+}
+
+/// Render the `tabs` of an `rsi_help` result as cards.
+fn render_help_tabs(ui: &mut egui::Ui, help: &Value) {
+    let Some(tabs) = help.get("tabs").and_then(Value::as_array) else {
+        return;
+    };
+    for t in tabs {
+        let title = t.get("title").and_then(Value::as_str).unwrap_or("");
+        let badge = t.get("badge").and_then(Value::as_str).unwrap_or("");
+        let summary = t.get("summary").and_then(Value::as_str).unwrap_or("");
+        accent_card(ui, ACCENT_CYAN, |ui| {
+            ui.horizontal_wrapped(|ui| {
+                ui.heading(title);
+                ui.label(RichText::new(format!("[{badge}]")).color(ACCENT_EMERALD));
+            });
+            ui.add(egui::Label::new(RichText::new(summary).italics()).wrap());
+            if let Some(sections) = t.get("sections").and_then(Value::as_array) {
+                for s in sections {
+                    ui.separator();
+                    let h = s.get("heading").and_then(Value::as_str).unwrap_or("");
+                    let b = s.get("body").and_then(Value::as_str).unwrap_or("");
+                    ui.label(RichText::new(h).color(ACCENT_AMBER).strong());
+                    ui.add(egui::Label::new(b).wrap());
+                    if let Some(code) = s.get("code_example").and_then(Value::as_str) {
+                        ui.code(code);
                     }
-                });
+                }
             }
+        });
+        ui.add_space(6.0);
+    }
+}
+
+/// A step or provider failure, wrapped and readable: what happened, and the
+/// fix on its own line. Text format from the core: "[llm:<class>] what | fix: how".
+fn render_failure_box(ui: &mut egui::Ui, class: &str, text: &str) {
+    let (what, fix) = match text.split_once(" | fix: ") {
+        Some((w, f)) => (w, Some(f)),
+        None => (text, None),
+    };
+    let what = what
+        .strip_prefix(&format!("[llm:{class}] "))
+        .unwrap_or(what);
+    egui::Frame::new()
+        .stroke(Stroke::new(1.5, ACCENT_ROSE))
+        .corner_radius(CornerRadius::same(4))
+        .inner_margin(egui::Margin::same(8))
+        .show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.label(
+                RichText::new(format!("Problem: {class}"))
+                    .color(ACCENT_ROSE)
+                    .strong(),
+            );
+            ui.add(egui::Label::new(what).wrap());
+            if let Some(fix) = fix {
+                ui.label(RichText::new("Fix:").color(ACCENT_EMERALD).strong());
+                ui.add(egui::Label::new(fix).wrap());
+            }
+            ui.label(RichText::new("Help page, tab Troubleshooting, explains every class.").weak());
+        });
+}
+
+/// Human view of an `rsi_llm_probe` report.
+fn render_provider_report(ui: &mut egui::Ui, r: &Value) {
+    let ok = r.get("ok").and_then(Value::as_bool).unwrap_or(false);
+    let s = |k: &str| r.get(k).and_then(Value::as_str).unwrap_or("-").to_string();
+    ui.horizontal_wrapped(|ui| {
+        if ok {
+            ui.label(RichText::new("Provider OK").color(ACCENT_EMERALD).strong());
+        } else {
+            ui.label(
+                RichText::new("Provider NOT usable")
+                    .color(ACCENT_ROSE)
+                    .strong(),
+            );
+        }
+        ui.label(format!(
+            "server: {} | address: {} | model: {} | latency: {} ms",
+            s("provider"),
+            s("base_url"),
+            s("configured_model"),
+            r.get("latency_ms").and_then(Value::as_u64).unwrap_or(0)
+        ));
+    });
+    if let Some(f) = r.get("failure").filter(|f| f.is_object()) {
+        let class = f.get("kind").and_then(Value::as_str).unwrap_or("error");
+        let msg = f.get("message").and_then(Value::as_str).unwrap_or("");
+        let fix = f.get("remedy").and_then(Value::as_str).unwrap_or("");
+        render_failure_box(ui, class, &format!("{msg} | fix: {fix}"));
+    }
+    if let Some(ws) = r.get("warnings").and_then(Value::as_array) {
+        for w in ws.iter().filter_map(Value::as_str) {
+            ui.add(
+                egui::Label::new(RichText::new(format!("Warning: {w}")).color(ACCENT_AMBER)).wrap(),
+            );
+        }
+    }
+    if let Some(models) = r.get("available_models").and_then(Value::as_array) {
+        if !models.is_empty() {
+            let names: Vec<&str> = models.iter().filter_map(Value::as_str).collect();
+            ui.collapsing(format!("Models served ({})", names.len()), |ui| {
+                ui.add(egui::Label::new(names.join(", ")).wrap());
+            });
         }
     }
 }
@@ -3682,9 +3856,9 @@ impl eframe::App for RsiCraftApp {
             }
             if ui
                 .button(if self.show_quick_help_modal {
-                    "[x Hide Quick Matrix]"
+                    "[x Hide intro]"
                 } else {
-                    "[? Skynet vs Tsinghua OpenRSI]"
+                    "[? New here]"
                 })
                 .clicked()
             {
@@ -3714,10 +3888,16 @@ impl eframe::App for RsiCraftApp {
         if self.show_quick_help_modal {
             ui.separator();
             accent_card(ui, ACCENT_PURPLE, |ui| {
-                ui.heading("Why RSICraft Flips the Script on Closed Frontier RSI");
-                ui.label("1. Western frontier labs (OpenAI Preparedness Framework, Anthropic ASL-4) treat Recursive Self-Improvement as a classified 'Skynet' threshold to justify keeping their automated AI R&D loops 100% closed.");
-                ui.label("2. Tsinghua University & Frontis.AI (Bowen Zhou, Ning Ding, Kaiyan Zhang, Junlin Yang, Che Jiang et al., arXiv:2607.28568) demystified RSI into an open-weights 4-operator evolutionary science (Draft, Improve, Debug, Crossover) running on a single consumer 24 GB RTX 4090 (FrontisAI/OpenRSI).");
-                ui.label("3. RSICraft compiles that architecture into a Pure-Rust 3-crate workspace (rsicraft-core, rsicraft-mcp, rsicraft-app) with SQLite WAL, BLAKE3/Zstd CAS, and 26 MCP tools.");
+                ui.heading("New here?");
+                ui.add(egui::Label::new("rsicraft lets a language model on your machine write, test and improve small programs in a loop, and records every attempt with its parents. The model itself does not change.").wrap());
+                ui.add(egui::Label::new("1. Try it without a model: provider demo, sandbox demo, then Run campaign on this page. Scores are invented in demo mode.").wrap());
+                ui.add(egui::Label::new("2. Connect a real model on the LLM page (Ollama, LM Studio, llama-server), press Apply and check provider, then choose provider llama and sandbox local or docker.").wrap());
+                ui.add(egui::Label::new("3. Read the Help page: Start here, What is RSI?, Quickstart. Problems appear in the Live Run panel with their fix.").wrap());
+                if ui.button("[Open Help: Start here]").clicked() {
+                    self.page = StudioPage::MultitabHelpAndTools;
+                    self.selected_help_tab = "start".to_string();
+                    self.refresh_help();
+                }
             });
         }
 
@@ -3746,7 +3926,7 @@ fn main() {
             && app.exec(Command::HardwareProfile).is_ok()
             && app
                 .exec(Command::Help {
-                    tab: Some("tsinghua_openrsi".into()),
+                    tab: Some("based_on".into()),
                     search: None,
                 })
                 .is_ok()
@@ -3757,7 +3937,8 @@ fn main() {
             && app.active_dialog == Some(StudioDialog::About);
         if ok {
             println!(
-                "smoke: ok (rsicraft-app {VERSION}, default_view=cards, tools=26, tabs=9, menu=8)"
+                "smoke: ok (rsicraft-app {VERSION}, default_view=cards, tools=26, help_tabs={}, menu=8)",
+                rsicraft_core::help::tab_ids().len()
             );
             std::process::exit(0);
         }
