@@ -96,15 +96,15 @@ $$U_i = 0.50 \cdot s_{\text{norm}, i} + 0.35 \cdot \Delta_{\text{norm}, i} + 0.1
 
 ## Tab 6: Competitive Architecture Matrix (`compare`)
 
-| Feature / Metric | OpenAI / Anthropic RSI | DeepMind FunSearch | `FrontisAI/OpenRSI` (Python) | **RSICraft (`0.2.0` Rust)** |
+| Feature / Metric | OpenAI / Anthropic RSI | DeepMind FunSearch | `FrontisAI/OpenRSI` (Python) | **RSICraft (`0.3.1` Rust)** |
 | :--- | :--- | :--- | :--- | :--- |
 | **Weights & Harness** | 100% Closed / Proprietary | Partial Python scripts | Open Weights + Python Stack | **Pure Rust 3-Crate + Native GPU Studio** |
 | **Hardware Target** | Datacenter H100 clusters | Cloud TPUs / containers | Single RTX 4090 (Python) | **Single RTX 4090 (<15 ms Rust startup)** |
 | **Artifact Storage** | Proprietary cloud | Raw strings | Files on disk | **SQLite `WAL` + BLAKE3 + Zstd L3 CAS** |
 | **Parent Selection** | Undisclosed | Island Boltzmann score | $U_i$ Composite Utility | **$U_i = 0.50s + 0.35\Delta + 0.15\nu$ in SQLite** |
-| **Frontis Ladder Coverage** | Closed Industrial R&D | Rung 1 (Heuristic Search) | Rung 1 (Search Prototype) | **Full Rungs 1--4 (Evolution to Closed-Loop RSI)** |
-| **Search Policy Engine** | Proprietary RL | Static Island Mutation | Fixed Operator Schedule | **Bayesian Thompson Sampling Bandit ($\text{Beta}(\alpha, \beta)$)** |
-| **Closed-Loop Model Update** | Closed Cloud Retraining | None (Frozen Weights) | Offline Research Scripts | **In-the-Loop LoRA ($G_t \to G_{t+1}$) + Promotion Gate** |
+| **Frontis Ladder Coverage** | Closed Industrial R&D | Rung 1 (Heuristic Search) | Rung 1 (Search Prototype) | **Rung 1 running. Export, train script, and alias gate exist. Loop not closed.** |
+| **Search Policy Engine** | Proprietary RL | Static Island Mutation | Fixed Operator Schedule | **Fixed 4-operator cycle. Bandit is advisory and unused.** |
+| **Closed-Loop Model Update** | Closed Cloud Retraining | None (Frozen Weights) | Offline Research Scripts | **Not closed. Training does not change the active model.** |
 | **Desktop Studio** | None | None | None | **Native `eframe`/`egui 0.37` Bézier DAG Studio** |
 | **MCP Support** | None | None | None | **26 Stdio Tools (`2024-11-05`)** |
 

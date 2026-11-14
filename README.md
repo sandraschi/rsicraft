@@ -1,6 +1,6 @@
 # RSICraft
 
-> **Status (2026-11-10):** the evolution loop is real and verified against a live local model. Trace export, a real promotion gate and a LoRA harness exist, but no model generation has been trained yet, so the meta-evolution rung of the Frontis ladder is **not** reached. Passages below that say otherwise predate this note. Honest state and plan: [docs/FRONTIS_PARITY_PLAN.md](docs/FRONTIS_PARITY_PLAN.md).
+> **Status (2026-11-14):** the evolution loop is real. Trace export, a promotion gate, and a LoRA harness exist. No model generation has been trained. Campaigns use a fixed operator cycle. The bandit is advisory and unused. pack-v1 median amplification was 1.18. pack-v2 on a 9B model produced a success card in 2 of 15 runs. Honest state: [docs/FRONTIS_PARITY_PLAN.md](docs/FRONTIS_PARITY_PLAN.md). Measurements: [docs/BENCH_MODELSWAP_V2.md](docs/BENCH_MODELSWAP_V2.md), [docs/BENCH_AMP_V2.md](docs/BENCH_AMP_V2.md).
 
 [![Rust 1.85+](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org)
 [![ArtCraft 3-Crate](https://img.shields.io/badge/ArtCraft-3--Crate_Standard-0ea5e9.svg)](docs/ARCHITECTURE.md)
@@ -40,7 +40,7 @@ For years, Western AI discourse framed **Recursive Self-Improvement (RSI)** with
 On **July 30, 2026**, a 24-researcher team from **Tsinghua University**, **Frontis.AI**, and **Horizon Research** led by **Junlin Yang, Che Jiang, Yu Fu, Tianwei Luo, Ning Ding, Bowen Zhou, and Kaiyan Zhang** flipped that expectation completely ([`arXiv:2607.28568`](https://arxiv.org/abs/2607.28568), [`FrontisAI/OpenRSI`](https://github.com/FrontisAI/OpenRSI)):
 1. **Open Science Over Secrecy:** They formulated RSI ("AI4AI") as an executable, falsifiable optimization loop governed by four explicit atomic program-evolution operators (`Draft`, `Improve`, `Debug`, `Crossover`) and a 3-term composite utility function that prevents population collapse.
 2. **Single RTX 4090 Over 10,000-H100 Bunkers:** They benchmarked `Frontis-MA1` + `OpenMLE-Evo` on *MLE-Bench Lite* under a strict consumer hardware cap: **a single NVIDIA RTX 4090 over a 12-hour budget**.
-3. **Pure-Rust ArtCraft Hardening (`RSICraft`):** While `FrontisAI/OpenRSI` is a Python research stack, **RSICraft** compiles their exact mathematical and evolutionary architecture into a **zero-panic 3-crate Rust binary + native GPU `egui 0.37` desktop studio + 26-tool MCP server**, implementing the complete 4-rung ladder: (1) variance-hardened multi-trial evolution, (2) SFT/DPO trace curation, (3) Bayesian Thompson Sampling bandit operator control, and (4) in-the-loop LoRA fine-tuning ($G_t \to G_{t+1}$) with comparative promotion/rollback gates.
+3. **Pure-Rust ArtCraft Hardening (`RSICraft`):** While `FrontisAI/OpenRSI` is a Python research stack, **RSICraft** is the three-tier workstation for that loop: core engine, 26-tool CLI and MCP server, and the `egui 0.37` studio. The search rung is measured. Trace export, operator statistics, the LoRA harness, and the Welch t gate are in the same binary. Campaigns still use a fixed operator cycle. No generation has been trained. The studio has the 8-menu bar and the five Help dialogs. Undo, redo, and a database file picker are not in it.
 
 ---
 

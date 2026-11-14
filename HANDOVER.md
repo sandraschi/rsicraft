@@ -1,44 +1,57 @@
 # RSICraft - Handover State
 
-**Date:** 2026-11-10 (evening)
-**Status:** Evolution loop real and verified live. Meta-evolution NOT reached. See `docs/FRONTIS_PARITY_PLAN.md`.
+**Date:** 2026-11-14
+**Status:** Tiers 1-4 built (core, 26-tool CLI/MCP with `--smoke`, studio, 8-menu bar). Search measured. Export, operator statistics, LoRA harness, and promotion gate are in the binary. pack-v1 and pack-v2 both fail the amplification gate. No generation trained. Undo, redo, and a database file picker are not in the studio.
+**Read first:** `docs/FRONTIS_PARITY_PLAN.md` (state table, section 1a), `docs/BENCH_MODELSWAP_V2.md`, and `docs/BENCH_AMP_V2.md`.
 
-## Correction to the earlier handover
+## What changed since 2026-11-10
 
-The handover written at 13:23 on this date claimed "Frontis Ladder Full Parity Implemented & Verified" with no blockers. That was not true:
+- Model-swap benchmark `modelswap-v2` ran 26 of 36 runs and was stopped by hand. Findings:
+  - Frontis-MA1-35B is inside or below the base model's range on five of six pack-v1 tasks (one complete trial).
+  - Median search amplification (final best / first working candidate) is 1.18, inside the 20 to 30% trial noise. 9 of 25 runs had a fresh DRAFT as their best card.
+  - 25 to 33% of 35B steps produced no card. Cause not diagnosed.
+- New: `tasks/pack-v2` (tsp, maxcut, regression, schedule, classify; quality-scored, no timing noise), `scripts/bench-analyze.ps1`, and `bench-models.ps1` now saves the full campaign report per run.
+- PRD rewritten around gated goals (PRD section 5). The amplification gate is now mandatory before any training.
 
-- `rsi_train_step` never trained anything. It printed a hardcoded loss curve (1.84 falling by 0.42 per epoch), always passed `--dry-run` to the harness, and advanced the model generation anyway.
-- `sandboxes/train_lora.py` had no training code path at all.
-- `rsi_promote_gate` ran no evaluation. It gave every candidate a constant +4.5% and promoted it.
-- The model generation on a task had no effect: steps always used the process-wide model alias.
-- The "Thompson sampling" bandit is a posterior-mean argmax with hand-set biases and is not used by campaigns.
+## pack-v2 result (finished 2026-11-12 15:04)
 
-The first four are fixed. The bandit is still mislabeled and unwired (Phase 1 in the plan).
+The 9B amplification run completed. Report: `docs/BENCH_AMP_V2.md`. Raw files: `%LOCALAPPDATA%\rsicraft\bench\amp-v2-qwen9b\`.
 
-## What is real now
+- 15 of 15 runs finished. 13 have zero success cards.
+- The only scores are schedule trial 2 (252.67, one card) and classify trial 3 (64.25, four cards).
+- The 1.5 amplification gate was not met. Do not train on this pack.
+- `bench.log` names two repeating failures: the completion budget was spent on reasoning with no code drafted, and Ollama HTTP 500. Diagnosis is not finished.
+- Model alias `rsi-qwen9b` needs `num_ctx 16384`. Without that cap Ollama loads a 262,144-token context and spills the 4090 to CPU.
 
-- 4-operator evolution loop, store, sandboxes: verified live against Ollama `gemma4:12b` with the local sandbox.
-- Step pipeline in three phases (`plan_step`, `run_step`, `commit_step`); the desktop app runs steps, campaigns and lab evaluations on a worker thread with a live run panel and a stop button.
-- `rsi_train_step`: exports chat-format JSONL and runs the PEFT harness. Trains or fails; a dry run changes nothing; training never changes the active model. **The harness has not been run end to end.**
-- `rsi_promote_gate`: real A/B over fresh searches on scratch task copies, Welch t >= 2 to promote. Needs a live endpoint serving both aliases and a real sandbox.
-- Reasoning-model handling: 12,288-token default (`RSICRAFT_MAX_TOKENS`), salvage of the last drafted code block when the answer is empty, dedent of code fences nested in lists.
+## Next steps, in order
+
+1. Treat the product as a search tool until a pack produces a working candidate on most runs. Designing a new pack is optional. Training is not next.
+2. Diagnose the no-card and aborted steps from the saved campaign JSON (35B pack-v1 and 9B pack-v2). Suspect remains the 12,288-token completion budget against a 16,384-token context.
+3. Make `rsi-base-35b` and `rsi-frontis-35b` identical in parameters (the base alias has extra stop tokens and a temperature line).
+4. The 35B pack-v2 comparison stays blocked until step 2 is fixed.
+5. Then the rest of Phase 1 in the plan (token accounting, `runs` table, real bandit, ablations).
+
+## What is real, what is not
+
+Unchanged from the state table in the plan, section 2. Short form:
+- Real: evolution loop, sandboxes, store, three-phase step pipeline, worker-thread studio, real promotion gate, task packs, benchmark scripts.
+- Real code, never run end to end: `rsi_train_step` with `sandboxes/train_lora.py`.
+- Missing: adapter serving, held-out split in the store, token accounting, agentic steps.
+- Mislabeled: `bandit.rs` is advisory statistics, not Thompson sampling, and campaigns do not use it.
 
 ## Verification
 
-- `cargo clippy --workspace --all-targets --all-features -- -D warnings`: clean.
-- `cargo test --workspace`: 33 pass (28 core, 2 mcp, 3 app).
-- `cargo fmt --all --check`: clean.
-- Not verified: the egui live panel has not been looked at on screen; `train_lora.py`; the gate against two real models.
+- 2026-11-14: `cargo test --workspace` 38 passed (30 core, 4 mcp, 4 app) after `cli_smoke_checks_status_hardware_help_and_tool_count`. `cargo clippy --workspace --all-targets -- -D warnings` and `cargo fmt --all --check` were clean on the menu-bar pass. Release build re-runs the gates.
+- pack-v2 evaluators were checked earlier with a weak and a medium candidate each.
+- An uncommitted light-theme contrast edit in `crates/rsicraft-app/src/main.rs` was already in the tree. This pass did not make it.
+- Not verified: the egui Live Run panel on screen; `train_lora.py`; the promotion gate against two real models.
 
-## Blockers
+## Documentation debt
 
-See section 3 of the plan. The short list: no trained adapter can be served yet, no held-out task split, one task's traces are far too few to train on, and the 35B model cannot be fine-tuned on a 24 GB card.
-
-## Repo state
-
-Everything since `a9a5b6f` is uncommitted on `main` (two agents' work plus this session). Review and commit before the next large change.
+The README body, architecture page, essays, in-app help, HTML help, brochure HTML, and tiered plan were corrected on 2026-11-14 so they no longer say the 4-rung ladder or Thompson sampling are implemented. The 8-menu bar and five Help dialogs were added to the studio the same day. `docs/brochure/rsicraft-brochure.html` was edited in place, then EPUB and PDF were recompiled with the BookCraft script. The changelog title of v0.3.0 still says "4-rung Frontis ladder"; the correction paragraph under it is the one to trust.
 
 ## Local environment notes (Goliath)
 
 - Port 8081 (default `--llama-url`) is held by Docker. Use `--llama-url http://127.0.0.1:11434` for Ollama.
-- `qwen3.6-35b-a3b` (the Frontis-MA1-35B base model) is already in Ollama. The Frontis-MA1 GGUF is not downloaded.
+- Ollama aliases created for this project: `rsi-base-35b`, `rsi-frontis-35b`, `rsi-qwen9b`.
+- Frontis-MA1 weights are CC BY-NC 4.0: personal and research use only.

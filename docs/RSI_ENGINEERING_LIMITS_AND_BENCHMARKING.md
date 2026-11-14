@@ -1,6 +1,6 @@
 # RSI Engineering Manual: Limits, Mathematics, Trajectories, and Benchmarking
 
-> Technical specification, execution budgets, statistical variance control, and verification methodology for **RSICraft v0.2.0** across the 4-rung Frontis evolutionary ladder on consumer 24 GB hardware (**Goliath**: RTX 4090 24GB + Frontis-MA1 / OpenRSI).
+> Limits, model notes, and a verification sketch for RSICraft on one RTX 4090. **Status (2026-11-14):** tiers 1-3 are built (core, CLI/MCP, studio). The search rung is measured. Trace export, operator statistics, the LoRA harness, and the promotion gate are in the binary. Campaigns do not use the bandit. No generation has been trained. Measured runs: `docs/BENCH_MODELSWAP_V2.md`, `docs/BENCH_AMP_V2.md`. Sections below that give second-scale campaign times or Thompson sampling as the live controller predate those runs.
 
 ---
 
@@ -52,17 +52,17 @@ def solve(arr):
 
 ## 2. The 4-Rung Frontis Evolutionary Ladder
 
-RSICraft provides complete end-to-end implementation of the four rungs defined by Tsinghua University and Frontis.AI (`arXiv:2607.28568`):
+The four rungs below are the Frontis taxonomy (`arXiv:2607.28568`). The workstation around them is built (core, CLI/MCP, studio). Search is measured. Export, operator statistics, the LoRA harness, and the alias gate are in the binary. The loop has not trained a generation:
 
 ```
-                                    [ RUNG 4: CLOSED-LOOP RSI ]
-                                    Model Retraining (LoRA G_t -> G_{t+1})
-                                    Statistical Promotion & Rollback Gate
+                                    [ RUNG 4: NOT CLOSED ]
+                                    LoRA script, active model unchanged
+                                    Welch t gate on two served aliases
                                               ^
                                               |
                                    [ RUNG 3: META-EVOLUTION ]
-                                   Bayesian Thompson Sampling Bandit
-                                   Dynamic Operator Policy Optimization
+                                   Advisory statistics only
+                                   Campaigns keep a fixed cycle
                                               ^
                                               |
                                   [ RUNG 2: SELF-EVOLUTION ]
@@ -98,9 +98,9 @@ RSICraft provides complete end-to-end implementation of the four rungs defined b
   - $\text{Rejected}$: Candidate with inferior utility or execution failure.
 - **Tooling:** `rsi_dataset_export` / `rsicraft dataset-export --task-id <id> --format sft|dpo|all`.
 
-### Rung 3: Meta-Evolution (Dynamic Bayesian Thompson Sampling Bandit)
-- **Engine:** `rsicraft_core::bandit`.
-- **Bayesian Formalism:** Rather than hardcoded round-robin schedules, operator selection is governed by a Multi-Armed Bandit with Beta conjugate distributions:
+### Rung 3: Operator statistics (not the campaign policy)
+- **Engine:** `rsicraft_core::bandit`. Campaigns do not call it. They use a fixed four-operator cycle.
+- **What the module computes:** per-operator Beta posterior means, not a Thompson draw. The formulas below describe that advisory score, not a sampler that picks the next step:
   $$\theta_k \sim \text{Beta}(\alpha_k, \beta_k), \quad k \in \{\text{Draft}, \text{Improve}, \text{Debug}, \text{Crossover}\}$$
 - **Reward Function:** When operator $k$ produces child $C_i$ from parent $P$, the empirical reward is:
   $$r = \text{clamp}\!\left(\frac{\Delta_i}{\Delta_{\max}}, 0, 1\right)$$
@@ -109,7 +109,7 @@ RSICraft provides complete end-to-end implementation of the four rungs defined b
 - **Contextual Phase Detection:**
   - *Bootstrapping* ($N < 5$): Forces high-entropy `DRAFT` exploration.
   - *Error Recovery* ($\text{error\_rate} > 60\%$): Dynamically prioritizes deterministic `DEBUG` stack-trace repair.
-  - *Adaptive Bayesian* ($N \ge 5$): Draws Thompson samples $\theta_k$ to balance exploration against exploitation.
+  - *Adaptive Bayesian* ($N \ge 5$): label on the advisory ranking. It does not draw $\theta_k$ and it does not change the campaign.
 - **Tooling:** `rsi_bandit_status` / `rsicraft bandit --task-id <id>`.
 
 ### Rung 4: Closed-Loop RSI (Local LoRA Training and Promotion Gate)
@@ -119,11 +119,8 @@ RSICraft provides complete end-to-end implementation of the four rungs defined b
   - LoRA Hyperparameters: Rank $r = 16$, scaling factor $\alpha = 32$, dropout $p = 0.05$.
   - Target Modules: Attention projections (`q_proj`, `k_proj`, `v_proj`, `o_proj`).
   - Memory Footprint: Fits entirely within 18.5 GB VRAM during gradient computation.
-- **Generation Tracking:** Manages model generations $G_0 \to G_1 \to \dots \to G_t$, persisting timestamped adapter weights in the store.
-- **Statistical Promotion Gate:** Before candidate generation $G_{t+1}$ replaces baseline $G_t$, both models evaluate held-out benchmark tasks across $K$ repeated trials. The gate computes the empirical delta:
-  $$\Delta_{\text{eval}} = \bar{s}(G_{t+1}) - \bar{s}(G_t)$$
-  - *Promotion:* If $\Delta_{\text{eval}} > \epsilon$, $G_{t+1}$ is promoted and becomes the generator for subsequent evolutionary campaigns.
-  - *Rollback:* If $\Delta_{\text{eval}} \le \epsilon$ or regression is detected, the candidate adapter is rejected and the system automatically rolls back to $G_t$.
+- **Generation tracking that exists:** a task can store `active_model_alias` and `active_model_gen`. Training does not write those. The promotion gate does, and only after Welch $t \ge 2$ on two aliases the endpoint already serves. Adapter files are not stored as the active model.
+- **Held-out split:** task files can say `split: heldout`. The store and the gate ignore it.
 - **Tooling:** `rsi_train_step` (`rsicraft train`) and `rsi_promote_gate` (`rsicraft promote`).
 
 ---
@@ -148,7 +145,7 @@ Total wall-clock duration for an evolutionary campaign is governed by:
 
 $$T_{\text{total}} = N \cdot \left( \frac{\text{Tokens}}{\text{Tok/Sec}} + T_{\text{compile}} + \sum_{j=1}^{\text{trials}} T_{\text{run}, j} + T_{\text{CAS}} \right)$$
 
-On Goliath (RTX 4090 + AMD Ryzen 9 7900X) operating Frontis-MA1:
+The table below is an old projection (about 2.5 seconds per candidate, bandit-driven gains). The 2026-11 runs did not look like this: reasoning steps took tens of seconds to minutes, and pack-v2 mostly failed to produce a working program. Treat the rows as a sketch that the measurements replaced.
 
 | Generations ($N$) | Avg Time per Candidate | Total Duration | Primary Operator Dynamic | Expected Pareto Frontier Trajectory |
 |---|---|---|---|---|
@@ -174,7 +171,7 @@ rsicraft campaign --task-id my-task --steps 5 --provider llama --sandbox-mode lo
 ```
 
 ### Step 2: Evolutionary Search and Dataset Curation
-Run an autonomous campaign driven by the Bayesian Thompson Sampling bandit:
+Run a campaign. The operator order is the fixed cycle, not the bandit:
 ```bash
 rsicraft campaign --task-id my-task --steps 100 --provider llama --sandbox-mode local
 rsicraft dataset-export --task-id my-task --format all --out ./traces_task.json
@@ -183,13 +180,13 @@ rsicraft dataset-export --task-id my-task --format all --out ./traces_task.json
 ### Step 3: Closed-Loop Adapter Training ($G_0 \to G_1$)
 Execute the parameter-efficient LoRA training step on the curated experience traces:
 ```bash
-rsicraft train --task-id my-task --dataset-path ./traces_task.json
+rsicraft train --task-id my-task --epochs 3
 ```
 
 ### Step 4: Comparative Promotion Gate
 Benchmark candidate generation $G_1$ against baseline $G_0$ on the held-out validation suite over $K=5$ repeated trials:
 ```bash
-rsicraft promote --task-id my-task --candidate-alias frontis-g1 --baseline-alias frontis --trials 5 --steps 4 --sandbox-mode local
+rsicraft promote --task-id my-task --candidate frontis-g1 --baseline frontis --trials 5 --steps 6 --sandbox-mode local
 ```
 The system interleaves searches between both arms, evaluates Welch's t-statistic ($t \ge 2.0$), and promotes $G_1$ as the task's default model alias only when improvement is statistically significant.
 

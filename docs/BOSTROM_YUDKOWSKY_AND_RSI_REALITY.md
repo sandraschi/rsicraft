@@ -94,7 +94,7 @@ The evolutionary loop begins externalizing memory into durable training traces. 
 - Direct contrastive sibling pairs sharing a common parent, formatting them into Direct Preference Optimization (DPO) chosen/rejected pairs.
 
 ### Rung 3: Meta-Evolution (Adaptive Operator Policy)
-Rather than cycling through operators with static heuristics, the meta-evolutionary controller models operator selection as a dynamic Multi-Armed Bandit using Bayesian Thompson Sampling. With Beta conjugate priors $\text{Beta}(\alpha_k, \beta_k)$, the system continuously shifts its probability distribution across operators based on real-time search phase telemetry:
+The paper's meta-evolution rung would replace a fixed operator cycle with a multi-armed bandit. RSICraft does not do that. Campaigns walk a fixed cycle. `rsi_bandit_status` only reports posterior means. The design that is not built would shift weight across operators like this:
 - Prioritizing high-entropy `DRAFT` exploration during initial cold starts.
 - Prioritizing stack-trace `DEBUG` interventions when sandbox failure rates spike.
 - Converging toward `IMPROVE` and `CROSSOVER` as candidates populate the Pareto frontier.
@@ -104,7 +104,7 @@ The loop finally closes over the model itself. The curated traces from Rung 2 ar
 
 Before $G_{t+1}$ is granted generation authority, it must pass a strict **Statistical Promotion Gate**: it is evaluated across repeated benchmark trials against the baseline $G_t$. If $G_{t+1}$ demonstrates statistically significant improvement over $G_t$, it is promoted to the active model alias. If it regresses or exhibits catastrophic forgetting, the system executes an automated rollback to $G_t$.
 
-Only when all four rungs are operational does a system earn the title of Recursive Self-Improvement.
+Only when all four rungs are operational does a system earn the title of Recursive Self-Improvement. RSICraft ships the core, the 26-tool CLI/MCP server, and the studio. Search is measured. Export, operator statistics, the LoRA harness, and the promotion gate are in that binary. The bandit does not choose operators. No generation has been trained. See `docs/FRONTIS_PARITY_PLAN.md`.
 
 ---
 

@@ -19,7 +19,7 @@ flowchart TD
         MCP["MCP 2024-11-05 Stdio Server (26 Tools)"]
     end
 
-    subgraph L1["L1: crates/rsicraft-core (Engine, Store & Rungs 1-4)"]
+        subgraph L1["L1: crates/rsicraft-core (Engine and Store)"]
         BUS["Command::dispatch Command Bus"]
         
         subgraph R1["Rung 1: Evolution Engine"]
@@ -32,13 +32,13 @@ flowchart TD
             DATA["Dataset Curator\nSFT Positive Deltas | DPO Sibling Pairs"]
         end
 
-        subgraph R3["R3: Meta-Evolution Engine"]
-            BANDIT["Bayesian Thompson Sampling Bandit\nBeta Priors | Phase Transitions"]
+        subgraph R3["R3: Operator statistics (advisory)"]
+            BANDIT["Per-operator Beta means\nNot sampled | Unused by campaigns"]
         end
 
-        subgraph R4["R4: Closed-Loop RSI Engine"]
-            TRAIN["LoRA Training Coordinator\nRTX 4090 QLoRA (G_t -> G_{t+1})"]
-            GATE["Statistical Promotion Gate\nComparative Benchmark & Auto-Rollback"]
+        subgraph R4["R4: Train harness and alias gate"]
+            TRAIN["LoRA script\nCandidate adapter only | Active model unchanged"]
+            GATE["Welch t gate\nTwo served aliases | No adapter load"]
         end
     end
 
@@ -62,9 +62,9 @@ flowchart TD
 ### 2.1 Multi-Trial Sandbox Runner (`crates/rsicraft-core/src/sandbox.rs`)
 To prevent the evolutionary search loop from selecting measurement noise or transient scheduler fluctuations:
 - **Execution Gateway:** The unified `evaluate` entry point accepts candidate source code, task evaluator scripts, and a trial parameter (`trials: u32`, default 1).
-- **Single Compilation, Multi-Trial Run:** In native Rust sandbox mode, candidate code and evaluator harness compile once into a temporary binary (`rustc --crate-type=bin`), which is then executed $N$ times.
+- **Compile once, run N times:** The candidate compiles as an rlib (`rustc --crate-type=rlib --crate-name=candidate`). The evaluator compiles to a binary that links that rlib. The binary then runs $N$ times. Evolutionary steps call this with `trials = 1`.
 - **Statistical Metric Extraction:** Computes sample mean ($\bar{s}$), sample standard deviation ($s$), and logs `runs_count` directly into the database card telemetry.
-- **Air-Gapped Docker Mode:** Evaluates Python candidates inside rootless containers (`sandboxes/Dockerfile.evaluator`) with `--network none`, `--read-only`, `--cap-drop ALL`, `--user 10000:10001`, and a 50 ms polling watchdog reaper.
+- **Air-Gapped Docker Mode:** Evaluates Python candidates inside containers (`sandboxes/Dockerfile.evaluator`) with `--network none`, `--read-only`, `--cap-drop ALL`, `--security-opt no-new-privileges`, `--user 10000:10001`, `--pids-limit 256`, `--memory 4g`, `--cpus 4`, and a 50 ms polling reaper.
 
 ### 2.2 Content-Addressable Storage and Utility Selector (`store/`)
 - **Stigmergic Persistence:** SQLite WAL engine (`schema.sql`) maintains relational tables for `tasks`, `experience_cards`, and materialized `task_frontiers`.
@@ -77,17 +77,15 @@ To prevent the evolutionary search loop from selecting measurement noise or tran
 - **SFT Trajectory Mining:** Identifies positive evolutionary leaps ($\Delta_i \ge \Delta_{\min}$) and successful `DEBUG` repairs from compiler/runtime errors, packaging them into standardized prompt-completion records.
 - **Contrastive DPO Pairs:** Finds sibling branches descending from a common parent node, pairing superior performers with inferior or failed siblings for offline preference alignment.
 
-### 2.4 Meta-Evolutionary Bandit Engine (`bandit.rs`)
-- **Bayesian Thompson Sampling:** Models operator selection via Beta conjugate priors $\text{Beta}(\alpha_k, \beta_k)$ across the four action arms (`Draft`, `Improve`, `Debug`, `Crossover`).
-- **Dynamic Phase Shifting:**
-  - `Bootstrapping`: Forces initial diversity when card count $N < 5$.
-  - `ErrorRecovery`: Shifts allocation toward deterministic `DEBUG` repair when sandbox error rates exceed 60%.
-  - `AdaptiveBayesian`: Samples posterior distributions to automatically balance exploitation of winning operators against exploration of stalled branches.
+### 2.4 Operator statistics (`bandit.rs`)
+- **Advisory only.** Ranks the four operators by Beta posterior mean plus hand-set biases. It does not draw a Thompson sample.
+- **Unused by campaigns.** `campaign_operator` walks a fixed DRAFT, IMPROVE, DEBUG, CROSSOVER cycle, with IMPROVE as the fallback when DEBUG or CROSSOVER has nothing to work on.
+- The phase labels in the status payload (`Bootstrapping`, `ErrorRecovery`, `AdaptiveBayesian`) describe that ranking. They do not change the campaign schedule.
 
-### 2.5 Closed-Loop Model Generation and Promotion Gate (`trainer.rs` & `lib.rs`)
-- **RTX 4090 LoRA Harness:** Orchestrates consumer GPU fine-tuning (`sandboxes/train_lora.py`) utilizing 4-bit NormalFloat base quantization and rank 16 low-rank adapters. Produces candidate adapters without modifying the active generation until passing the promotion gate.
-- **Model Lineage:** Tracks generation transitions ($G_0 \to G_1 \to \dots \to G_t$), updating the task's promoted model alias in SQLite WAL.
-- **Welch's $t$-Test Promotion Gate:** Benchmarks candidate generation $G_{t+1}$ against baseline $G_t$ over $K$ repeated evaluation trials (interleaved to cancel host-side performance drift). If Welch's $t \ge 2.0$, the candidate is promoted; otherwise, rollback is preserved.
+### 2.5 Training harness and promotion gate (`trainer.rs` and `lib.rs`)
+- **LoRA harness:** `rsi_train_step` exports chat JSONL and runs `sandboxes/train_lora.py`. It produces a candidate adapter or it fails. A dry run changes nothing. Training does not change the active model. The script has not been run end to end on Goliath.
+- **No adapter serving.** Nothing converts a LoRA adapter to GGUF or registers an endpoint alias.
+- **Welch t gate:** `rsi_promote_gate` runs fresh searches of two aliases the endpoint already serves, interleaved, and promotes the candidate alias only when $t \ge 2$. It refuses the demo sandbox. A loss keeps the task's current alias. It does not roll weights back, because training never installed them.
 
 ### 2.6 The 3-Phase Step Pipeline (`plan_step` / `run_step` / `commit_step`)
 To prevent multi-minute LLM completions or sandbox runs from holding SQLite database locks:
