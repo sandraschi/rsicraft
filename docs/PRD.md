@@ -8,9 +8,9 @@
 
 Build **`rsicraft`**, a pure-Rust, zero-panic studio, CLI, and MCP server for **LLM-guided evolutionary program search**, and use it as a bench to test, with measurements, how far the self-improvement ladder of **Frontis-MA1 / OpenRSI (`OpenMLE-Evo`)** by **Tsinghua University**, **Frontis.AI**, and **Horizon Research** ([`arXiv:2607.28568`](https://arxiv.org/abs/2607.28568), [`FrontisAI/OpenRSI`](https://github.com/FrontisAI/OpenRSI)) can be climbed on one consumer GPU.
 
-**What the product is today:** all three crates. `rsicraft-core` holds the store, the four operators, the sandboxes, trace export, operator statistics, the LoRA harness, and the promotion gate. `rsicraft-mcp` is the 26-tool CLI and MCP server. `rsicraft-app` is the egui studio (lineage DAG, live run, seven pages). **What has not happened:** no generation has been trained, and campaigns still use a fixed operator cycle. The studio has the 8-menu bar. Undo, redo, and a database file picker are not in it. Recursive self-improvement is the bench question. The paper itself claims meta-evolution with one generation and disclaims general RSI. Status and measurements: [FRONTIS_PARITY_PLAN.md](FRONTIS_PARITY_PLAN.md), [BENCH_MODELSWAP_V2.md](BENCH_MODELSWAP_V2.md), [BENCH_AMP_V2.md](BENCH_AMP_V2.md).
+**What the product is today:** all three crates. `rsicraft-core` holds the store, the four operators, the sandboxes, trace export, operator statistics, the LoRA harness, the promotion gate, and classified LLM errors (a campaign preflights the provider, and a step with no top-level function is `no_code`). `rsicraft-mcp` is the 26-tool CLI and MCP server. `rsicraft-app` is the egui studio (lineage DAG, live run, seven pages, the same 10-tab manual as `rsicraft help-tabs`). **What has not happened:** no generation has been trained, and campaigns still use a fixed operator cycle. The studio has the 8-menu bar. Undo, redo, and a database file picker are not in it. Recursive self-improvement is the bench question. The paper itself claims meta-evolution with one generation and disclaims general RSI. Status and measurements: [FRONTIS_PARITY_PLAN.md](FRONTIS_PARITY_PLAN.md), [BENCH_MODELSWAP_V2.md](BENCH_MODELSWAP_V2.md), [BENCH_AMP_V2.md](BENCH_AMP_V2.md).
 The system manages an open-ended evolutionary search loop over executable code candidate spaces on a single consumer 24 GB GPU (**Goliath**: AMD Ryzen 9 7900X, 64 GB DDR5, NVIDIA GeForce RTX 4090 24 GB VRAM), maintaining persistent stigmergic state in SQLite `WAL` with BLAKE3+Zstd Content-Addressable Storage (CAS), running isolated execution evaluations in sandboxed containers or local Python 3.12 environments, and exposing control via:
-1. **`rsicraft-app` (`L3`)**: A native GPU-rendered `eframe`/`egui 0.37` Desktop Studio with an interactive Bézier Lineage DAG Canvas, 4-operator launchpad, score spark charts, and 9-tab dossier.
+1. **`rsicraft-app` (`L3`)**: A native GPU-rendered `eframe`/`egui 0.37` Desktop Studio with an interactive Bézier Lineage DAG Canvas, 4-operator launchpad, score spark charts, and the 10-tab manual (Help page) plus a "What is RSI?" page.
 2. **`rsicraft-mcp` (`L2`)**: A unified CLI (`--json` + formatted tables) and MCP `2024-11-05` stdio server exposing 26 tools.
 3. **`rsicraft-core` (`L1`)**: The deterministic evolutionary state machine, composite utility selector, and store.
 
@@ -42,7 +42,7 @@ The system manages an open-ended evolutionary search loop over executable code c
    - Materialized `task_frontiers` table tracking the top-K Pareto frontier per task.
 4. **Extended Tooling & Multi-Language Sandboxing**:
    - Line-by-line unified code diffing (`rsi_diff`) between CAS experience cards.
-   - Active LLM endpoint reachability and latency probing (`rsi_llm_probe`).
+   - LLM diagnosis (`rsi_llm_probe`): provider, whether the configured model is served, and warnings. The call itself does not fail.
    - Runtime composite utility hyperparameter inspection and tuning (`rsi_hyperparams_get`, `rsi_hyperparams_set`).
    - Complete task lineage JSON export and import bundles (`rsi_export`, `rsi_import`).
    - Cascading task deletion (`rsi_task_delete`) and Pareto frontier card pruning (`rsi_cards_prune`).
@@ -53,13 +53,13 @@ The system manages an open-ended evolutionary search loop over executable code c
    - Gate 3: `cargo fmt --all --check`.
    - Gate 4: MCP `2024-11-05` stdio probe (`initialize`, `tools/list` = 26 tools, `tools/call`).
    - Gate 5: Committed `Cargo.lock`.
-   - Gate 6: Complete README stack, 9-tab help, and `BookCraft` brochure (`HTML`, `EPUB`, `PDF`).
+   - Gate 6: Complete README stack, 10-tab help, and `BookCraft` brochure (`HTML`, `EPUB`, `PDF`).
 
 ---
 
 ## 4. UI/UX Architecture & Menu Bar Standard
 
-**Current studio:** a top menu bar (`File`, `Edit`, `View`, `Insert`, `Modify`, `Commands`, `Window`, `Help`) plus seven sidebar pages (Evolutionary Studio, Lineage DAG Canvas, Experience Cards, Task and Sandbox Lab, RTX 4090 and LLM, RSI and Tsinghua Dossier, Help and Tools). Help opens Command Palette, Keyboard Shortcuts, Project Files and Docs, Licenses and Notices, and About RSICraft. Engine entries call `Command::dispatch`. Undo, redo, and a project file picker are not in this studio. The list below is the target hierarchy those menus follow.
+**Current studio:** a top menu bar (`File`, `Edit`, `View`, `Insert`, `Modify`, `Commands`, `Window`, `Help`) plus seven sidebar pages: Evolutionary Studio, Lineage DAG Canvas, Experience Cards, Task and Sandbox Lab, RTX 4090 and LLM, What is RSI?, Help. The Help page is the 10-tab manual. "What is RSI?" shows the `rsi` and `based_on` tabs. Help dialogs: Command Palette, Keyboard Shortcuts, Project Files and Docs, Licenses and Notices, About RSICraft. Engine entries call `Command::dispatch`. Undo, redo, cut, paste, select all, save, and save as set a status banner. Open Database does the same: there is no file picker. Copy places the selected card source on the clipboard. The list below is the menu that is in the binary.
 
 In accordance with [`CRAFT_MENU_BAR_STANDARD.md`](../../mcp-central-docs/standards/rust-artcraft/CRAFT_MENU_BAR_STANDARD.md):
 - **Pattern 2 (Viewport-Centric Craft Workstation):** Persistent Bézier Lineage DAG canvas and candidate code evaluation stage. Top quick button row acts as accelerators into the `View` menu. To add a new search operator or telemetry dock:
@@ -67,13 +67,13 @@ In accordance with [`CRAFT_MENU_BAR_STANDARD.md`](../../mcp-central-docs/standar
   2. Add an entry in the sidebar Operator / Candidate toolbox.
   3. Wire the action directly into the universal `Command::dispatch` bus.
 - **Top Menu Bar Hierarchy:**
-  - `File`: New Task (`Ctrl+N`), Open Task DAG (`Ctrl+O`), Open Recent ▸, Save Task (`Ctrl+S`), Save As... (`Ctrl+Shift+S`), Export Lineage (`Ctrl+E`), Close Task (`Ctrl+W`), Quit (`Ctrl+Q`).
-  - `Edit`: Undo (`Ctrl+Z`), Redo (`Ctrl+Y`), Cut, Copy, Paste, Select All, Preferences (`Ctrl+,`).
-  - `View`: Lineage DAG Canvas, Candidate Code Inspector, Evaluation Log, Score Sparkline HUD, Theme (`Dark`/`Light`).
-  - `Insert`: Add Seed Candidate, Insert Problem Specification, Add Evaluation Metric.
-  - `Modify`: Mutate Candidate, Cross Parents, Prune Frontier, Tune Hyperparameters.
-  - `Commands`: Run Evolutionary Loop, Probe LLM Endpoint, Evaluate Candidate Sandboxes, Calculate Pareto Frontier.
-  - `Window`: Reset Layout, Lineage DAG Viewport, Candidate Diff Inspector, Terminal Output.
+  - `File`: New Task (`Ctrl+N`), Open Database (`Ctrl+O`), Open Recent (none), Save (`Ctrl+S`), Save As (`Ctrl+Shift+S`), Export Lineage (`Ctrl+E`), Close Task (`Ctrl+W`), Quit (`Ctrl+Q`).
+  - `Edit`: Undo (`Ctrl+Z`), Redo (`Ctrl+Y`), Cut, Copy card source (`Ctrl+C`), Paste, Select All, Preferences (`Ctrl+,`).
+  - `View`: Reset Zoom, the seven pages, Theme Dark, Theme Light.
+  - `Insert`: Add Seed Candidate, Insert Problem Specification.
+  - `Modify`: Mutate Candidate (IMPROVE), Repair Candidate (DEBUG), Cross Parents (CROSSOVER), Prune Frontier, Show Utility Weights.
+  - `Commands`: Run Evolutionary Loop, Probe LLM Endpoint, Evaluate Candidate Sandbox, Calculate Pareto Frontier.
+  - `Window`: Reset Panel Layout, Lineage DAG Viewport, Candidate Diff Inspector, Live Run.
   - `Help` (Mandatory 5-Dialog Suite): `Command Palette...` (`Ctrl+K`), `Keyboard Shortcuts...` (`F1`), `Project Files & Docs...`, `Licenses & Notices...`, `About RSICraft`.
 - **Behavioral Mechanics:** Smooth `switch_on_hover` between top-level menus, zero-unsafe immediate-mode rendering, and headless `--smoke` parity.
 

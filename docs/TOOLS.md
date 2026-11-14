@@ -1,6 +1,6 @@
 # Complete 26-Tool Reference: RSICraft (`MCP 2024-11-05` & CLI)
 
-**Navigation:** [README](../README.md) · [Architecture](ARCHITECTURE.md) · [Configuration](CONFIGURATION.md) · [9-Tab Help Manual](../HELP.md) · [RSI Limits & Benchmarking](RSI_ENGINEERING_LIMITS_AND_BENCHMARKING.md) · [Bostrom & Yudkowsky Analysis](BOSTROM_YUDKOWSKY_AND_RSI_REALITY.md)
+**Navigation:** [README](../README.md) · [Architecture](ARCHITECTURE.md) · [Configuration](CONFIGURATION.md) · [10-tab manual](../HELP.md) · [RSI Limits & Benchmarking](RSI_ENGINEERING_LIMITS_AND_BENCHMARKING.md) · [Bostrom & Yudkowsky Analysis](BOSTROM_YUDKOWSKY_AND_RSI_REALITY.md)
 
 Every tool is exposed over stdio MCP (`rsicraft mcp`, accepting both `rsi_*` and dotted `rsi.*` names) and as a 1:1 matching CLI subcommand (`rsicraft <verb> [--json]`).
 
@@ -15,13 +15,13 @@ Returns SQLite `WAL` store metrics (`tasks_count`, `cards_count`, `success_cards
 Returns the Goliath hardware specification (Ryzen 9 7900X, 64 GB DDR5, RTX 4090 24 GB VRAM), `Frontis-MA1` 30B/35B MoE VRAM budget (`18.0–19.5 GB`), and the recommended `llama-server` launch command.
 
 ### `rsi_llm_probe` (CLI: `rsicraft probe [--url <url>]`)
-Actively pings the configured LLM endpoint (`/v1/models`), returning latency in ms, reachability status, and list of available models.
-- **`url`**: Optional custom `llama-server` URL to probe (defaults to configured `base_url`).
+Inspects the endpoint without generating text. The JSON reports `ok`, the detected provider, whether the configured model is served, up to 50 model names, and warnings (for example a context window smaller than the completion budget). Problems are inside that JSON. The call does not fail.
+- **`url`**: Optional server root (Ollama `http://127.0.0.1:11434`, LM Studio `http://127.0.0.1:1234`, llama-server `http://127.0.0.1:8080`). Default is the configured URL.
 
 ### `rsi_help` (CLI: `rsicraft help-tabs [--tab <slug>] [--search <query>]`)
-Queries the 9-tab Operator Manual, RSI Geopolitics Dossier, Tsinghua/Frontis.AI OpenRSI Dossier, and Competitive Matrix.
-- **`tab`**: `"all"` (default), `"overview"`, `"rsi_landscape"`, `"tsinghua_openrsi"`, `"wrappee"`, `"operators"`, `"compare"`, `"api"`, `"troubleshoot"`, `"faq"`.
-- **`search`**: Optional case-insensitive substring filter across all tabs and sections.
+Reads the 10-tab manual: start, what RSI is, what this is based on, quickstart, providers, tasks, concepts, tools, troubleshooting (one entry per LLM failure class), and FAQ.
+- **`tab`**: `"all"` (default), `"start"`, `"rsi"`, `"based_on"`, `"quickstart"`, `"providers"`, `"tasks"`, `"concepts"`, `"api"`, `"troubleshoot"`, `"faq"`.
+- **`search`**: Optional case-insensitive substring filter across headings and bodies.
 
 ---
 

@@ -9,8 +9,9 @@
 | CLI Flag | Environment Variable | Default Value | Description |
 | :--- | :--- | :--- | :--- |
 | `--db <PATH>` | `RSICRAFT_DB` | `%LOCALAPPDATA%\rsicraft\rsicraft.db` | Path to the SQLite `WAL` database file (use `:memory:` for ephemeral runs). |
-| `--llama-url <URL>` | - | `http://127.0.0.1:8081` | Base URL of `llama-server` or Ollama serving `/v1/chat/completions`. |
-| `--model <ALIAS>` | - | `frontis` | Model identifier sent in the OpenAI-compatible completion payload. |
+| `--llama-url <URL>` | `RSICRAFT_LLM_URL` | `http://127.0.0.1:8081` | Server root. An explicit flag wins, then the environment variable, then the default. Ollama is `http://127.0.0.1:11434`, LM Studio `http://127.0.0.1:1234`, llama-server `http://127.0.0.1:8080`. On this machine port 8081 is held by Docker. |
+| `--model <ALIAS>` | `RSICRAFT_MODEL` | `frontis` | Model name as the server knows it. An explicit flag wins, then the environment variable, then the default. |
+| - | `RSICRAFT_LLM_API_KEY` | unset | Bearer token when the endpoint requires one. |
 | `--docker-image <TAG>` | - | `rsicraft-evaluator:latest` | Container image tag used when `--sandbox-mode docker` is selected. |
 | - | `RSICRAFT_PYTHON` | `python3` (or uv Python 3.12 on Windows) | Custom path to Python executable for local sandbox evaluation. |
 | - | `RSICRAFT_RUSTC` | `rustc` (or `%USERPROFILE%\.cargo\bin\rustc.exe`) | Custom path to `rustc` compiler for local native Rust sandbox evaluation. |

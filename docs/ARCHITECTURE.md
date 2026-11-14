@@ -90,7 +90,9 @@ To prevent the evolutionary search loop from selecting measurement noise or tran
 ### 2.6 The 3-Phase Step Pipeline (`plan_step` / `run_step` / `commit_step`)
 To prevent multi-minute LLM completions or sandbox runs from holding SQLite database locks:
 - **`plan_step` / `plan_evaluate`:** Reads current task frontiers, samples parent candidates, and builds operator prompts in a brief read-only transaction.
-- **`run_step` / `run_evaluate`:** Executes inference against `llama-server` or Ollama and compiles/runs sandbox evaluation completely off the database lock. Handles reasoning models gracefully with a 12,288-token budget, thought-preamble code extraction, and list-nested fence dedenting.
+- **`run_step` / `run_evaluate`:** Executes inference against the configured OpenAI-compatible server and compiles/runs sandbox evaluation completely off the database lock. Handles reasoning models with a 12,288-token budget, thought-preamble code extraction, and list-nested fence dedenting. A llama answer with no top-level function is `no_code` and is not evaluated.
+- **Campaign preflight:** before the first step, a llama campaign calls `preflight`. `config`, `unreachable`, `model_not_found`, and `auth_required` stop the campaign at once. Other failures are counted in `failures_by_kind`. Two failed steps in a row also stop it.
+- **`rsi_llm_probe`:** returns `diagnose` (provider, model availability, warnings) and does not fail the call.
 - **`commit_step` / `commit_evaluate`:** Acquires an exclusive lock only to store the resulting BLAKE3/Zstd experience card, recompute task utility scores, and update the materialized Pareto frontier.
 
 ### 2.7 Desktop Studio Worker Thread & Live Run Panel (`rsicraft-app`)

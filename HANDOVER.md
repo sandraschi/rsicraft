@@ -1,7 +1,7 @@
 # RSICraft - Handover State
 
 **Date:** 2026-11-14
-**Status:** Tiers 1-4 built (core, 26-tool CLI/MCP with `--smoke`, studio, 8-menu bar). Search measured. Export, operator statistics, LoRA harness, and promotion gate are in the binary. pack-v1 and pack-v2 both fail the amplification gate. No generation trained. Undo, redo, and a database file picker are not in the studio.
+**Status:** Tiers 1-4 built (core, 26-tool CLI/MCP with `--smoke`, studio, 8-menu bar, 10-tab manual). Search measured. Export, operator statistics, LoRA harness, and promotion gate are in the binary. LLM failures are classified. A campaign preflights the provider. An answer with no top-level function is `no_code`. pack-v1 and pack-v2 both fail the amplification gate. No generation trained. Undo, redo, and a database file picker are not in the studio (those menu items set a status banner).
 **Read first:** `docs/FRONTIS_PARITY_PLAN.md` (state table, section 1a), `docs/BENCH_MODELSWAP_V2.md`, and `docs/BENCH_AMP_V2.md`.
 
 ## What changed since 2026-11-10
@@ -9,7 +9,7 @@
 - Model-swap benchmark `modelswap-v2` ran 26 of 36 runs and was stopped by hand. Findings:
   - Frontis-MA1-35B is inside or below the base model's range on five of six pack-v1 tasks (one complete trial).
   - Median search amplification (final best / first working candidate) is 1.18, inside the 20 to 30% trial noise. 9 of 25 runs had a fresh DRAFT as their best card.
-  - 25 to 33% of 35B steps produced no card. Cause not diagnosed.
+  - 81 of 259 attempted pack-v1 steps were skipped (31%). Two campaigns died on HTTP 500. Counted in `docs/BENCH_MODELSWAP_V2.md`.
 - New: `tasks/pack-v2` (tsp, maxcut, regression, schedule, classify; quality-scored, no timing noise), `scripts/bench-analyze.ps1`, and `bench-models.ps1` now saves the full campaign report per run.
 - PRD rewritten around gated goals (PRD section 5). The amplification gate is now mandatory before any training.
 
@@ -20,14 +20,14 @@ The 9B amplification run completed. Report: `docs/BENCH_AMP_V2.md`. Raw files: `
 - 15 of 15 runs finished. 13 have zero success cards.
 - The only scores are schedule trial 2 (252.67, one card) and classify trial 3 (64.25, four cards).
 - The 1.5 amplification gate was not met. Do not train on this pack.
-- `bench.log` names two repeating failures: the completion budget was spent on reasoning with no code drafted, and Ollama HTTP 500. Diagnosis is not finished.
+- The recorded failures are the completion budget and Ollama HTTP 500. Counted in `docs/BENCH_AMP_V2.md`. The current binary labels an answer with no top-level function as `no_code` and does not evaluate it.
 - Model alias `rsi-qwen9b` needs `num_ctx 16384`. Without that cap Ollama loads a 262,144-token context and spills the 4090 to CPU.
 
 ## Next steps, in order
 
 1. Treat the product as a search tool until a pack produces a working candidate on most runs. Designing a new pack is optional. Training is not next.
-2. Pack-v2 9B is counted in `docs/BENCH_AMP_V2.md`. The HTTP 500s are the runner dying at the completion budget, or a second client loading a 262,144 context, not a prompt rejected up front. Pack-v1 has no per-step JSON: 81 of 259 attempted steps were skipped (31%), and 2 campaigns died on HTTP 500. `rsi-base-35b` and `rsi-frontis-35b` are still not the same alias. Do not `ollama create` over the base alias until its template is repaired on purpose. The 12,288 default stays.
-3. Make `rsi-base-35b` and `rsi-frontis-35b` identical in parameters (the base alias has extra stop tokens and a temperature line).
+2. Pack-v2 9B is counted in `docs/BENCH_AMP_V2.md`. The HTTP 500s are the runner dying at the completion budget, or a second client loading a 262,144 context, not a prompt rejected up front. Pack-v1 has no per-step JSON: 81 of 259 attempted steps were skipped (31%), and 2 campaigns died on HTTP 500. The 12,288 default stays.
+3. Done on 2026-11-14: `rsi-base-35b` was rewritten with `ollama create`. Both 35B aliases are now `TEMPLATE {{ .Prompt }}` and `PARAMETER num_ctx 16384`. The base weight blobs are unchanged. `scripts/align-35b-alias.ps1 -Apply` calls `ollama create -f` because `/api/create` no longer accepts a Modelfile string.
 4. The 35B pack-v2 comparison stays blocked until step 2 is fixed.
 5. Then the rest of Phase 1 in the plan (token accounting, `runs` table, real bandit, ablations).
 
@@ -48,7 +48,7 @@ Unchanged from the state table in the plan, section 2. Short form:
 
 ## Documentation debt
 
-The README body, architecture page, essays, in-app help, HTML help, brochure HTML, and tiered plan were corrected on 2026-11-14 so they no longer say the 4-rung ladder or Thompson sampling are implemented. The 8-menu bar and five Help dialogs were added to the studio the same day. `docs/brochure/rsicraft-brochure.html` was edited in place, then EPUB and PDF were recompiled with the BookCraft script. The changelog title of v0.3.0 still says "4-rung Frontis ladder"; the correction paragraph under it is the one to trust.
+The README, PRD, architecture page, tool list, and configuration page describe the studio that is in the binary: eight menus, seven pages, ten help tabs, classified LLM errors. `docs/GUIDE.md` and `docs/help/index.html` are generated from `help.rs` by `scripts/build-help-docs.ps1`. The changelog title of v0.3.0 still says "4-rung Frontis ladder"; the correction paragraph under it is the one to trust.
 
 ## Local environment notes (Goliath)
 
