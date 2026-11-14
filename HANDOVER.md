@@ -1,7 +1,7 @@
 # RSICraft - Handover State
 
 **Date:** 2026-11-14
-**Status:** Tiers 1-4 built (core, 26-tool CLI/MCP with `--smoke`, studio, 8-menu bar, 10-tab manual). Search measured. Export, operator statistics, LoRA harness, and promotion gate are in the binary. LLM failures are classified. A campaign preflights the provider. An answer with no top-level function is `no_code`. pack-v1 and pack-v2 both fail the amplification gate. No generation trained. Undo, redo, and a database file picker are not in the studio (those menu items set a status banner).
+**Status:** Tiers 1-4 built (core, 26-tool CLI/MCP with `--smoke`, studio, 8-menu bar, 10-tab manual, undo/redo of store snapshots, Open Database and Save As file dialogs). Search measured. Export, operator statistics, LoRA harness, and promotion gate are in the binary. LLM failures are classified. A campaign preflights the provider. An answer with no top-level function is `no_code`. pack-v1 and pack-v2 both fail the amplification gate. No generation trained. Cut, paste, and select all still have no selection.
 **Read first:** `docs/FRONTIS_PARITY_PLAN.md` (state table, section 1a), `docs/BENCH_MODELSWAP_V2.md`, and `docs/BENCH_AMP_V2.md`.
 
 ## What changed since 2026-11-10

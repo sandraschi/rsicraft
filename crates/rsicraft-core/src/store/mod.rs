@@ -42,6 +42,44 @@ pub const DEFAULT_FRONTIER_SIZE: usize = 10;
 /// (desktop studio, CLI and MCP server can all share one database file).
 const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 
+fn snap_temp_path() -> std::path::PathBuf {
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    std::env::temp_dir().join(format!("rsicraft-snap-{}-{nanos}.db", std::process::id()))
+}
+
+fn sidecar(path: &Path, suffix: &str) -> std::path::PathBuf {
+    std::path::PathBuf::from(format!("{}{suffix}", path.display()))
+}
+
+fn write_db_file(path: &Path, bytes: &[u8]) -> StoreResult<()> {
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            std::fs::create_dir_all(parent)?;
+        }
+    }
+    let _ = std::fs::remove_file(sidecar(path, "-wal"));
+    let _ = std::fs::remove_file(sidecar(path, "-shm"));
+    std::fs::write(path, bytes)?;
+    Ok(())
+}
+
+fn backup_conn(src: &Connection, dst: &mut Connection) -> StoreResult<()> {
+    let backup = rusqlite::backup::Backup::new(src, dst)?;
+    for _ in 0..10_000 {
+        match backup.step(64)? {
+            rusqlite::backup::StepResult::Done => return Ok(()),
+            rusqlite::backup::StepResult::More => {}
+            _ => std::thread::sleep(Duration::from_millis(20)),
+        }
+    }
+    Err(StoreError::Validation(
+        "sqlite backup did not finish".into(),
+    ))
+}
+
 const HYPERPARAMS_KEY: &str = "utility_hyperparams";
 
 const CARD_COLUMNS: &str = "card_id, task_id, parent_a_id, parent_b_id, operator_used,
@@ -179,6 +217,7 @@ fn hyperparams_valid(p: &UtilityHyperparams) -> bool {
 
 pub struct Registry {
     conn: Connection,
+    path: Option<std::path::PathBuf>,
 }
 
 impl Registry {
@@ -190,16 +229,92 @@ impl Registry {
         }
         let conn = Connection::open(path)?;
         conn.busy_timeout(BUSY_TIMEOUT)?;
-        let reg = Self { conn };
+        let reg = Self {
+            conn,
+            path: Some(path.to_path_buf()),
+        };
         reg.migrate()?;
         Ok(reg)
     }
 
     pub fn open_in_memory() -> StoreResult<Self> {
         let conn = Connection::open_in_memory()?;
-        let reg = Self { conn };
+        let reg = Self { conn, path: None };
         reg.migrate()?;
         Ok(reg)
+    }
+
+    #[must_use]
+    pub fn db_path(&self) -> Option<&Path> {
+        self.path.as_deref()
+    }
+
+    /// Consistent single-file copy of the store, including anything still in the WAL.
+    pub fn snapshot_bytes(&self) -> StoreResult<Vec<u8>> {
+        let mut dst = Connection::open_in_memory()?;
+        backup_conn(&self.conn, &mut dst)?;
+        let path = snap_temp_path();
+        {
+            let mut file = Connection::open(&path)?;
+            backup_conn(&dst, &mut file)?;
+        }
+        let bytes = std::fs::read(&path)?;
+        let _ = std::fs::remove_file(&path);
+        Ok(bytes)
+    }
+
+    /// Replace this connection with `bytes`. `path` is where the restored store lives.
+    /// `None` keeps it in memory. The previous connection is dropped first so a file
+    /// can be overwritten on Windows.
+    pub fn restore_bytes(
+        &mut self,
+        bytes: &[u8],
+        path: Option<std::path::PathBuf>,
+    ) -> StoreResult<()> {
+        let dummy = Connection::open_in_memory()?;
+        let old = std::mem::replace(&mut self.conn, dummy);
+        drop(old);
+        let opened = match path {
+            Some(p) => {
+                write_db_file(&p, bytes)?;
+                Self::open(&p)
+            }
+            None => Self::open_from_bytes(bytes),
+        };
+        match opened {
+            Ok(reg) => {
+                *self = reg;
+                Ok(())
+            }
+            Err(e) => {
+                self.path = None;
+                let _ = self.migrate();
+                Err(e)
+            }
+        }
+    }
+
+    fn open_from_bytes(bytes: &[u8]) -> StoreResult<Self> {
+        let path = snap_temp_path();
+        std::fs::write(&path, bytes)?;
+        let src = Connection::open(&path)?;
+        let mut dst = Connection::open_in_memory()?;
+        let copied = backup_conn(&src, &mut dst);
+        drop(src);
+        let _ = std::fs::remove_file(&path);
+        copied?;
+        let reg = Self {
+            conn: dst,
+            path: None,
+        };
+        reg.migrate()?;
+        Ok(reg)
+    }
+
+    pub fn checkpoint(&self) -> StoreResult<()> {
+        self.conn
+            .execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")?;
+        Ok(())
     }
 
     pub fn migrate(&self) -> StoreResult<()> {

@@ -3,7 +3,7 @@
 **Parent Standard:** [`RUST_ARTCRAFT_STANDARD.md`](../../mcp-central-docs/standards/RUST_ARTCRAFT_STANDARD.md)
 **Menu Bar Standard:** [`CRAFT_MENU_BAR_STANDARD.md`](../../mcp-central-docs/standards/rust-artcraft/CRAFT_MENU_BAR_STANDARD.md)
 **Architecture Model:** 4-Tier ArtCraft Incremental Delivery
-**Status:** Tiers 1, 2, and 3 are built. Tier 4 menu bar and the five Help dialogs are in the studio. Undo, redo, and a database file picker are still open.
+**Status:** Tiers 1 through 4 are built. Undo and redo restore the SQLite store (up to 8 snapshots). Open Database and Save As use a file dialog. Cut, paste, and select all still have no selection.
 
 ---
 
@@ -41,7 +41,7 @@ BUILT rsicraft-core     BUILT rsicraft         BUILT rsicraft-app     BUILT (Fil
 ### Tier 4 - Craft Menu Bar Standard, Help Suite and Packaging
 - [x] Universal 8-menu bar (`File`, `Edit`, `View`, `Insert`, `Modify`, `Commands`, `Window`, `Help`) with `switch_on_hover`.
 - [x] 5-dialog Help suite (Command Palette, Keyboard Shortcuts, Project Files and Docs, Licenses and Notices, About RSICraft).
-- [x] View menu switches the seven studio pages. Undo, redo, and an Open Database picker are not implemented.
+- [x] View menu switches the seven studio pages. Undo and redo restore store snapshots. Open Database and Save As use a file dialog (`rfd`). Cut, paste, and select all still have no selection.
 - [x] Tofu Guard verification (`glyph_allowlist_no_tofu_chars`).
 - [x] Desktop `--smoke` check.
 - [x] Release packaging scripts and installer manifest (`scripts/release.ps1`, `installer/craft-installer.nsi`).

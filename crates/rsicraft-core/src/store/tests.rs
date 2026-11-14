@@ -285,3 +285,22 @@ fn recompute_scales_past_the_old_card_limit_without_decoding_code() {
     assert_eq!(best[0].card.card_id, "c0299");
     assert_eq!(reg.status().unwrap().cards_count, 300);
 }
+
+#[test]
+fn snapshot_roundtrip_keeps_cards_across_a_file() {
+    let mut reg = Registry::open_in_memory().unwrap();
+    seed_task(&reg, "t");
+    add_card(&reg, "c1", "t", None, "SUCCESS", 3.0).unwrap();
+    let bytes = reg.snapshot_bytes().unwrap();
+    let dir = std::env::temp_dir().join(format!("rsicraft-store-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("roundtrip.db");
+    reg.restore_bytes(&bytes, Some(path.clone())).unwrap();
+    assert_eq!(reg.db_path(), Some(path.as_path()));
+    assert_eq!(reg.status().unwrap().cards_count, 1);
+    reg.restore_bytes(&bytes, None).unwrap();
+    assert!(reg.db_path().is_none());
+    assert_eq!(reg.status().unwrap().cards_count, 1);
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_dir(&dir);
+}
