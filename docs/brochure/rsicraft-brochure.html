@@ -257,7 +257,7 @@ rsicraft/
 │   └── Dockerfile.evaluator  # Air-gapped rootless Python 3.12 + NumPy/SciPy evaluator image
 └── docs/
     ├── brochure/         # rsicraft-brochure.{html,epub,pdf}
-    ├── help/             # 9-tab interactive HTML Help Studio (index.html)
+    ├── help/             # generated index of the 10-tab manual (index.html)
     ├── RSI_LANDSCAPE_AND_SKYNET_MYTH.md
     └── TSINGHUA_OPENRSI_TEAM.md
 </pre>
@@ -425,7 +425,7 @@ cargo run -p rsicraft-mcp -- --db demo.db demo-seed
 cargo run -p rsicraft-mcp -- --db demo.db frontier --task-id opt-synth
 
 # 4. Query the built-in 9-Tab Operator Manual &amp; Tsinghua/OpenRSI Dossier
-cargo run -p rsicraft-mcp -- help-tabs --tab rsi_landscape
+cargo run -p rsicraft-mcp -- help-tabs --tab start
 cargo run -p rsicraft-mcp -- help-tabs --tab tsinghua_openrsi
 </pre>
 <p>---</p>
@@ -456,14 +456,14 @@ cargo run -p rsicraft-mcp -- help-tabs --tab tsinghua_openrsi
 <td><code>probe</code></td>
 <td>system</td>
 <td>Read-Only</td>
-<td>Actively pings the LLM <code>/v1/models</code> endpoint, returning latency in ms and model alias.</td>
+<td>Diagnose the endpoint: provider, whether the configured model is served, warnings. The call does not fail.</td>
 </tr>
 <tr>
 <td><code>rsi_help</code></td>
 <td><code>help-tabs</code></td>
 <td>system</td>
 <td>Read-Only</td>
-<td>Query the 9-tab Operator Manual, Skynet vs Closed Labs &amp; Tsinghua Dossier.</td>
+<td>Read the 10-tab manual (start, rsi, based_on, quickstart, providers, tasks, concepts, api, troubleshoot, faq).</td>
 </tr>
 <tr>
 <td><code>rsi_task_upsert</code></td>
@@ -699,7 +699,7 @@ cargo run -p rsicraft-mcp -- help-tabs --tab tsinghua_openrsi
 <h2 class="section-title">1. Mission Statement</h2>
 <p>Build <strong><code>rsicraft</code></strong>, a pure-Rust, zero-panic sovereign Recursive Self-Improvement (RSI) studio, CLI, and MCP server derived from the architectural principles of <strong>Frontis-MA1 (30B/35B MoE)</strong> and <strong>OpenRSI (<code>OpenMLE-Evo</code>)</strong> by researchers at <strong>Tsinghua University</strong>, <strong>Frontis.AI</strong>, and <strong>Horizon Research</strong> (<code>arXiv:2607.28568</code>, <code>FrontisAI/OpenRSI</code>).</p>
 <p>The system manages an open-ended evolutionary search loop over executable code candidate spaces on a single consumer 24 GB GPU (<strong>Goliath</strong>: AMD Ryzen 9 7900X, 64 GB DDR5, NVIDIA GeForce RTX 4090 24 GB VRAM), maintaining persistent stigmergic state in SQLite <code>WAL</code> with BLAKE3+Zstd Content-Addressable Storage (CAS), running isolated execution evaluations in sandboxed containers or local Python 3.12 environments, and exposing control via:</p>
-<p>1. <strong><code>rsicraft-app</code> (<code>L3</code>)</strong>: A native GPU-rendered <code>eframe</code>/<code>egui 0.37</code> Desktop Studio with an interactive B&#233;zier Lineage DAG Canvas, 4-operator launchpad, score spark charts, and 9-tab dossier.</p>
+<p>1. <strong><code>rsicraft-app</code> (<code>L3</code>)</strong>: A native GPU-rendered <code>eframe</code>/<code>egui 0.37</code> Desktop Studio with an interactive B&#233;zier Lineage DAG Canvas, 4-operator launchpad, score spark charts, and the 10-tab manual.</p>
 <p>2. <strong><code>rsicraft-mcp</code> (<code>L2</code>)</strong>: A unified CLI (<code>--json</code> + formatted tables) and MCP <code>2024-11-05</code> stdio server exposing 26 tools.</p>
 <p>3. <strong><code>rsicraft-core</code> (<code>L1</code>)</strong>: The deterministic evolutionary state machine, composite utility selector, and store.</p>
 <p>---</p>
@@ -765,7 +765,7 @@ cargo run -p rsicraft-mcp -- help-tabs --tab tsinghua_openrsi
 <li>Gate 3: <code>cargo fmt --all --check</code>.</li>
 <li>Gate 4: MCP <code>2024-11-05</code> stdio probe (<code>initialize</code>, <code>tools/list</code> = 26 tools, <code>tools/call</code>).</li>
 <li>Gate 5: Committed <code>Cargo.lock</code>.</li>
-<li>Gate 6: Complete README stack, 9-tab help, and <code>BookCraft</code> brochure (<code>HTML</code>, <code>EPUB</code>, <code>PDF</code>).</li>
+<li>Gate 6: Complete README stack, 10-tab help, and <code>BookCraft</code> brochure (<code>HTML</code>, <code>EPUB</code>, <code>PDF</code>).</li>
 </ul>
 
   <div class="page-break"></div><h2 class="section-title">Complete MCP Tool &amp; CLI Verb Reference</h2><p><strong>Navigation:</strong> README &#183; Architecture &#183; Configuration &#183; 9-Tab Help Manual &#183; RSI Limits &amp; Benchmarking &#183; Bostrom &amp; Yudkowsky Analysis</p>
@@ -777,14 +777,14 @@ cargo run -p rsicraft-mcp -- help-tabs --tab tsinghua_openrsi
 <h3><code>rsi_hardware_profile</code> (CLI: <code>rsicraft hardware</code>)</h3>
 <p>Returns the Goliath hardware specification (Ryzen 9 7900X, 64 GB DDR5, RTX 4090 24 GB VRAM), <code>Frontis-MA1</code> 30B/35B MoE VRAM budget (<code>18.0–19.5 GB</code>), and the recommended <code>llama-server</code> launch command.</p>
 <h3><code>rsi_llm_probe</code> (CLI: <code>rsicraft probe [--url &lt;url&gt;]</code>)</h3>
-<p>Actively pings the configured LLM endpoint (<code>/v1/models</code>), returning latency in ms, reachability status, and list of available models.</p>
+<p>Inspects the endpoint without generating text. The JSON reports the provider, whether the configured model is served, and warnings. The call does not fail.</p>
 <ul>
 <li><strong><code>url</code></strong>: Optional custom <code>llama-server</code> URL to probe (defaults to configured <code>base_url</code>).</li>
 </ul>
 <h3><code>rsi_help</code> (CLI: <code>rsicraft help-tabs [--tab &lt;slug&gt;] [--search &lt;query&gt;]</code>)</h3>
-<p>Queries the 9-tab Operator Manual, RSI Geopolitics Dossier, Tsinghua/Frontis.AI OpenRSI Dossier, and Competitive Matrix.</p>
+<p>Reads the 10-tab manual: start, what RSI is, what this is based on, quickstart, providers, tasks, concepts, tools, troubleshooting, and FAQ.</p>
 <ul>
-<li><strong><code>tab</code></strong>: <code>&quot;all&quot;</code> (default), <code>&quot;overview&quot;</code>, <code>&quot;rsi_landscape&quot;</code>, <code>&quot;tsinghua_openrsi&quot;</code>, <code>&quot;wrappee&quot;</code>, <code>&quot;operators&quot;</code>, <code>&quot;compare&quot;</code>, <code>&quot;api&quot;</code>, <code>&quot;troubleshoot&quot;</code>, <code>&quot;faq&quot;</code>.</li>
+<li><strong><code>tab</code></strong>: <code>&quot;all&quot;</code> (default), <code>&quot;start&quot;</code>, <code>&quot;rsi&quot;</code>, <code>&quot;based_on&quot;</code>, <code>&quot;quickstart&quot;</code>, <code>&quot;providers&quot;</code>, <code>&quot;tasks&quot;</code>, <code>&quot;concepts&quot;</code>, <code>&quot;api&quot;</code>, <code>&quot;troubleshoot&quot;</code>, <code>&quot;faq&quot;</code>.</li>
 <li><strong><code>search</code></strong>: Optional case-insensitive substring filter across all tabs and sections.</li>
 </ul>
 <p>---</p>

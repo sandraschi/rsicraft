@@ -58,7 +58,7 @@ For each run: the first working candidate, the final best, and their ratio ("amp
 - **Skipped steps:** `results.csv` has 81 skipped steps and 178 executed steps (31% of attempted steps). The per-step error text was not saved (the script now writes `<task>-t<n>.json`; this run predates that). The same Ollama log, through the night of 2026-11-12, shows `POST /v1/chat/completions` returning 500 while a slot is still generating, then a runner reload. One of those is 03:18:05, 5m00s, `n_gen` 5,647, which is the base inversions trial 3 failure in `bench.log`. There is no per-step split of budget versus 500 for this run.
 - **Aborted runs:** 9 of 26 runs ended early. 2 produced no card at all, both HTTP 500: base inversions trial 3 and Frontis edit-distance trial 2.
 - **Speed:** about 50 minutes per 12-step run on the 35B models, so 4 to 5 minutes per step. A full 36-run comparison is about 30 hours.
-- **Alias mismatch, still present on 2026-11-14:** `ollama show` was not changed. `rsi-frontis-35b` is `TEMPLATE {{ .Prompt }}` and `PARAMETER num_ctx 16384`. `rsi-base-35b` adds `temperature 0.3`, stops on `<|im_start|>`, `<|im_end|>`, `<think>`, and the literal `.Prompt }}<|im_end|>`, and its template prints ` .Prompt }}` where the prompt action should be. The two aliases are not parameter-identical. They were not rewritten in this pass.
+- **Alias mismatch, repaired 2026-11-14:** `rsi-base-35b` was rewritten onto the same template and `num_ctx 16384` as `rsi-frontis-35b`. The old base alias had `temperature 0.3` and stops that included `<think>` and a literal `.Prompt }}`. The weight blobs were kept. `scripts/align-35b-alias.ps1` is the record of that repair.
 
 ## Decisions taken
 

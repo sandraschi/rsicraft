@@ -51,7 +51,7 @@ A common category error is confusing outer-loop program search (such as DeepMind
 - **Stigmergic CAS Store:** SQLite with Write-Ahead Logging (`WAL`), 256-bit BLAKE3 content hashing, and Zstd level-3 compression.
 - **Docker sandbox for Python:** `--network none`, `--read-only`, `--cap-drop ALL`, `--security-opt no-new-privileges`, `--user 10000:10001`, `--pids-limit 256`, `--memory 4g`, `--cpus 4`, and a 50 ms reaper. Rust candidates compile on the host with `rustc`, not inside that container.
 - **100% CLI / MCP Parity:** All 26 engine tools are exposed identically over MCP 2024-11-05 stdio JSON-RPC and CLI subcommands (`rsicraft campaign`, `rsicraft step`, `rsicraft bandit`, `rsicraft dataset-export`, `rsicraft train`, `rsicraft promote`).
-- **GPU Desktop Studio:** Built with `eframe`/`egui 0.37`, featuring an interactive Bézier Lineage DAG canvas, evolutionary trajectory spark charts, a 24 GB VRAM gauge, and a 9-tab operator dossier.
+- **GPU Desktop Studio:** Built with `eframe`/`egui 0.37`, featuring an interactive Bézier Lineage DAG canvas, evolutionary trajectory spark charts, a 24 GB VRAM gauge, and the same 10-tab manual as the CLI.
 
 ### Verification and Offline Mode
 

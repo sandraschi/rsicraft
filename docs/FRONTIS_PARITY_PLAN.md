@@ -111,7 +111,7 @@ Done:
 
 To do, in this order:
 1. Stay at "search tool" until a pack produces a working candidate on most runs. A 35B pack-v2 run is not useful until steps stop dying.
-2. Diagnose the steps that produce no card (35B pack-v1 and 9B pack-v2 campaign JSON) and fix them; make the two 35B aliases identical.
+2. Diagnose the steps that produce no card, and make the two 35B aliases identical. Counted in the bench reports. The 35B aliases were aligned on 2026-11-14 (`TEMPLATE {{ .Prompt }}`, `num_ctx 16384`). The completion budget stays 12,288. Steps still die when the runner hits that budget, so this item is not closed.
 3. Record tokens and seconds per card; add a `runs` table so curves can be compared across models and variants.
 4. Real Thompson sampling over operators, wired into campaigns, with the fixed cycle kept as the control arm.
 5. Harness ablations on the train tasks only (drop CROSSOVER, drop DEBUG, utility vs greedy vs random parent choice, one vs three scoring trials), on the 9B model, at equal token budget.

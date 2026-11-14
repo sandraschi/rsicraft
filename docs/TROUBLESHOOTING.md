@@ -8,16 +8,16 @@ This runbook documents real failure modes encountered and resolved during live v
 
 ## 1. Ollama (`:11434`) Model-Swap Timeout vs. Direct `llama-server.exe`
 
-- **Symptom:** Running `rsicraft step --provider llama` against `http://127.0.0.1:11434` times out after 90–180 seconds.
-- **Root Cause:** Background processes polling Ollama (`:11434`) request heavy 262k-context models (`gemma4:e2b`), causing Ollama to unload and reload 15–20 GB GGUF weights on every request.
-- **Fix:** Connect `rsicraft` directly to the dedicated `llama-server.exe` port (`--llama-url http://127.0.0.1:8081` or the active runner port discovered via `Get-NetTCPConnection -OwningProcess <PID>`).
+- **Symptom:** A step against Ollama dies while another client loads a large context, or the runner returns HTTP 500 after a long generation.
+- **What the current binary does:** The completion timeout is `RSICRAFT_LLM_TIMEOUT_SECS` (default 600). `rsicraft probe` reports the provider, whether the model is served, and a context window smaller than the completion budget. A campaign stops on unreachable, unknown model, missing key, or a bad address. Port 8081 on this machine is held by Docker. Ollama is `http://127.0.0.1:11434` (`RSICRAFT_LLM_URL` or `--llama-url`).
+- **Measured case:** On 2026-11-12 a second client asked Ollama for `num_ctx 262144`, Ollama evicted the 9B runner, and the step returned HTTP 500. See `docs/BENCH_AMP_V2.md`.
 
 ---
 
 ## 2. Reasoning Models Emitting `<|channel>thought` or `<think>` Preambles
 
 - **Symptom:** Reasoning models (Gemma-4, Qwen3, DeepSeek-R1) emit `<|channel>thought ... <channel|>` before the final ````python` block. If the thought block contains markdown fences, naive extraction grabs unfinished scratch code.
-- **Fix:** Fixed in `PromptBuilder::extract_code_block` (`crates/rsicraft-core/src/operators.rs`), which strips all text through the last `<channel|>` or `</think>` delimiter before extracting the Python block.
+- **Fix:** `PromptBuilder::extract_code_block` drops text through the last `<channel|>` or `</think>` before taking a fence. A llama answer that still has no top-level function is `no_code` and is not evaluated.
 
 ---
 

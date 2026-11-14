@@ -113,9 +113,9 @@ rsicraft probe
 rsicraft --db verify.db demo-seed
 rsicraft --db verify.db frontier --task-id opt-synth
 
-# 4. Query the 9-tab built-in Operator Manual
-rsicraft help-tabs --tab overview
+# 4. Read the 10-tab manual
+rsicraft help-tabs --tab start
 ```
 
  Or ask your MCP client:
-> *"Call `rsi_status`, `rsi_hardware_profile`, and `rsi_help` with `tab: 'operators'` to verify RSICraft is online."*
+> *"Call `rsi_status`, `rsi_hardware_profile`, and `rsi_help` with `tab: 'start'` to verify RSICraft is online."*
