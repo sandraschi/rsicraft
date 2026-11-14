@@ -10,7 +10,7 @@
     AppSmoke    = @('--smoke')
     CliPackage  = 'rsicraft-mcp'
     CliBin      = 'rsicraft'
-    CliSmoke    = @('--db', '{db}', 'status')
+    CliSmoke    = @('--db', '{db}', '--smoke')
     McpArgs     = @('mcp')
     McpSmoke    = @('mcp')
     Installer   = $true

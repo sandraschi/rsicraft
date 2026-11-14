@@ -42,8 +42,11 @@ struct Cli {
     /// Emit machine-readable JSON only.
     #[arg(long, global = true)]
     json: bool,
+    /// Open a throwaway or `--db` store and check status, hardware, help, and the tool count.
+    #[arg(long, global = true)]
+    smoke: bool,
     #[command(subcommand)]
-    cmd: Cmd,
+    cmd: Option<Cmd>,
 }
 
 #[derive(Subcommand)]
@@ -198,6 +201,12 @@ enum Cmd {
         task_id: String,
         #[arg(long, default_value_t = 5)]
         trials: u32,
+        #[arg(long, default_value_t = 6)]
+        steps: u32,
+        #[arg(long, default_value = "local")]
+        sandbox_mode: String,
+        #[arg(long, default_value_t = 30)]
+        timeout_secs: u64,
         #[arg(long)]
         baseline: Option<String>,
         #[arg(long)]
@@ -443,6 +452,9 @@ fn to_tool(cmd: Cmd) -> Result<(&'static str, Value), String> {
         Cmd::Promote {
             task_id,
             trials,
+            steps,
+            sandbox_mode,
+            timeout_secs,
             baseline,
             candidate,
         } => (
@@ -450,6 +462,9 @@ fn to_tool(cmd: Cmd) -> Result<(&'static str, Value), String> {
             obj(vec![
                 ("task_id", Some(json!(task_id))),
                 ("trials", Some(json!(trials))),
+                ("steps", Some(json!(steps))),
+                ("sandbox_mode", Some(json!(sandbox_mode))),
+                ("timeout_secs", Some(json!(timeout_secs))),
                 ("baseline_alias", baseline.map(Value::String)),
                 ("candidate_alias", candidate.map(Value::String)),
             ]),
@@ -642,9 +657,45 @@ fn render(v: &Value) -> String {
     out
 }
 
+fn run_cli_smoke(db: Option<PathBuf>) -> Result<(), String> {
+    let reg = match db {
+        Some(path) => Registry::open(&path).map_err(|e| e.to_string())?,
+        None => Registry::open_in_memory().map_err(|e| e.to_string())?,
+    };
+    let mut ctx = Ctx::new(reg, None, None, None);
+    dispatch(&mut ctx, Command::Status)?;
+    dispatch(&mut ctx, Command::HardwareProfile)?;
+    dispatch(
+        &mut ctx,
+        Command::Help {
+            tab: Some("api".into()),
+            search: None,
+        },
+    )?;
+    let n = tools().len();
+    if n != 26 {
+        return Err(format!("expected 26 tools, found {n}"));
+    }
+    println!("smoke: ok (rsicraft {VERSION}, tools=26)");
+    Ok(())
+}
+
 fn main() -> ExitCode {
     let cli = Cli::parse();
-    if matches!(cli.cmd, Cmd::Tools) {
+    if cli.smoke {
+        return match run_cli_smoke(cli.db.clone()) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(e) => {
+                eprintln!("smoke: failed: {e}");
+                ExitCode::FAILURE
+            }
+        };
+    }
+    let Some(cmd) = cli.cmd else {
+        eprintln!("rsicraft: a subcommand is required. Pass --smoke for the headless check.");
+        return ExitCode::FAILURE;
+    };
+    if matches!(&cmd, Cmd::Tools) {
         println!(
             "{}",
             serde_json::to_string_pretty(&tools()).unwrap_or_default()
@@ -665,7 +716,7 @@ fn main() -> ExitCode {
         cli.model.as_deref(),
         cli.docker_image.as_deref(),
     );
-    if matches!(cli.cmd, Cmd::Mcp) {
+    if matches!(&cmd, Cmd::Mcp) {
         eprintln!("[rsicraft] db {}", db_path.display());
         let mut host = Host { ctx };
         return match serve_stdio(&mut host) {
@@ -677,16 +728,13 @@ fn main() -> ExitCode {
         };
     }
 
-    let export_path = if let Cmd::Export {
-        out: Some(ref p), ..
-    } = cli.cmd
-    {
+    let export_path = if let Cmd::Export { out: Some(p), .. } = &cmd {
         Some(p.clone())
     } else {
         None
     };
     let json_out = cli.json;
-    let res = to_tool(cli.cmd)
+    let res = to_tool(cmd)
         .and_then(|(name, args)| Command::from_tool(name, &args))
         .and_then(|cmd| dispatch(&mut ctx, cmd));
 
@@ -845,6 +893,9 @@ mod tests {
             Cmd::Promote {
                 task_id: "opt-synth".into(),
                 trials: 5,
+                steps: 6,
+                sandbox_mode: "local".into(),
+                timeout_secs: 30,
                 baseline: None,
                 candidate: None,
             },
@@ -856,6 +907,33 @@ mod tests {
         for v in verbs {
             let (name, _) = to_tool(v).unwrap();
             assert!(known.iter().any(|k| k == name), "missing tool {name}");
+        }
+    }
+
+    #[test]
+    fn cli_smoke_checks_status_hardware_help_and_tool_count() {
+        assert!(run_cli_smoke(None).is_ok());
+    }
+
+    #[test]
+    fn promote_cli_forwards_steps_sandbox_and_aliases() {
+        let mapped = to_tool(Cmd::Promote {
+            task_id: "opt-synth".into(),
+            trials: 5,
+            steps: 6,
+            sandbox_mode: "docker".into(),
+            timeout_secs: 45,
+            baseline: Some("rsi-base-35b".into()),
+            candidate: Some("rsi-frontis-35b".into()),
+        });
+        assert!(mapped.is_ok());
+        if let Ok((name, args)) = mapped {
+            assert_eq!(name, "rsi_promote_gate");
+            assert_eq!(args["steps"], json!(6));
+            assert_eq!(args["sandbox_mode"], json!("docker"));
+            assert_eq!(args["timeout_secs"], json!(45));
+            assert_eq!(args["baseline_alias"], json!("rsi-base-35b"));
+            assert_eq!(args["candidate_alias"], json!("rsi-frontis-35b"));
         }
     }
 }

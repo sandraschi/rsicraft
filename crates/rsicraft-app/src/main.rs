@@ -81,6 +81,64 @@ pub enum ViewMode {
     Json,
 }
 
+/// The five Help dialogs from the Craft menu-bar standard.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StudioDialog {
+    CommandPalette,
+    Shortcuts,
+    Docs,
+    Licenses,
+    About,
+}
+
+/// Menu and command-palette entries. `id` is what `menu_action` accepts.
+const MENU_CATALOG: &[(&str, &str, &str)] = &[
+    ("new_task", "New Task...", "Ctrl+N"),
+    ("open_db", "Open Database...", "Ctrl+O"),
+    ("save", "Save", "Ctrl+S"),
+    ("save_as", "Save As...", "Ctrl+Shift+S"),
+    ("export", "Export Lineage...", "Ctrl+E"),
+    ("close_task", "Close Task", "Ctrl+W"),
+    ("quit", "Quit", "Ctrl+Q"),
+    ("undo", "Undo", "Ctrl+Z"),
+    ("redo", "Redo", "Ctrl+Y"),
+    ("cut", "Cut", "Ctrl+X"),
+    ("copy_card", "Copy", "Ctrl+C"),
+    ("paste", "Paste", "Ctrl+V"),
+    ("select_all", "Select All", "Ctrl+A"),
+    ("preferences", "Preferences...", "Ctrl+,"),
+    ("view_lineage", "Lineage DAG Canvas", ""),
+    ("view_cards", "Experience Cards", ""),
+    ("view_lab", "Task and Sandbox Lab", ""),
+    ("view_studio", "Evolutionary Studio", ""),
+    ("view_gpu", "RTX 4090 and LLM", ""),
+    ("view_help", "Help and Tools", ""),
+    ("theme_dark", "Theme Dark", ""),
+    ("theme_light", "Theme Light", ""),
+    ("zoom_reset", "Reset Zoom (100%)", "Ctrl+1"),
+    ("seed", "Add Seed Candidate", ""),
+    ("insert_spec", "Insert Problem Specification", ""),
+    ("step_improve", "Mutate Candidate (IMPROVE)", ""),
+    ("step_crossover", "Cross Parents (CROSSOVER)", ""),
+    ("step_debug", "Repair Candidate (DEBUG)", ""),
+    ("prune", "Prune Frontier", ""),
+    ("hyperparams", "Tune Hyperparameters", ""),
+    ("campaign", "Run Evolutionary Loop", ""),
+    ("probe", "Probe LLM Endpoint", ""),
+    ("frontier", "Calculate Pareto Frontier", ""),
+    ("reset_layout", "Reset Panel Layout", ""),
+    ("palette", "Command Palette...", "Ctrl+K"),
+    ("shortcuts", "Keyboard Shortcuts...", "F1"),
+    ("docs", "Project Files and Docs...", ""),
+    ("licenses", "Licenses and Notices...", ""),
+    ("about", "About RSICraft", ""),
+    ("status", "Store Status", ""),
+    ("hardware", "Hardware Profile", ""),
+    ("lineage", "Refresh Lineage", ""),
+    ("tasks", "List Tasks", ""),
+    ("help_api", "Operator Manual", ""),
+];
+
 pub struct RsiCraftApp {
     pub ctx: Ctx,
     pub page: StudioPage,
@@ -127,6 +185,12 @@ pub struct RsiCraftApp {
 
     pub status_banner: String,
     pub repo_root: PathBuf,
+    pub active_dialog: Option<StudioDialog>,
+    pub palette_query: String,
+    pub theme_dirty: bool,
+    pub quit_requested: bool,
+    pub pending_copy: Option<String>,
+    pub zoom_reset: bool,
 
     // 3D RTX 4090 GPU Studio State
     pub gpu_rot_x: f32,
@@ -256,6 +320,12 @@ impl RsiCraftApp {
                 "RSICraft v{VERSION} Sovereign Studio Online (Goliath RTX 4090 Profile Ready)"
             ),
             repo_root: default_repo_root(),
+            active_dialog: None,
+            palette_query: String::new(),
+            theme_dirty: false,
+            quit_requested: false,
+            pending_copy: None,
+            zoom_reset: false,
             gpu_rot_x: -0.32,
             gpu_rot_y: 0.65,
             gpu_auto_spin: true,
@@ -821,6 +891,465 @@ impl RsiCraftApp {
     }
 }
 
+fn switch_on_hover(ctx: &egui::Context, titles: &[egui::Response]) {
+    let is_open =
+        |t: &egui::Response| egui::Popup::is_id_open(ctx, egui::Popup::default_response_id(t));
+    if !titles.iter().any(is_open) {
+        return;
+    }
+    if let Some(title) = titles
+        .iter()
+        .find(|t| t.hovered() && !t.clicked() && !is_open(t))
+    {
+        egui::Popup::open_id(ctx, egui::Popup::default_response_id(title));
+    }
+}
+
+impl RsiCraftApp {
+    /// Run one menu or command-palette id. Engine work goes through `Command::dispatch`.
+    pub fn menu_action(&mut self, id: &str) -> Result<Value, String> {
+        let go = |page: StudioPage| json!({ "page": page.label() });
+        match id {
+            "new_task" | "insert_spec" => {
+                self.page = StudioPage::TaskAndSandboxLab;
+                self.status_banner =
+                    "Task lab open. Fill the specification and upsert it into the store.".into();
+                Ok(go(self.page))
+            }
+            "open_db" => {
+                self.status_banner =
+                    "The studio uses RSICRAFT_DB or an in-memory store. There is no file picker."
+                        .into();
+                Ok(json!({ "db": "env" }))
+            }
+            "save" | "save_as" => {
+                self.status_banner =
+                    "Each command writes the SQLite store immediately. There is no separate save file.".into();
+                Ok(json!({ "persisted": "store" }))
+            }
+            "export" => {
+                let tid = self.active_task_id.clone();
+                let v = self.exec(Command::Export { task_id: tid })?;
+                let n = v
+                    .get("cards")
+                    .and_then(Value::as_array)
+                    .map(Vec::len)
+                    .unwrap_or(0);
+                self.status_banner = format!(
+                    "Lineage bundle is in memory ({n} cards). `rsicraft export` writes the file."
+                );
+                Ok(v)
+            }
+            "close_task" => {
+                self.selected_card_json = None;
+                self.page = StudioPage::EvolutionaryStudio;
+                self.status_banner = format!("Closed the card view for {}", self.active_task_id);
+                Ok(go(self.page))
+            }
+            "quit" => {
+                self.quit_requested = true;
+                self.status_banner = "Quit requested".into();
+                Ok(json!({ "quit": true }))
+            }
+            "undo" | "redo" | "cut" | "paste" | "select_all" => {
+                self.status_banner =
+                    "This studio has no undo stack or marquee selection. Copy uses the open card."
+                        .into();
+                Ok(json!({ "edit": id }))
+            }
+            "copy_card" => {
+                let code = self
+                    .selected_card_json
+                    .as_ref()
+                    .and_then(|v| v.get("code"))
+                    .and_then(Value::as_str)
+                    .map(str::to_string);
+                match code {
+                    Some(code) => {
+                        self.pending_copy = Some(code);
+                        self.status_banner = "Card source copied".into();
+                        Ok(json!({ "copied": true }))
+                    }
+                    None => {
+                        self.status_banner = "Open a card before copying its source".into();
+                        Err("no card open".into())
+                    }
+                }
+            }
+            "preferences" | "view_gpu" => {
+                self.page = StudioPage::Goliath4090AndLlm;
+                self.status_banner = "LLM endpoint and model alias".into();
+                Ok(go(self.page))
+            }
+            "view_lineage" => {
+                self.page = StudioPage::LineageDagCanvas;
+                Ok(go(self.page))
+            }
+            "view_cards" => {
+                self.page = StudioPage::ExperienceCards;
+                Ok(go(self.page))
+            }
+            "view_lab" => {
+                self.page = StudioPage::TaskAndSandboxLab;
+                Ok(go(self.page))
+            }
+            "view_studio" => {
+                self.page = StudioPage::EvolutionaryStudio;
+                Ok(go(self.page))
+            }
+            "view_help" => {
+                self.page = StudioPage::MultitabHelpAndTools;
+                Ok(go(self.page))
+            }
+            "view_dossier" => {
+                self.page = StudioPage::RsiAndTsinghuaDossier;
+                Ok(go(self.page))
+            }
+            "theme_dark" => {
+                self.dark_mode = true;
+                self.theme_dirty = true;
+                self.status_banner = "Dark theme".into();
+                Ok(json!({ "theme": "dark" }))
+            }
+            "theme_light" => {
+                self.dark_mode = false;
+                self.theme_dirty = true;
+                self.status_banner = "Light theme".into();
+                Ok(json!({ "theme": "light" }))
+            }
+            "zoom_reset" => {
+                self.zoom_reset = true;
+                self.status_banner = "Zoom reset to 100%".into();
+                Ok(json!({ "zoom": 1.0 }))
+            }
+            "seed" => match self.exec(Command::DemoSeed) {
+                Ok(v) => {
+                    self.refresh_all();
+                    self.status_banner = "Seeded the demo task".into();
+                    Ok(v)
+                }
+                Err(e) => {
+                    self.status_banner = e.clone();
+                    Err(e)
+                }
+            },
+            "step_improve" => {
+                self.page = StudioPage::EvolutionaryStudio;
+                self.trigger_step(SearchOperator::Improve);
+                Ok(json!({ "op": "IMPROVE" }))
+            }
+            "step_crossover" => {
+                self.page = StudioPage::EvolutionaryStudio;
+                self.trigger_step(SearchOperator::Crossover);
+                Ok(json!({ "op": "CROSSOVER" }))
+            }
+            "step_debug" => {
+                self.page = StudioPage::EvolutionaryStudio;
+                self.trigger_step(SearchOperator::Debug);
+                Ok(json!({ "op": "DEBUG" }))
+            }
+            "prune" => {
+                let tid = self.active_task_id.clone();
+                let v = self.exec(Command::CardsPrune {
+                    task_id: tid,
+                    keep_frontier: 10,
+                })?;
+                self.refresh_all();
+                self.status_banner = "Pruned cards outside the frontier".into();
+                Ok(v)
+            }
+            "hyperparams" => {
+                let v = self.exec(Command::HyperparamsGet)?;
+                self.status_banner = format!("Utility weights: {v}");
+                Ok(v)
+            }
+            "campaign" => {
+                self.page = StudioPage::EvolutionaryStudio;
+                self.start_campaign();
+                Ok(json!({ "banner": self.status_banner }))
+            }
+            "probe" => {
+                let url = Some(self.llama_url_edit.clone());
+                match self.exec(Command::LlmProbe { url }) {
+                    Ok(v) => {
+                        self.status_banner = "LLM probe reached the endpoint".into();
+                        Ok(v)
+                    }
+                    Err(e) => {
+                        self.status_banner = e.clone();
+                        Err(e)
+                    }
+                }
+            }
+            "frontier" => {
+                let tid = self.active_task_id.clone();
+                let v = self.exec(Command::GetFrontier {
+                    task_id: tid,
+                    limit: 10,
+                })?;
+                self.frontier_json = v.clone();
+                self.page = StudioPage::EvolutionaryStudio;
+                self.status_banner = "Frontier refreshed".into();
+                Ok(v)
+            }
+            "lineage" => {
+                let tid = self.active_task_id.clone();
+                let v = self.exec(Command::Lineage { task_id: tid })?;
+                self.lineage_json = v.clone();
+                Ok(v)
+            }
+            "tasks" => {
+                let v = self.exec(Command::TaskList)?;
+                self.tasks_json = v.clone();
+                Ok(v)
+            }
+            "status" => {
+                let v = self.exec(Command::Status)?;
+                self.status_json = v.clone();
+                Ok(v)
+            }
+            "hardware" => {
+                let v = self.exec(Command::HardwareProfile)?;
+                self.hw_json = v.clone();
+                Ok(v)
+            }
+            "help_api" => {
+                self.page = StudioPage::MultitabHelpAndTools;
+                self.exec(Command::Help {
+                    tab: Some("api".into()),
+                    search: None,
+                })
+            }
+            "reset_layout" => {
+                self.page = StudioPage::EvolutionaryStudio;
+                self.view_mode = ViewMode::Cards;
+                self.show_quick_help_modal = false;
+                self.status_banner = "Layout reset to the evolutionary studio".into();
+                Ok(json!({ "layout": "default" }))
+            }
+            "palette" => {
+                self.active_dialog = Some(StudioDialog::CommandPalette);
+                Ok(json!({ "dialog": "palette" }))
+            }
+            "shortcuts" => {
+                self.active_dialog = Some(StudioDialog::Shortcuts);
+                Ok(json!({ "dialog": "shortcuts" }))
+            }
+            "docs" => {
+                self.active_dialog = Some(StudioDialog::Docs);
+                Ok(json!({ "dialog": "docs" }))
+            }
+            "licenses" => {
+                self.active_dialog = Some(StudioDialog::Licenses);
+                Ok(json!({ "dialog": "licenses" }))
+            }
+            "about" => {
+                self.active_dialog = Some(StudioDialog::About);
+                Ok(json!({ "dialog": "about" }))
+            }
+            other => Err(format!("unknown menu action '{other}'")),
+        }
+    }
+
+    fn menu_item(&mut self, ui: &mut egui::Ui, id: &str, label: &str) {
+        if ui.button(label).clicked() {
+            match self.menu_action(id) {
+                Ok(_) => {}
+                Err(e) => self.status_banner = e,
+            }
+            ui.close();
+        }
+    }
+
+    fn render_menu_bar(&mut self, ui: &mut egui::Ui) {
+        egui::Panel::top("top_menubar").show(ui, |ui| {
+            egui::MenuBar::new().ui(ui, |ui| {
+                let file = ui
+                    .menu_button("File", |ui| {
+                        self.menu_item(ui, "new_task", "New Task... (Ctrl+N)");
+                        self.menu_item(ui, "open_db", "Open Database... (Ctrl+O)");
+                        ui.label("Open Recent: none");
+                        ui.separator();
+                        self.menu_item(ui, "save", "Save (Ctrl+S)");
+                        self.menu_item(ui, "save_as", "Save As... (Ctrl+Shift+S)");
+                        ui.separator();
+                        self.menu_item(ui, "export", "Export Lineage... (Ctrl+E)");
+                        ui.separator();
+                        self.menu_item(ui, "close_task", "Close Task (Ctrl+W)");
+                        self.menu_item(ui, "quit", "Quit (Ctrl+Q)");
+                    })
+                    .response;
+                let edit = ui
+                    .menu_button("Edit", |ui| {
+                        self.menu_item(ui, "undo", "Undo (Ctrl+Z)");
+                        self.menu_item(ui, "redo", "Redo (Ctrl+Y)");
+                        ui.separator();
+                        self.menu_item(ui, "cut", "Cut");
+                        self.menu_item(ui, "copy_card", "Copy card source (Ctrl+C)");
+                        self.menu_item(ui, "paste", "Paste");
+                        self.menu_item(ui, "select_all", "Select All");
+                        ui.separator();
+                        self.menu_item(ui, "preferences", "Preferences... (Ctrl+,)");
+                    })
+                    .response;
+                let view = ui
+                    .menu_button("View", |ui| {
+                        self.menu_item(ui, "zoom_reset", "Reset Zoom (100%)");
+                        ui.separator();
+                        self.menu_item(ui, "view_studio", "Evolutionary Studio");
+                        self.menu_item(ui, "view_lineage", "Lineage DAG Canvas");
+                        self.menu_item(ui, "view_cards", "Experience Cards");
+                        self.menu_item(ui, "view_lab", "Task and Sandbox Lab");
+                        self.menu_item(ui, "view_gpu", "RTX 4090 and LLM");
+                        self.menu_item(ui, "view_dossier", "RSI and Tsinghua Dossier");
+                        self.menu_item(ui, "view_help", "Help and Tools");
+                        ui.separator();
+                        self.menu_item(ui, "theme_dark", "Theme: Dark");
+                        self.menu_item(ui, "theme_light", "Theme: Light");
+                    })
+                    .response;
+                let insert = ui
+                    .menu_button("Insert", |ui| {
+                        self.menu_item(ui, "seed", "Add Seed Candidate");
+                        self.menu_item(ui, "insert_spec", "Insert Problem Specification");
+                    })
+                    .response;
+                let modify = ui
+                    .menu_button("Modify", |ui| {
+                        self.menu_item(ui, "step_improve", "Mutate Candidate (IMPROVE)");
+                        self.menu_item(ui, "step_debug", "Repair Candidate (DEBUG)");
+                        self.menu_item(ui, "step_crossover", "Cross Parents (CROSSOVER)");
+                        ui.separator();
+                        self.menu_item(ui, "prune", "Prune Frontier");
+                        self.menu_item(ui, "hyperparams", "Show Utility Weights");
+                    })
+                    .response;
+                let commands = ui
+                    .menu_button("Commands", |ui| {
+                        self.menu_item(ui, "campaign", "Run Evolutionary Loop");
+                        self.menu_item(ui, "probe", "Probe LLM Endpoint");
+                        self.menu_item(ui, "view_lab", "Evaluate Candidate Sandbox");
+                        self.menu_item(ui, "frontier", "Calculate Pareto Frontier");
+                    })
+                    .response;
+                let window = ui
+                    .menu_button("Window", |ui| {
+                        self.menu_item(ui, "reset_layout", "Reset Panel Layout");
+                        ui.separator();
+                        self.menu_item(ui, "view_lineage", "Lineage DAG Viewport");
+                        self.menu_item(ui, "view_cards", "Candidate Diff Inspector");
+                        self.menu_item(ui, "view_studio", "Live Run");
+                    })
+                    .response;
+                let help = ui
+                    .menu_button("Help", |ui| {
+                        self.menu_item(ui, "palette", "Command Palette... (Ctrl+K)");
+                        self.menu_item(ui, "shortcuts", "Keyboard Shortcuts... (F1)");
+                        self.menu_item(ui, "docs", "Project Files and Docs...");
+                        self.menu_item(ui, "licenses", "Licenses and Notices...");
+                        ui.separator();
+                        self.menu_item(ui, "about", "About RSICraft");
+                    })
+                    .response;
+                switch_on_hover(
+                    ui.ctx(),
+                    &[file, edit, view, insert, modify, commands, window, help],
+                );
+            });
+        });
+    }
+
+    fn render_active_dialog(&mut self, ctx: &egui::Context) {
+        let Some(dialog) = self.active_dialog else {
+            return;
+        };
+        let title = match dialog {
+            StudioDialog::CommandPalette => "Command Palette",
+            StudioDialog::Shortcuts => "Keyboard Shortcuts",
+            StudioDialog::Docs => "Project Files and Docs",
+            StudioDialog::Licenses => "Licenses and Notices",
+            StudioDialog::About => "About RSICraft",
+        };
+        let mut open = true;
+        egui::Window::new(title).open(&mut open).show(ctx, |ui| {
+            match dialog {
+                StudioDialog::CommandPalette => {
+                    ui.label("Filter, then run. Engine entries call Command::dispatch.");
+                    ui.text_edit_singleline(&mut self.palette_query);
+                    let q = self.palette_query.to_ascii_lowercase();
+                    for (id, label, shortcut) in MENU_CATALOG {
+                        if !q.is_empty()
+                            && !label.to_ascii_lowercase().contains(&q)
+                            && !id.contains(q.as_str())
+                        {
+                            continue;
+                        }
+                        let text = if shortcut.is_empty() {
+                            (*label).to_string()
+                        } else {
+                            format!("{label}  ({shortcut})")
+                        };
+                        if ui.button(text).clicked() {
+                            match self.menu_action(id) {
+                                Ok(_) => {}
+                                Err(e) => self.status_banner = e,
+                            }
+                            let opens_dialog = matches!(
+                                *id,
+                                "palette" | "shortcuts" | "docs" | "licenses" | "about"
+                            );
+                            if !opens_dialog {
+                                self.active_dialog = None;
+                            }
+                        }
+                    }
+                }
+                StudioDialog::Shortcuts => {
+                    for (id, label, shortcut) in MENU_CATALOG {
+                        if shortcut.is_empty() {
+                            continue;
+                        }
+                        ui.label(format!("{shortcut}    {label}    [{id}]"));
+                    }
+                }
+                StudioDialog::Docs => {
+                    ui.label("Opens the file with the system handler.");
+                    for rel in [
+                        "docs/PRD.md",
+                        "docs/ARCHITECTURE.md",
+                        "docs/TIERED_PLAN.md",
+                        "HANDOVER.md",
+                        "README.md",
+                    ] {
+                        if ui.button(rel).clicked() {
+                            self.open_external(rel);
+                        }
+                    }
+                }
+                StudioDialog::Licenses => {
+                    ui.label("RSICraft is MIT OR Apache-2.0.");
+                    ui.label(
+                        "Workspace clippy denies unwrap, expect, panic, todo, and unimplemented.",
+                    );
+                    ui.label(
+                        "The crates do not declare forbid(unsafe_code). Dependencies include egui, eframe, rusqlite, serde, blake3, zstd, clap, and ureq.",
+                    );
+                }
+                StudioDialog::About => {
+                    ui.heading(format!("RSICraft {VERSION}"));
+                    ui.label("Core engine, 26-tool CLI and MCP server, egui studio.");
+                    ui.label(
+                        "Search is measured. No generation has been trained. The menu bar is this window's tier-4 shell.",
+                    );
+                }
+            }
+        });
+        if !open {
+            self.active_dialog = None;
+        }
+    }
+}
+
 fn harsh_visuals() -> egui::Visuals {
     let mut v = egui::Visuals::dark();
     v.panel_fill = Color32::from_rgb(10, 13, 18); // slate-950
@@ -841,11 +1370,15 @@ fn harsh_visuals() -> egui::Visuals {
 
 fn crisp_light_visuals() -> egui::Visuals {
     let mut v = egui::Visuals::light();
-    v.panel_fill = Color32::from_rgb(248, 250, 252);
-    v.window_fill = Color32::from_rgb(255, 255, 255);
-    v.extreme_bg_color = Color32::from_rgb(241, 245, 249);
-    v.override_text_color = Some(Color32::from_rgb(15, 23, 42));
-    v.widgets.noninteractive.bg_fill = Color32::from_rgb(255, 255, 255);
+    v.panel_fill = Color32::WHITE;
+    v.window_fill = Color32::WHITE;
+    v.extreme_bg_color = Color32::WHITE;
+    v.faint_bg_color = Color32::WHITE;
+    v.override_text_color = Some(Color32::BLACK);
+    v.weak_text_color = Some(Color32::BLACK);
+    v.widgets.noninteractive.bg_fill = Color32::WHITE;
+    v.widgets.noninteractive.fg_stroke = Stroke::new(1.0, Color32::BLACK);
+    v.widgets.inactive.fg_stroke = Stroke::new(1.0, Color32::BLACK);
     v.widgets.noninteractive.bg_stroke = Stroke::new(1.0, Color32::from_rgb(203, 213, 225));
     v.widgets.inactive.bg_fill = Color32::from_rgb(226, 232, 240);
     v.widgets.inactive.bg_stroke = Stroke::new(1.0, Color32::from_rgb(148, 163, 184));
@@ -3065,6 +3598,49 @@ impl eframe::App for RsiCraftApp {
             self.style_initialized = true;
         }
         handle_zoom(ui.ctx());
+        if self.theme_dirty {
+            ui.ctx().set_visuals(if self.dark_mode {
+                harsh_visuals()
+            } else {
+                crisp_light_visuals()
+            });
+            self.theme_dirty = false;
+        }
+        if self.zoom_reset {
+            ui.ctx().set_zoom_factor(1.0);
+            self.zoom_reset = false;
+        }
+        if let Some(text) = self.pending_copy.take() {
+            ui.ctx().copy_text(text);
+        }
+        if self.quit_requested {
+            ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
+            self.quit_requested = false;
+        }
+        self.render_menu_bar(ui);
+        self.render_active_dialog(ui.ctx());
+        let typing = ui.ctx().egui_wants_keyboard_input();
+        let mut hotkey: Option<&'static str> = None;
+        ui.input(|i| {
+            if i.key_pressed(egui::Key::F1) {
+                hotkey = Some("shortcuts");
+            } else if i.modifiers.command && i.key_pressed(egui::Key::K) {
+                hotkey = Some("palette");
+            } else if !typing && i.modifiers.command && i.key_pressed(egui::Key::N) {
+                hotkey = Some("new_task");
+            } else if !typing && i.modifiers.command && i.key_pressed(egui::Key::E) {
+                hotkey = Some("export");
+            } else if !typing && i.modifiers.command && i.key_pressed(egui::Key::Q) {
+                hotkey = Some("quit");
+            } else if !typing && i.modifiers.command && i.key_pressed(egui::Key::Num1) {
+                hotkey = Some("zoom_reset");
+            }
+        });
+        if let Some(id) = hotkey {
+            if let Err(e) = self.menu_action(id) {
+                self.status_banner = e;
+            }
+        }
         if self.repaint_ctx.is_none() {
             self.repaint_ctx = Some(ui.ctx().clone());
         }
@@ -3141,7 +3717,7 @@ impl eframe::App for RsiCraftApp {
                 ui.heading("Why RSICraft Flips the Script on Closed Frontier RSI");
                 ui.label("1. Western frontier labs (OpenAI Preparedness Framework, Anthropic ASL-4) treat Recursive Self-Improvement as a classified 'Skynet' threshold to justify keeping their automated AI R&D loops 100% closed.");
                 ui.label("2. Tsinghua University & Frontis.AI (Bowen Zhou, Ning Ding, Kaiyan Zhang, Junlin Yang, Che Jiang et al., arXiv:2607.28568) demystified RSI into an open-weights 4-operator evolutionary science (Draft, Improve, Debug, Crossover) running on a single consumer 24 GB RTX 4090 (FrontisAI/OpenRSI).");
-                ui.label("3. RSICraft compiles that exact architecture into a zero-panic Pure-Rust ArtCraft 3-Crate workspace (rsicraft-core, rsicraft-mcp, rsicraft-app) with SQLite WAL + BLAKE3/Zstd CAS and 14 MCP tools.");
+                ui.label("3. RSICraft compiles that architecture into a Pure-Rust 3-crate workspace (rsicraft-core, rsicraft-mcp, rsicraft-app) with SQLite WAL, BLAKE3/Zstd CAS, and 26 MCP tools.");
             });
         }
 
@@ -3175,9 +3751,14 @@ fn main() {
                 })
                 .is_ok()
             && app.view_mode == ViewMode::Cards
-            && tools().len() == 26;
+            && tools().len() == 26
+            && app.menu_action("frontier").is_ok()
+            && app.menu_action("about").is_ok()
+            && app.active_dialog == Some(StudioDialog::About);
         if ok {
-            println!("smoke: ok (rsicraft-app {VERSION}, default_view=cards, tools=26, tabs=9)");
+            println!(
+                "smoke: ok (rsicraft-app {VERSION}, default_view=cards, tools=26, tabs=9, menu=8)"
+            );
             std::process::exit(0);
         }
         eprintln!("smoke: failed");
@@ -3253,6 +3834,28 @@ mod tests {
         app.trigger_step(SearchOperator::Draft);
         assert!(!app.is_busy());
         assert!(app.status_banner.contains("invalid provider"));
+    }
+
+    #[test]
+    fn menu_catalog_reaches_dispatch_or_a_dialog() {
+        let mut app = RsiCraftApp::new(None).unwrap();
+        for (id, _label, _shortcut) in MENU_CATALOG {
+            if matches!(
+                *id,
+                "probe" | "campaign" | "step_improve" | "step_debug" | "step_crossover"
+            ) {
+                continue;
+            }
+            let err = app.menu_action(id).err();
+            if let Some(msg) = err {
+                assert!(
+                    !msg.contains("unknown menu action"),
+                    "{id} is not wired: {msg}"
+                );
+            }
+        }
+        assert_eq!(app.active_dialog, Some(StudioDialog::About));
+        assert!(app.menu_action("frontier").unwrap()["frontier"].is_array());
     }
 
     #[test]

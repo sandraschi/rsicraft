@@ -619,3 +619,37 @@ fn step_phases_compose_to_the_same_result_as_dispatch() {
     assert!(plan_step(&ctx, "opt-synth", SearchOperator::Draft, "bogus", "demo", 5).is_err());
     assert!(plan_step(&ctx, "opt-synth", SearchOperator::Draft, "demo", "bogus", 5).is_err());
 }
+
+#[test]
+fn promote_gate_trials_clamp_matches_the_schema() {
+    let low = Command::from_tool("rsi_promote_gate", &json!({"trials": 1, "steps": 0}));
+    let high = Command::from_tool("rsi_promote_gate", &json!({"trials": 100, "steps": 1000}));
+    assert!(matches!(
+        low,
+        Ok(Command::PromoteGate {
+            trials: 3,
+            steps: 1,
+            timeout_secs: 30,
+            ref sandbox_mode,
+            ..
+        }) if sandbox_mode == "local"
+    ));
+    assert!(matches!(
+        high,
+        Ok(Command::PromoteGate {
+            trials: 20,
+            steps: 64,
+            ..
+        })
+    ));
+}
+
+#[test]
+fn help_api_tab_does_not_claim_a_finished_ladder() {
+    let help = help::query_help(Some("api"), None).ok();
+    let text = help.map(|v| v.to_string()).unwrap_or_default();
+    assert!(text.contains("campaigns do not use it"), "{text}");
+    assert!(text.contains("does not change the active model"), "{text}");
+    assert!(!text.contains("Thompson"), "{text}");
+    assert!(!text.contains("advancing active model"), "{text}");
+}

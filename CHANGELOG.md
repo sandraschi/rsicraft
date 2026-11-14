@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Desktop studio gained the 8-menu bar and the five Help dialogs. Engine menu entries call `Command::dispatch`. `switch_on_hover` moves between open menus.
+- `rsicraft --smoke` checks status, hardware, help, and the 26-tool count without a subcommand.
+- Recorded the finished pack-v2 9B run (`docs/BENCH_AMP_V2.md`): 15 of 15 complete, 2 runs with a success card, amplification gate not met. Handover, PRD goal G2, and the parity plan now say that.
+- Corrected documents and in-app help that described a finished 4-rung ladder, Thompson sampling driving campaigns, LoRA advancing the active model, an 8-menu bar, FastMCP, and a 22-tool bus.
+- `rsicraft promote` now forwards `--steps`, `--sandbox-mode`, and `--timeout-secs`. Trials passed to `rsi_promote_gate` clamp to 3..=20 (default 5), matching the tool schema.
+
 ## 0.3.1 - 2026-11-11
 
 ### Documentation Synchronization, Pack-v1 Benchmarks & Recompiled Brochure Suite

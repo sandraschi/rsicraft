@@ -451,7 +451,7 @@ impl Command {
                 })
             }
             "rsi_promote_gate" => {
-                let trials = u32::try_from(opt_u64(args, "trials", 5).clamp(1, 100)).unwrap_or(5);
+                let trials = u32::try_from(opt_u64(args, "trials", 5).clamp(3, 20)).unwrap_or(5);
                 Ok(Self::PromoteGate {
                     task_id: opt_str(args, "task_id").unwrap_or_else(|| "opt-synth".into()),
                     trials,
@@ -724,7 +724,7 @@ pub fn tools() -> Vec<Value> {
                 "baseline_alias": { "type": "string", "description": "Baseline model alias (defaults to the task's current model)." },
                 "candidate_alias": { "type": "string", "description": "Required. Alias under which the endpoint serves the model to test." }
             }),
-            &[],
+            &["candidate_alias"],
         ),
     ]
 }
