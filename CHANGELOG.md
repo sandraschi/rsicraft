@@ -2,10 +2,11 @@
 
 ## Unreleased
 
+- Undo and redo restore SQLite snapshots (up to 8). Open Database and Save As use a file dialog. Save checkpoints a file-backed store. Cut, paste, and select all still have no selection.
 - The built-in manual is ten tabs (`start`, `rsi`, `based_on`, `quickstart`, `providers`, `tasks`, `concepts`, `api`, `troubleshoot`, `faq`). The studio Help page and "What is RSI?" page read that text. `docs/GUIDE.md` and `docs/help/index.html` are generated from it.
 - LLM failures are classified (`config`, `unreachable`, `timeout`, `model_not_found`, `auth_required`, `context_overflow`, `server_error`, `bad_request`, `bad_response`, `budget_exhausted`, `empty_answer`, `no_code`). A campaign preflights the provider and stops on a fatal class. An answer with no top-level function is `no_code` and is not evaluated. `rsicraft probe` returns that diagnosis and does not fail the call.
 - `--llama-url` and `--model` follow `RSICRAFT_LLM_URL` and `RSICRAFT_MODEL`. `RSICRAFT_LLM_API_KEY` is sent as a Bearer token when set.
-- Desktop studio gained the 8-menu bar and the five Help dialogs. Engine menu entries call `Command::dispatch`. `switch_on_hover` moves between open menus. Undo, redo, save, and Open Database set a status banner. There is no undo stack and no file picker.
+- Desktop studio gained the 8-menu bar and the five Help dialogs. Engine menu entries call `Command::dispatch`. `switch_on_hover` moves between open menus.
 - `rsicraft --smoke` checks status, hardware, help, and the 26-tool count without a subcommand.
 - A non-2xx llama-server response now keeps a short response body on the step error.
 - `rsi-base-35b` was rewritten so its template and `num_ctx` match `rsi-frontis-35b`. `scripts/align-35b-alias.ps1` is that repair.

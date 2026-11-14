@@ -140,6 +140,14 @@ const MENU_CATALOG: &[(&str, &str, &str)] = &[
     ("help_api", "Operator Manual", ""),
 ];
 
+const UNDO_CAP: usize = 8;
+
+struct StoreSnap {
+    label: &'static str,
+    path: Option<PathBuf>,
+    bytes: Vec<u8>,
+}
+
 pub struct RsiCraftApp {
     pub ctx: Ctx,
     pub page: StudioPage,
@@ -192,6 +200,12 @@ pub struct RsiCraftApp {
     pub quit_requested: bool,
     pub pending_copy: Option<String>,
     pub zoom_reset: bool,
+    undo: Vec<StoreSnap>,
+    redo: Vec<StoreSnap>,
+    open_recent: Vec<PathBuf>,
+    pick_open: bool,
+    pick_save: bool,
+    pending_recent: Option<usize>,
 
     // 3D RTX 4090 GPU Studio State
     pub gpu_rot_x: f32,
@@ -340,6 +354,12 @@ impl RsiCraftApp {
             quit_requested: false,
             pending_copy: None,
             zoom_reset: false,
+            undo: Vec::new(),
+            redo: Vec::new(),
+            open_recent: Vec::new(),
+            pick_open: false,
+            pick_save: false,
+            pending_recent: None,
             gpu_rot_x: -0.32,
             gpu_rot_y: 0.65,
             gpu_auto_spin: true,
@@ -363,6 +383,219 @@ impl RsiCraftApp {
 
     pub fn exec(&mut self, cmd: Command) -> Result<Value, String> {
         dispatch(&mut self.ctx, cmd)
+    }
+
+    fn remember_before(&mut self, label: &'static str) -> bool {
+        match self.ctx.reg.snapshot_bytes() {
+            Ok(bytes) => {
+                self.redo.clear();
+                self.undo.push(StoreSnap {
+                    label,
+                    path: self.ctx.reg.db_path().map(Path::to_path_buf),
+                    bytes,
+                });
+                if self.undo.len() > UNDO_CAP {
+                    let extra = self.undo.len() - UNDO_CAP;
+                    self.undo.drain(..extra);
+                }
+                true
+            }
+            Err(e) => {
+                self.status_banner = format!("Could not snapshot the store: {e}");
+                false
+            }
+        }
+    }
+
+    fn adopt_store(&mut self) {
+        self.ctx.hyperparams = self.ctx.reg.load_hyperparams();
+        self.refresh_all();
+    }
+
+    /// Run a store mutation that Undo can put back.
+    pub fn undoable(&mut self, label: &'static str, cmd: Command) -> Result<Value, String> {
+        if self.job.is_some() {
+            let msg = "A run is in progress. Undoable edits wait until it finishes.".to_string();
+            self.status_banner = msg.clone();
+            return Err(msg);
+        }
+        if !self.remember_before(label) {
+            return Err(self.status_banner.clone());
+        }
+        match self.exec(cmd) {
+            Ok(v) => Ok(v),
+            Err(e) => {
+                self.undo.pop();
+                Err(e)
+            }
+        }
+    }
+
+    fn restore_snap(&mut self, snap: StoreSnap) -> Result<(), String> {
+        self.ctx
+            .reg
+            .restore_bytes(&snap.bytes, snap.path)
+            .map_err(|e| e.to_string())?;
+        self.adopt_store();
+        Ok(())
+    }
+
+    fn undo_store(&mut self) -> Result<Value, String> {
+        if self.job.is_some() {
+            self.status_banner = "Undo waits until the run finishes".into();
+            return Ok(json!({ "undo": "busy" }));
+        }
+        let Some(snap) = self.undo.pop() else {
+            self.status_banner = "Nothing to undo".into();
+            return Ok(json!({ "undo": false }));
+        };
+        let label = snap.label;
+        let current = match self.ctx.reg.snapshot_bytes() {
+            Ok(bytes) => StoreSnap {
+                label: "redo",
+                path: self.ctx.reg.db_path().map(Path::to_path_buf),
+                bytes,
+            },
+            Err(e) => {
+                self.undo.push(snap);
+                return Err(e.to_string());
+            }
+        };
+        self.restore_snap(snap)?;
+        self.redo.push(current);
+        self.status_banner = format!("Undid {label}");
+        Ok(json!({ "undo": label }))
+    }
+
+    fn redo_store(&mut self) -> Result<Value, String> {
+        if self.job.is_some() {
+            self.status_banner = "Redo waits until the run finishes".into();
+            return Ok(json!({ "redo": "busy" }));
+        }
+        let Some(snap) = self.redo.pop() else {
+            self.status_banner = "Nothing to redo".into();
+            return Ok(json!({ "redo": false }));
+        };
+        let current = match self.ctx.reg.snapshot_bytes() {
+            Ok(bytes) => StoreSnap {
+                label: "undo",
+                path: self.ctx.reg.db_path().map(Path::to_path_buf),
+                bytes,
+            },
+            Err(e) => {
+                self.redo.push(snap);
+                return Err(e.to_string());
+            }
+        };
+        self.restore_snap(snap)?;
+        self.undo.push(current);
+        self.status_banner = "Redid the last edit".into();
+        Ok(json!({ "redo": true }))
+    }
+
+    fn note_recent(&mut self, path: PathBuf) {
+        self.open_recent.retain(|p| p != &path);
+        self.open_recent.insert(0, path);
+        self.open_recent.truncate(5);
+    }
+
+    pub fn save_store_as(&mut self, path: PathBuf) -> Result<(), String> {
+        if self.job.is_some() {
+            return Err("A run is in progress".into());
+        }
+        let bytes = self.ctx.reg.snapshot_bytes().map_err(|e| e.to_string())?;
+        if !self.remember_before("save as") {
+            return Err(self.status_banner.clone());
+        }
+        self.ctx
+            .reg
+            .restore_bytes(&bytes, Some(path.clone()))
+            .map_err(|e| e.to_string())?;
+        self.adopt_store();
+        self.note_recent(path.clone());
+        self.status_banner = format!("Saved {}", path.display());
+        Ok(())
+    }
+
+    pub fn open_store_at(&mut self, path: PathBuf) -> Result<(), String> {
+        if self.job.is_some() {
+            return Err("A run is in progress".into());
+        }
+        if !path.is_file() {
+            return Err(format!("No database at {}", path.display()));
+        }
+        if !self.remember_before("open database") {
+            return Err(self.status_banner.clone());
+        }
+        match Registry::open(&path) {
+            Ok(reg) => {
+                self.ctx.reg = reg;
+                self.adopt_store();
+                self.note_recent(path.clone());
+                self.status_banner = format!("Opened {}", path.display());
+                Ok(())
+            }
+            Err(e) => {
+                self.undo.pop();
+                Err(e.to_string())
+            }
+        }
+    }
+
+    fn browse_open(&mut self) {
+        let mut dialog = rfd::FileDialog::new().add_filter("SQLite", &["db", "sqlite"]);
+        if let Some(path) = self.ctx.reg.db_path().and_then(|p| p.parent()) {
+            dialog = dialog.set_directory(path);
+        }
+        if let Some(path) = dialog.pick_file() {
+            if let Err(e) = self.open_store_at(path) {
+                self.status_banner = e;
+            }
+        }
+    }
+
+    fn browse_save(&mut self) {
+        let mut dialog = rfd::FileDialog::new()
+            .add_filter("SQLite", &["db"])
+            .set_file_name("rsicraft.db");
+        if let Some(path) = self.ctx.reg.db_path().and_then(|p| p.parent()) {
+            dialog = dialog.set_directory(path);
+        }
+        if let Some(mut path) = dialog.save_file() {
+            if path.extension().is_none() {
+                path.set_extension("db");
+            }
+            if let Err(e) = self.save_store_as(path) {
+                self.status_banner = e;
+            }
+        }
+    }
+
+    fn apply_file_picks(&mut self) {
+        if self.job.is_some() {
+            if self.pick_open || self.pick_save || self.pending_recent.is_some() {
+                self.status_banner = "File changes wait until the run finishes".into();
+            }
+            self.pick_open = false;
+            self.pick_save = false;
+            self.pending_recent = None;
+            return;
+        }
+        if self.pick_open {
+            self.pick_open = false;
+            self.browse_open();
+        }
+        if self.pick_save {
+            self.pick_save = false;
+            self.browse_save();
+        }
+        if let Some(i) = self.pending_recent.take() {
+            if let Some(path) = self.open_recent.get(i).cloned() {
+                if let Err(e) = self.open_store_at(path) {
+                    self.status_banner = e;
+                }
+            }
+        }
     }
 
     pub fn refresh_all(&mut self) {
@@ -734,6 +967,7 @@ impl RsiCraftApp {
         };
         match msg {
             WorkerMsg::Eval(plan, res) => {
+                let snapped = res.is_ok() && self.remember_before("evaluate");
                 match res.and_then(|r| commit_evaluate(&self.ctx, &plan, &r)) {
                     Ok(v) => {
                         self.lab_last_eval = Some(v);
@@ -741,11 +975,17 @@ impl RsiCraftApp {
                             "Sandbox evaluation completed and recorded".to_string();
                         self.refresh_all();
                     }
-                    Err(e) => self.status_banner = format!("Evaluation error: {e}"),
+                    Err(e) => {
+                        if snapped {
+                            self.undo.pop();
+                        }
+                        self.status_banner = format!("Evaluation error: {e}");
+                    }
                 }
             }
             WorkerMsg::Step(plan, res) => {
                 let secs = job.step_started.elapsed().as_secs_f32();
+                let snapped = res.is_ok() && self.remember_before("step");
                 match res.and_then(|o| commit_step(&self.ctx, &plan, &o)) {
                     Ok(step) => {
                         job.done += 1;
@@ -773,6 +1013,9 @@ impl RsiCraftApp {
                         }
                     }
                     Err(e) => {
+                        if snapped {
+                            self.undo.pop();
+                        }
                         // No card came out of this step. Setup problems (server
                         // unreachable, unknown model, missing key, bad address)
                         // end the run at once; otherwise a campaign skips one
@@ -1023,15 +1266,41 @@ impl RsiCraftApp {
                 Ok(go(self.page))
             }
             "open_db" => {
-                self.status_banner =
-                    "The studio uses RSICRAFT_DB or an in-memory store. There is no file picker."
-                        .into();
-                Ok(json!({ "db": "env" }))
+                if self.job.is_some() {
+                    self.status_banner = "Open Database waits until the run finishes".into();
+                } else {
+                    self.pick_open = true;
+                    self.status_banner = "Choose a SQLite database".into();
+                }
+                Ok(json!({ "db": "pick" }))
             }
-            "save" | "save_as" => {
-                self.status_banner =
-                    "Each command writes the SQLite store immediately. There is no separate save file.".into();
-                Ok(json!({ "persisted": "store" }))
+            "save" => {
+                if self.job.is_some() {
+                    self.status_banner = "Save waits until the run finishes".into();
+                    return Ok(json!({ "persisted": "busy" }));
+                }
+                if let Some(path) = self.ctx.reg.db_path().map(Path::to_path_buf) {
+                    match self.ctx.reg.checkpoint() {
+                        Ok(()) => {
+                            self.status_banner = format!("Saved {}", path.display());
+                            Ok(json!({ "persisted": path.display().to_string() }))
+                        }
+                        Err(e) => Err(e.to_string()),
+                    }
+                } else {
+                    self.pick_save = true;
+                    self.status_banner = "This store is in memory. Choose a file.".into();
+                    Ok(json!({ "persisted": "pick" }))
+                }
+            }
+            "save_as" => {
+                if self.job.is_some() {
+                    self.status_banner = "Save As waits until the run finishes".into();
+                } else {
+                    self.pick_save = true;
+                    self.status_banner = "Choose where to save the database".into();
+                }
+                Ok(json!({ "persisted": "pick" }))
             }
             "export" => {
                 let tid = self.active_task_id.clone();
@@ -1057,10 +1326,11 @@ impl RsiCraftApp {
                 self.status_banner = "Quit requested".into();
                 Ok(json!({ "quit": true }))
             }
-            "undo" | "redo" | "cut" | "paste" | "select_all" => {
+            "undo" => self.undo_store(),
+            "redo" => self.redo_store(),
+            "cut" | "paste" | "select_all" => {
                 self.status_banner =
-                    "This studio has no undo stack or marquee selection. Copy uses the open card."
-                        .into();
+                    "Cut, paste, and select all have no selection. Copy uses the open card.".into();
                 Ok(json!({ "edit": id }))
             }
             "copy_card" => {
@@ -1128,7 +1398,7 @@ impl RsiCraftApp {
                 self.status_banner = "Zoom reset to 100%".into();
                 Ok(json!({ "zoom": 1.0 }))
             }
-            "seed" => match self.exec(Command::DemoSeed) {
+            "seed" => match self.undoable("seed", Command::DemoSeed) {
                 Ok(v) => {
                     self.refresh_all();
                     self.status_banner = "Seeded the demo task".into();
@@ -1156,10 +1426,13 @@ impl RsiCraftApp {
             }
             "prune" => {
                 let tid = self.active_task_id.clone();
-                let v = self.exec(Command::CardsPrune {
-                    task_id: tid,
-                    keep_frontier: 10,
-                })?;
+                let v = self.undoable(
+                    "prune",
+                    Command::CardsPrune {
+                        task_id: tid,
+                        keep_frontier: 10,
+                    },
+                )?;
                 self.refresh_all();
                 self.status_banner = "Pruned cards outside the frontier".into();
                 Ok(v)
@@ -1268,13 +1541,24 @@ impl RsiCraftApp {
     }
 
     fn render_menu_bar(&mut self, ui: &mut egui::Ui) {
+        let recent = self.open_recent.clone();
         egui::Panel::top("top_menubar").show(ui, |ui| {
             egui::MenuBar::new().ui(ui, |ui| {
                 let file = ui
                     .menu_button("File", |ui| {
                         self.menu_item(ui, "new_task", "New Task... (Ctrl+N)");
                         self.menu_item(ui, "open_db", "Open Database... (Ctrl+O)");
-                        ui.label("Open Recent: none");
+                        if recent.is_empty() {
+                            ui.label("Open Recent: none");
+                        } else {
+                            for (i, path) in recent.iter().enumerate() {
+                                let label = format!("Recent: {}", path.display());
+                                if ui.button(label).clicked() {
+                                    self.pending_recent = Some(i);
+                                    ui.close();
+                                }
+                            }
+                        }
                         ui.separator();
                         self.menu_item(ui, "save", "Save (Ctrl+S)");
                         self.menu_item(ui, "save_as", "Save As... (Ctrl+Shift+S)");
@@ -1438,7 +1722,7 @@ impl RsiCraftApp {
                         "Workspace clippy denies unwrap, expect, panic, todo, and unimplemented.",
                     );
                     ui.label(
-                        "The crates do not declare forbid(unsafe_code). Dependencies include egui, eframe, rusqlite, serde, blake3, zstd, clap, and ureq.",
+                        "The crates do not declare forbid(unsafe_code). Dependencies include egui, eframe, rfd, rusqlite, serde, blake3, zstd, clap, and ureq.",
                     );
                 }
                 StudioDialog::About => {
@@ -3454,7 +3738,7 @@ impl RsiCraftApp {
                         description: self.edit_task_desc.clone(),
                         evaluator_script: self.edit_evaluator.clone(),
                     };
-                    match self.exec(cmd) {
+                    match self.undoable("task", cmd) {
                         Ok(_) => {
                             self.active_task_id = self.edit_task_id.clone();
                             self.status_banner = format!("Upserted task '{}'", self.edit_task_id);
@@ -3792,6 +4076,7 @@ impl eframe::App for RsiCraftApp {
             self.quit_requested = false;
         }
         self.render_menu_bar(ui);
+        self.apply_file_picks();
         self.render_active_dialog(ui.ctx());
         let typing = ui.ctx().egui_wants_keyboard_input();
         let mut hotkey: Option<&'static str> = None;
@@ -3802,6 +4087,20 @@ impl eframe::App for RsiCraftApp {
                 hotkey = Some("palette");
             } else if !typing && i.modifiers.command && i.key_pressed(egui::Key::N) {
                 hotkey = Some("new_task");
+            } else if !typing && i.modifiers.command && i.key_pressed(egui::Key::O) {
+                hotkey = Some("open_db");
+            } else if !typing
+                && i.modifiers.command
+                && i.modifiers.shift
+                && i.key_pressed(egui::Key::S)
+            {
+                hotkey = Some("save_as");
+            } else if !typing && i.modifiers.command && i.key_pressed(egui::Key::S) {
+                hotkey = Some("save");
+            } else if !typing && i.modifiers.command && i.key_pressed(egui::Key::Z) {
+                hotkey = Some("undo");
+            } else if !typing && i.modifiers.command && i.key_pressed(egui::Key::Y) {
+                hotkey = Some("redo");
             } else if !typing && i.modifiers.command && i.key_pressed(egui::Key::E) {
                 hotkey = Some("export");
             } else if !typing && i.modifiers.command && i.key_pressed(egui::Key::Q) {
@@ -4037,6 +4336,56 @@ mod tests {
         }
         assert_eq!(app.active_dialog, Some(StudioDialog::About));
         assert!(app.menu_action("frontier").unwrap()["frontier"].is_array());
+    }
+
+    #[test]
+    fn undo_and_save_as_roundtrip_the_store() {
+        let mut app = RsiCraftApp::new(None).unwrap();
+        let before = app.exec(Command::Status).unwrap()["tasks_count"]
+            .as_u64()
+            .unwrap();
+        app.undoable(
+            "task",
+            Command::TaskUpsert {
+                task_id: "undo-me".into(),
+                name: "Undo me".into(),
+                description: "temporary".into(),
+                evaluator_script: "print('RSI_METRIC_JSON={\"status\":\"SUCCESS\",\"score\":1}')"
+                    .into(),
+            },
+        )
+        .unwrap();
+        let mid = app.exec(Command::Status).unwrap()["tasks_count"]
+            .as_u64()
+            .unwrap();
+        assert!(mid > before);
+        app.menu_action("undo").unwrap();
+        assert_eq!(
+            app.exec(Command::Status).unwrap()["tasks_count"].as_u64(),
+            Some(before)
+        );
+        app.menu_action("redo").unwrap();
+        assert_eq!(
+            app.exec(Command::Status).unwrap()["tasks_count"].as_u64(),
+            Some(mid)
+        );
+
+        let dir = std::env::temp_dir().join(format!("rsicraft-app-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("studio.db");
+        app.save_store_as(path.clone()).unwrap();
+        assert_eq!(app.ctx.reg.db_path(), Some(path.as_path()));
+        app.open_store_at(path.clone()).unwrap();
+        assert_eq!(
+            app.exec(Command::Status).unwrap()["tasks_count"].as_u64(),
+            Some(mid)
+        );
+        app.menu_action("undo").unwrap();
+        assert_eq!(app.ctx.reg.db_path(), Some(path.as_path()));
+        app.menu_action("undo").unwrap();
+        assert!(app.ctx.reg.db_path().is_none());
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_dir(&dir);
     }
 
     #[test]
