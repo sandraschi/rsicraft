@@ -26,7 +26,7 @@ The 9B amplification run completed. Report: `docs/BENCH_AMP_V2.md`. Raw files: `
 ## Next steps, in order
 
 1. Treat the product as a search tool until a pack produces a working candidate on most runs. Designing a new pack is optional. Training is not next.
-2. Diagnose the no-card and aborted steps from the saved campaign JSON (35B pack-v1 and 9B pack-v2). Suspect remains the 12,288-token completion budget against a 16,384-token context.
+2. Pack-v2 9B campaign JSON is counted in `docs/BENCH_AMP_V2.md`: 23 skipped steps spent the 12,288-token completion budget on reasoning, 8 skipped steps are Ollama HTTP 500, and 4 campaigns died before a report (2 budget, 2 HTTP 500). The default stays 12,288. Still open: the same count on 35B pack-v1, and whether the 500s are context overflow.
 3. Make `rsi-base-35b` and `rsi-frontis-35b` identical in parameters (the base alias has extra stop tokens and a temperature line).
 4. The 35B pack-v2 comparison stays blocked until step 2 is fixed.
 5. Then the rest of Phase 1 in the plan (token accounting, `runs` table, real bandit, ablations).
@@ -41,7 +41,7 @@ Unchanged from the state table in the plan, section 2. Short form:
 
 ## Verification
 
-- 2026-11-14: `cargo test --workspace` 38 passed (30 core, 4 mcp, 4 app) after `cli_smoke_checks_status_hardware_help_and_tool_count`. `cargo clippy --workspace --all-targets -- -D warnings` and `cargo fmt --all --check` were clean on the menu-bar pass. Release build re-runs the gates.
+- 2026-11-14: `scripts/release.ps1` exited 0. Gates passed, release smoke passed (app, CLI `--smoke`, MCP initialize). Artifacts are in `dist\`: `rsicraft-app.exe` (14.2 MB), `rsicraft.exe` (4.9 MB), `rsicraft-0.3.1-setup.exe`, the portable zip, and `rsicraft-v0.3.1.mcpb`. Not published. Tag `v0.3.1` already exists, so a later publish needs a version bump. `CHANGELOG_LATEST.md` is still missing.
 - pack-v2 evaluators were checked earlier with a weak and a medium candidate each.
 - An uncommitted light-theme contrast edit in `crates/rsicraft-app/src/main.rs` was already in the tree. This pass did not make it.
 - Not verified: the egui Live Run panel on screen; `train_lora.py`; the promotion gate against two real models.

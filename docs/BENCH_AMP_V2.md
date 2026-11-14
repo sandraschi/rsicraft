@@ -34,7 +34,12 @@ Raw data: `%LOCALAPPDATA%\rsicraft\bench\amp-v2-qwen9b\` (`bench.log`, `results.
 
 13 of 15 runs have zero success cards. The two that scored are schedule trial 2 (one card, best 252.67, first success at step 2) and classify trial 3 (four cards, best 64.25, first success at step 3). A median amplification across tasks cannot be computed from this table.
 
-`bench.log` records two repeating failures on the aborted runs: the completion budget was spent on reasoning and no code was drafted, and Ollama returned HTTP 500. That is a lead, not a finished diagnosis.
+The 15 campaign JSON files under `%LOCALAPPDATA%\rsicraft\bench\amp-v2-qwen9b\rsi-qwen9b_latest\` split into two failures and nothing else.
+
+- 4 files are a bare error, with no campaign report: schedule trials 1 and 3 (completion budget spent on reasoning, no code), and tsp trials 1 and 2 (Ollama HTTP 500).
+- The other 11 reports list 31 skipped steps: 23 completion-budget, 8 HTTP 500. Eight of those reports aborted. Three ran to the end (classify trial 1, best 0; classify trial 3, best 64.25; regression trial 3, best 0).
+
+`DEFAULT_MAX_TOKENS` is 12,288 and the `rsi-qwen9b` context cap is 16,384. Raising the completion budget shrinks the room left for the prompt. The HTTP 500s are a separate failure. The default stays 12,288 until those two are pulled apart.
 
 ## What this does to the plan
 
