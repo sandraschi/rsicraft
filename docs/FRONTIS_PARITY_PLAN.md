@@ -63,7 +63,7 @@ The most achievable real result is narrower than "RSI": a fine-tuned small model
 | Operator bandit (`rsi_bandit_status`) | **Advisory only, mislabeled** | not Thompson sampling (posterior mean plus hand-set biases) and not wired into campaigns |
 | Model generations on a task | **Real since today** | steps now send the task's promoted alias to the endpoint; before today the generation number was cosmetic |
 | LoRA training (`rsi_train_step`) | **Real code path, never run end to end** | `train_lora.py` is a standard PEFT script, unverified on Goliath |
-| Task packs and model-swap benchmark | **Real** | `tasks/pack-v1`, `tasks/pack-v2`, `scripts/bench-models.ps1`, `scripts/bench-analyze.ps1`. pack-v1 report: `BENCH_MODELSWAP_V2.md`. pack-v2 9B report: `BENCH_AMP_V2.md` (gate failed) |
+| Task packs and model-swap benchmark | **Real** | `tasks/pack-v1`, `tasks/pack-v2`, `scripts/bench-models.ps1`, `scripts/bench-analyze.ps1`. pack-v1 report: `BENCH_MODELSWAP_V2.md`. pack-v2 9B report: `BENCH_AMP_V2.md` (invalid: extractor defect, rerun needed) |
 | Promotion gate (`rsi_promote_gate`) | **Real** | A/B of two served aliases over fresh searches, Welch t >= 2; refuses the demo sandbox |
 | Serving a trained adapter | **Missing** | no adapter-to-GGUF conversion, no endpoint registration |
 | Held-out task split | **In the pack files only** | each task file declares `split`; the store and the gate do not use it yet |
@@ -105,7 +105,7 @@ Done:
 - First model-swap run and report. Outcome: pack-v1 fails the amplification gate.
 - `scripts/bench-analyze.ps1`: per-run first / best / amplification table.
 - `tasks/pack-v2`: five quality-scored tasks without a textbook optimum (tsp, maxcut, regression as train; schedule, classify as held-out). Evaluators validated with weak and medium candidates.
-- 9B amplification run on pack-v2, finished 2026-11-12 15:04. Outcome: the gate fails. 13 of 15 runs produced no success card. Report: [BENCH_AMP_V2.md](BENCH_AMP_V2.md).
+- 9B amplification run on pack-v2, finished 2026-11-12 15:04: 13 of 15 runs produced no success card, but the run is invalid. The code extractor took fragments from the model's reasoning text and evaluated them (44% of cards had no `solve()`). Fixed in 212f2d5; the gate on pack-v2 is open until a rerun. Report: [BENCH_AMP_V2.md](BENCH_AMP_V2.md).
 
 **Amplification gate (mandatory):** a pack qualifies for training only if, on a majority of its tasks, the final best beats the first working candidate by more than the spread between repeat trials. Target: median amplification of 1.5 or more with at least 3 trials. Neither pack-v1 nor pack-v2 has passed.
 

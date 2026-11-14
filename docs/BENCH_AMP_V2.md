@@ -2,7 +2,9 @@
 
 **Run:** 2026-11-12 12:39 to 15:04, completed. 15 of 15 rows.
 **Question:** on quality-scored tasks, does search beat the first working candidate by enough to justify training?
-**Short answer:** no. The amplification gate (median 1.5 over at least 3 trials) was not met. Most runs never produced a working program, so the ratio is undefined.
+**Short answer:** not measured. This run is invalid as evidence about search or the model.
+
+**Correction (2026-11-14):** the harness had a defect during this run. When a reasoning model's final answer had no code block, the extractor took a code fence from its reasoning text. That was often a fragment echoed from the prompt (for example a fence opening followed by "markdown block"), which was then evaluated as if it were a program. 44% of the cards in this run had no `solve()` at all. The failures below therefore mostly measure the extractor, not the model. Fixed in commit 212f2d5: the prompt no longer contains a literal fence, only a closed fence that defines a function is taken from reasoning text, and an answer without a top-level function is recorded as `no_code` and not evaluated. The gate (median amplification 1.5 over at least 3 trials) remains open until pack-v2 is rerun with the fixed harness. The table is kept as the raw record of the defective run.
 
 Raw data: `%LOCALAPPDATA%\rsicraft\bench\amp-v2-qwen9b\` (`bench.log`, `results.csv`, one campaign JSON per run).
 
