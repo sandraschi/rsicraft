@@ -603,21 +603,21 @@ cargo run -p rsicraft-mcp -- help-tabs --tab tsinghua_openrsi
 <td><code>bandit</code></td>
 <td>learning</td>
 <td>Read-Only</td>
-<td>Bayesian Thompson Sampling bandit distributions, prior/posterior Beta parameters (Rung 3).</td>
+<td>Advisory per-operator statistics. Not Thompson sampling. Campaigns do not use it.</td>
 </tr>
 <tr>
 <td><code>rsi_train_step</code></td>
 <td><code>train</code></td>
 <td>learning</td>
 <td>Mutating</td>
-<td>Execute RTX 4090 LoRA fine-tuning step on curated experience traces, incrementing $G_t \to G_{t+1}$ (Rung 4).</td>
+<td>Export traces and run train_lora.py. Does not change the active model.</td>
 </tr>
 <tr>
 <td><code>rsi_promote_gate</code></td>
 <td><code>promote</code></td>
 <td>learning</td>
 <td>Mutating</td>
-<td>Statistical promotion gate: compare $G_t$ vs $G_{t-1}$ on benchmark suite with automatic rollback (Rung 4).</td>
+<td>Welch t gate between two served aliases. Promotes the alias only. Does not load an adapter.</td>
 </tr>
 </tbody></table>
 <p>---</p>

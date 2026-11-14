@@ -23,6 +23,10 @@ param(
 
 $ErrorActionPreference = 'Continue'
 
+# powershell -File passes 'a,b' as one string; accept that form too.
+$Models = @($Models | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+$OnlyTasks = @($OnlyTasks | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+
 if (-not $OutDir) {
     $OutDir = Join-Path $env:LOCALAPPDATA ('rsicraft\bench\' + (Get-Date -Format 'yyyyMMdd-HHmm'))
 }
@@ -89,6 +93,8 @@ foreach ($model in $Models) {
             $secs = [int]$sw.Elapsed.TotalSeconds
             $res = $null
             try { $res = ($raw -join "`n") | ConvertFrom-Json } catch { $res = $null }
+            # Keep the full campaign report (per-step results and the reason for every skipped step).
+            ($raw -join "`n") | Set-Content -LiteralPath (Join-Path $modelDir "$id-t$trial.json") -Encoding ascii
 
             if ($null -eq $res -or $null -eq $res.steps) {
                 $err = if ($res) { [string]$res.error } else { 'no parsable output' }

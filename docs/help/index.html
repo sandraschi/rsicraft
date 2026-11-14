@@ -457,9 +457,9 @@ rsicraft hardware --json</pre>
             <tr><td><code>rsi_hyperparams_set</code></td><td><code>hyperparams</code></td><td><code>w_score?, w_delta?, w_novelty?</code></td><td>Dynamically tune composite utility weights at runtime.</td></tr>
             <tr><td><code>rsi_demo_seed</code></td><td><code>demo-seed</code></td><td><code>{}</code></td><td>Seed an empty DB with the <code>opt-synth</code> benchmark and 4 cards.</td></tr>
             <tr><td><code>rsi_dataset_export</code></td><td><code>dataset-export</code></td><td><code>task_id, format, out?</code></td><td>Export SFT or DPO preference traces for offline model post-training (Rung 2).</td></tr>
-            <tr><td><code>rsi_bandit_status</code></td><td><code>bandit</code></td><td><code>task_id</code></td><td>Bayesian Thompson Sampling bandit distributions, prior/posterior Beta parameters (Rung 3).</td></tr>
-            <tr><td><code>rsi_train_step</code></td><td><code>train</code></td><td><code>task_id, dataset_path?, target_gen?</code></td><td>Execute RTX 4090 LoRA fine-tuning step on curated experience traces, incrementing G_t to G_t+1 (Rung 4).</td></tr>
-            <tr><td><code>rsi_promote_gate</code></td><td><code>promote</code></td><td><code>task_id, candidate_gen, baseline_gen?, trials?</code></td><td>Statistical promotion gate: compare G_t vs G_t-1 on benchmark suite with automatic rollback (Rung 4).</td></tr>
+            <tr><td><code>rsi_bandit_status</code></td><td><code>bandit</code></td><td><code>task_id</code></td><td>Advisory per-operator statistics. Not Thompson sampling. Campaigns do not use it.</td></tr>
+            <tr><td><code>rsi_train_step</code></td><td><code>train</code></td><td><code>task_id, epochs, learning_rate, dry_run</code></td><td>Export traces and run train_lora.py. Does not change the active model.</td></tr>
+            <tr><td><code>rsi_promote_gate</code></td><td><code>promote</code></td><td><code>task_id, candidate, baseline, trials, steps, sandbox_mode, timeout_secs</code></td><td>Welch t gate between two served aliases. Promotes the alias only. Does not load an adapter.</td></tr>
           </tbody>
         </table>
       </div>

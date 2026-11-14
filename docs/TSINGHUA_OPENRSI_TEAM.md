@@ -60,16 +60,16 @@ To maintain long-horizon diversity, `OpenMLE-Evo` introduced:
 
 ---
 
-## 4. How `RSICraft` Implements the Full 4-Rung Ladder
+## 4. How far `RSICraft` has climbed
 
-While the upstream `FrontisAI/OpenRSI` repository provides a Python research prototype primarily implementing the Rung 1 search runtime (`OpenMLE-Evo`), **RSICraft** hardens the entire 4-rung theoretical survey ladder into a zero-panic Rust engine:
+`FrontisAI/OpenRSI` is a Python research stack whose released runtime is the search loop. RSICraft reimplements that loop in Rust and has partial code for the later rungs. It has not closed the loop.
 
-| Layer | Upstream `FrontisAI/OpenRSI` (Python Reference Stack) | **`RSICraft` (Pure-Rust ArtCraft 3-Crate Engine)** |
+| Layer | Upstream `FrontisAI/OpenRSI` (Python Reference Stack) | **`RSICraft` today** |
 | :--- | :--- | :--- |
-| **Rung 1: Evolution** | Python heuristic search; single timing evaluations | **Rust `MultiTrial` sandbox ($N \ge 3$), sample mean, and standard deviation noise filtering** |
-| **Rung 2: Self-Evolution** | Ad-hoc trace logging | **Automated DAG mining; SFT positive delta extraction and contrastive DPO sibling pair generation** |
-| **Rung 3: Meta-Evolution** | Static operator scheduling | **Bayesian Thompson Sampling multi-armed bandit with Beta conjugate priors and phase transitions** |
-| **Rung 4: Closed-Loop RSI** | Separate offline scripts | **In-the-loop LoRA fine-tuning ($G_t \to G_{t+1}$) with comparative statistical promotion/rollback gate** |
+| **Rung 1: Evolution** | Python heuristic search | **Real.** Four operators, CAS store, local and Docker sandboxes. The sandbox can repeat a run. Evolutionary steps score once. |
+| **Rung 2: Self-Evolution** | Trace logging in the research stack | **Export exists.** SFT and DPO rows are mined from the DAG. Prompts are rebuilt, not the prompts the model saw. |
+| **Rung 3: Meta-Evolution** | Fixed operator schedule in the paper's harness | **Advisory statistics only.** Campaigns use a fixed cycle. No Thompson sampling. |
+| **Rung 4: Closed-Loop RSI** | Training and eval scripts outside the search loop | **Not closed.** `train_lora.py` has not been run end to end and does not change the active model. The promotion gate compares two served aliases. No adapter is served. |
 | **Host Language & Safety** | Multi-script Python orchestrator | **Pure Rust (`#![deny(unwrap, expect, panic, todo)]`)** |
 | **State & CAS Store** | Python pickle / state dictionaries | **SQLite `WAL` + 256-bit `BLAKE3` + `Zstd` (L3) CAS (`rsicraft-core::store`)** |
 | **RTX 4090 Inference** | vLLM / Python HTTP clients | **Zero-dependency Rust `LlamaClient` (`/v1/chat/completions`, 16k `q4_0` KV)** |
