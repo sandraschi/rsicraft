@@ -27,6 +27,20 @@ fn operator_temperatures_and_code_extraction() {
 }
 
 #[test]
+fn llama_status_failure_keeps_the_code_and_a_short_body() {
+    let msg = llm::format_status_failure(
+        "http://127.0.0.1:11434/v1/chat/completions",
+        500,
+        "runner stopped\nafter the budget",
+    );
+    assert!(msg.contains("status code 500"));
+    assert!(msg.contains("runner stopped after the budget"));
+    let clipped = llm::format_status_failure("http://example", 500, &"x".repeat(400));
+    assert!(clipped.chars().count() < 320);
+    assert!(llm::format_status_failure("http://example", 500, "  \n").ends_with("status code 500"));
+}
+
+#[test]
 fn sandbox_metric_parser_extracts_last_marker() {
     let logs = "Loading data...\nRSI_METRIC_JSON={\"status\":\"SUCCESS\",\"score\":91.25}\n";
     let (status, score) = SandboxRunner::parse_evaluator_output(logs);

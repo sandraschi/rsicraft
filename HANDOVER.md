@@ -26,7 +26,7 @@ The 9B amplification run completed. Report: `docs/BENCH_AMP_V2.md`. Raw files: `
 ## Next steps, in order
 
 1. Treat the product as a search tool until a pack produces a working candidate on most runs. Designing a new pack is optional. Training is not next.
-2. Pack-v2 9B campaign JSON is counted in `docs/BENCH_AMP_V2.md`: 23 skipped steps spent the 12,288-token completion budget on reasoning, 8 skipped steps are Ollama HTTP 500, and 4 campaigns died before a report (2 budget, 2 HTTP 500). The default stays 12,288. Still open: the same count on 35B pack-v1, and whether the 500s are context overflow.
+2. Pack-v2 9B is counted in `docs/BENCH_AMP_V2.md`. The HTTP 500s are the runner dying at the completion budget, or a second client loading a 262,144 context, not a prompt rejected up front. Pack-v1 has no per-step JSON: 81 of 259 attempted steps were skipped (31%), and 2 campaigns died on HTTP 500. `rsi-base-35b` and `rsi-frontis-35b` are still not the same alias. Do not `ollama create` over the base alias until its template is repaired on purpose. The 12,288 default stays.
 3. Make `rsi-base-35b` and `rsi-frontis-35b` identical in parameters (the base alias has extra stop tokens and a temperature line).
 4. The 35B pack-v2 comparison stays blocked until step 2 is fixed.
 5. Then the rest of Phase 1 in the plan (token accounting, `runs` table, real bandit, ablations).
