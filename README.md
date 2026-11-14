@@ -1,5 +1,15 @@
 # rsicraft
 
+## Install
+
+Tell Cursor, Claude, Antigravity, or OpenCode: **Install this.**
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install-craft.ps1
+```
+
+Installs the Windows app, the CLI, and the MCP bundle.
+
 rsicraft lets a language model running on your own machine write, test and improve small programs in a loop, and records every attempt with its parents. It is a single Rust program with a desktop studio, a command line and an MCP server, built to test the "self-improvement ladder" of the Frontis-MA1 paper on one consumer GPU.
 
 **New here?** Read [docs/GUIDE.md](docs/GUIDE.md) (or the Help page in the studio, or `rsicraft help-tabs`). It explains what this is, what recursive self-improvement means, what the project is based on, how to connect Ollama or LM Studio, how to write a task, and every error message.
