@@ -2,6 +2,8 @@
 
 **Navigation:** [README](../README.md) · [Install](../INSTALL.md) · [Development](DEVELOPMENT.md)
 
+Every model server error is printed as `[llm:<class>] what happened | fix: what to do`. The table of all classes and their fixes is in the guide: [Troubleshooting](GUIDE.md#9-troubleshooting) (also `rsicraft help-tabs --tab troubleshoot`). Run `rsicraft probe` first for any provider problem.
+
 This runbook documents real failure modes encountered and resolved during live verification on **Goliath** (AMD Ryzen 9 7900X, 64 GB DDR5, NVIDIA GeForce RTX 4090 24 GB VRAM) on **2026-11-09**.
 
 ---
