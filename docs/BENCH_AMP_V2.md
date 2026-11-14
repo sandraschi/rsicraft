@@ -39,7 +39,15 @@ The 15 campaign JSON files under `%LOCALAPPDATA%\rsicraft\bench\amp-v2-qwen9b\rs
 - 4 files are a bare error, with no campaign report: schedule trials 1 and 3 (completion budget spent on reasoning, no code), and tsp trials 1 and 2 (Ollama HTTP 500).
 - The other 11 reports list 31 skipped steps: 23 completion-budget, 8 HTTP 500. Eight of those reports aborted. Three ran to the end (classify trial 1, best 0; classify trial 3, best 64.25; regression trial 3, best 0).
 
-`DEFAULT_MAX_TOKENS` is 12,288 and the `rsi-qwen9b` context cap is 16,384. Raising the completion budget shrinks the room left for the prompt. The HTTP 500s are a separate failure. The default stays 12,288 until those two are pulled apart.
+`DEFAULT_MAX_TOKENS` is 12,288. `ollama show rsi-qwen9b` has `num_ctx 16384`. On 2026-11-12 Ollama started that alias as llama-server `-c 32768 -np 2`, so each slot is 16,384. The cap was in effect. Raising the completion budget still shrinks the room left for the prompt, and the default stays 12,288.
+
+The HTTP 500s are not a prompt rejected up front for being too long. `%LOCALAPPDATA%\Ollama\server.log` shows the request already generating, then `POST /v1/chat/completions` returns 500 and llama-server reloads:
+
+- 14:03:03 (tsp trial 2 in `bench.log`): 1m50s, `n_gen` 12,202, then a reload of the same 9B weights.
+- 13:18:03 (tsp trial 1): `n_gen` already past 11,000. At the same second Ollama predicted 36.6 GiB for a different model at `num_ctx 262144`, evicted the 9B runner, and the other client's `POST /api/generate` ended 499.
+- 12:48:03 is the short one: 2.16s, while the prompt cache already held a 16,383-token entry in a 16,384 slot.
+
+A 500 at the token cap and a 200 with an empty answer are both the completion budget. The 262,144-context load is a second client on the same Ollama. The next non-2xx body is kept on the step error (`format_status_failure`), so a later run does not have to be read out of `server.log`.
 
 ## What this does to the plan
 

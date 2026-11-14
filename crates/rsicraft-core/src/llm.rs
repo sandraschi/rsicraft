@@ -18,6 +18,35 @@ pub const DEFAULT_MAX_TOKENS: u32 = 12288;
 /// minutes for one step. Override with `RSICRAFT_LLM_TIMEOUT_SECS`.
 pub const DEFAULT_LLM_TIMEOUT_SECS: u64 = 600;
 
+/// Keep a non-2xx body short enough for a campaign JSON line.
+pub(crate) fn format_status_failure(endpoint: &str, code: u16, body: &str) -> String {
+    let mut flat = String::new();
+    for ch in body.chars() {
+        if flat.chars().count() >= 240 {
+            break;
+        }
+        if ch != '\r' {
+            flat.push(if ch == '\n' { ' ' } else { ch });
+        }
+    }
+    let flat = flat.trim();
+    if flat.is_empty() {
+        format!("llama-server request to {endpoint} failed: status code {code}")
+    } else {
+        format!("llama-server request to {endpoint} failed: status code {code}: {flat}")
+    }
+}
+
+fn format_llama_failure(endpoint: &str, err: ureq::Error) -> String {
+    match err {
+        ureq::Error::Status(code, response) => {
+            let body = response.into_string().unwrap_or_default();
+            format_status_failure(endpoint, code, &body)
+        }
+        other => format!("llama-server request to {endpoint} failed: {other}"),
+    }
+}
+
 fn configured_timeout_secs() -> u64 {
     std::env::var("RSICRAFT_LLM_TIMEOUT_SECS")
         .ok()
@@ -150,7 +179,7 @@ impl LlamaClient {
             .post(&endpoint)
             .set("Content-Type", "application/json")
             .send_json(payload)
-            .map_err(|e| format!("llama-server request to {endpoint} failed: {e}"))?;
+            .map_err(|e| format_llama_failure(&endpoint, e))?;
 
         let body: Value = resp
             .into_json()

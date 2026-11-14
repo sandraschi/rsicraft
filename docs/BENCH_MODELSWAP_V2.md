@@ -55,10 +55,10 @@ For each run: the first working candidate, the final best, and their ratio ("amp
 
 ## Result 3: operational problems
 
-- **Skipped steps:** 25 to 33% of steps produced no card (2 to 5 of 12 in almost every run). Cause not yet diagnosed; the per-step error text was not saved by the script (fixed: the script now writes the full campaign report as `<task>-t<n>.json`). Leading suspect: the 12,288-token completion budget plus a long prompt against a 16,384-token context.
-- **Aborted runs:** 9 of 26 runs ended early on two cardless steps in a row; 2 produced no card at all (one HTTP 500).
+- **Skipped steps:** `results.csv` has 81 skipped steps and 178 executed steps (31% of attempted steps). The per-step error text was not saved (the script now writes `<task>-t<n>.json`; this run predates that). The same Ollama log, through the night of 2026-11-12, shows `POST /v1/chat/completions` returning 500 while a slot is still generating, then a runner reload. One of those is 03:18:05, 5m00s, `n_gen` 5,647, which is the base inversions trial 3 failure in `bench.log`. There is no per-step split of budget versus 500 for this run.
+- **Aborted runs:** 9 of 26 runs ended early. 2 produced no card at all, both HTTP 500: base inversions trial 3 and Frontis edit-distance trial 2.
 - **Speed:** about 50 minutes per 12-step run on the 35B models, so 4 to 5 minutes per step. A full 36-run comparison is about 30 hours.
-- **Alias mismatch:** `rsi-base-35b` carries extra stop tokens and a temperature parameter that `rsi-frontis-35b` does not. The base alias was confirmed to receive the task prompt, so the runs are valid, but the aliases must be made identical before any rerun.
+- **Alias mismatch, still present on 2026-11-14:** `ollama show` was not changed. `rsi-frontis-35b` is `TEMPLATE {{ .Prompt }}` and `PARAMETER num_ctx 16384`. `rsi-base-35b` adds `temperature 0.3`, stops on `<|im_start|>`, `<|im_end|>`, `<think>`, and the literal `.Prompt }}<|im_end|>`, and its template prints ` .Prompt }}` where the prompt action should be. The two aliases are not parameter-identical. They were not rewritten in this pass.
 
 ## Decisions taken
 
