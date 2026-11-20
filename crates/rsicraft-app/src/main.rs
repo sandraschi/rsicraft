@@ -15,6 +15,8 @@
     clippy::unimplemented
 )]
 
+mod welcome;
+
 use eframe::egui::{self, Color32, CornerRadius, FontFamily, FontId, Pos2, RichText, Stroke, Vec2};
 use rsicraft_core::llm::failure_kind_of;
 use rsicraft_core::operators::SearchOperator;
@@ -29,6 +31,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command as ProcessCommand;
 use std::sync::mpsc::{channel, Receiver, TryRecvError};
 use std::time::{Duration, Instant};
+use welcome::{WelcomeAction, WelcomeState};
 
 const ACCENT_CYAN: Color32 = Color32::from_rgb(56, 189, 248);
 const ACCENT_EMERALD: Color32 = Color32::from_rgb(52, 211, 153);
@@ -173,6 +176,7 @@ const MENU_CATALOG: &[(&str, &str, &str)] = &[
     ("help_planned", "Planned Extensions...", ""),
     ("help_skills", "Bundled Skills...", ""),
     ("docs", "Project Files and Docs...", ""),
+    ("welcome", "Welcome Screen...", ""),
     ("licenses", "Licenses and Notices...", ""),
     ("about", "About RSICraft", ""),
     ("status", "Store Status", ""),
@@ -237,6 +241,7 @@ pub struct RsiCraftApp {
     pub status_banner: String,
     pub repo_root: PathBuf,
     pub active_dialog: Option<StudioDialog>,
+    pub welcome: WelcomeState,
     pub help_center_tab: HelpCenterTab,
     pub help_skill_selected: usize,
     pub chat_dock_open: bool,
@@ -398,6 +403,7 @@ impl RsiCraftApp {
             ),
             repo_root: default_repo_root(),
             active_dialog: None,
+            welcome: WelcomeState::default(),
             help_center_tab: HelpCenterTab::GetStarted,
             help_skill_selected: 0,
             chat_dock_open: false,
@@ -1613,6 +1619,10 @@ impl RsiCraftApp {
                 self.active_dialog = Some(StudioDialog::Docs);
                 Ok(json!({ "dialog": "docs", "tab": "project_docs" }))
             }
+            "welcome" => {
+                self.welcome.open = true;
+                Ok(json!({ "welcome": true }))
+            }
             "licenses" => {
                 self.active_dialog = Some(StudioDialog::Licenses);
                 Ok(json!({ "dialog": "licenses" }))
@@ -1740,6 +1750,7 @@ impl RsiCraftApp {
                         self.menu_item(ui, "help_skills", "Bundled Skills...");
                         self.menu_item(ui, "docs", "Project Files & Docs...");
                         ui.separator();
+                        self.menu_item(ui, "welcome", "Welcome Screen...");
                         self.menu_item(ui, "licenses", "Licenses & Notices...");
                         self.menu_item(ui, "about", "About RSICraft");
                     })
@@ -4470,6 +4481,26 @@ impl eframe::App for RsiCraftApp {
         self.poll_chat();
         self.render_chat_dock(ui);
         self.render_active_dialog(ui.ctx());
+        match self.welcome.draw(ui.ctx()) {
+            WelcomeAction::SeedDemo => {
+                if let Err(e) = self.menu_action("seed") {
+                    self.status_banner = e;
+                } else {
+                    let _ = self.menu_action("frontier");
+                }
+            }
+            WelcomeAction::InspectLineage => {
+                self.page = StudioPage::LineageDagCanvas;
+                self.refresh_all();
+                self.status_banner = "Lineage DAG Canvas & Tasks ready".into();
+            }
+            WelcomeAction::OpenHelpCenter => {
+                self.help_center_tab = HelpCenterTab::GetStarted;
+                self.active_dialog = Some(StudioDialog::Docs);
+                self.status_banner = "Guided Quickstart & Help Center".into();
+            }
+            WelcomeAction::EnterWorkspace | WelcomeAction::None => {}
+        }
         let typing = ui.ctx().egui_wants_keyboard_input();
         let mut hotkey: Option<&'static str> = None;
         ui.input(|i| {
