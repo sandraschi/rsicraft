@@ -16,6 +16,7 @@ pub mod help;
 pub mod llm;
 pub mod operators;
 pub mod sandbox;
+pub mod skills;
 pub mod store;
 pub mod trainer;
 
@@ -134,6 +135,9 @@ pub enum Command {
     Help {
         tab: Option<String>,
         search: Option<String>,
+    },
+    SkillRead {
+        name: Option<String>,
     },
     Diff {
         card_a_id: String,
@@ -399,6 +403,9 @@ impl Command {
             "rsi_help" => Ok(Self::Help {
                 tab: opt_str(args, "tab"),
                 search: opt_str(args, "search"),
+            }),
+            "rsicraft_skill_read" => Ok(Self::SkillRead {
+                name: opt_str(args, "name"),
             }),
             "rsi_diff" => Ok(Self::Diff {
                 card_a_id: req_str(args, "card_a_id")?,
@@ -733,6 +740,17 @@ pub fn tools() -> Vec<Value> {
                 "candidate_alias": { "type": "string", "description": "Required. Alias under which the endpoint serves the model to test." }
             }),
             &["candidate_alias"],
+        ),
+        tool_def(
+            "rsicraft_skill_read",
+            "Read a bundled RSICraft SKILL.md guide (e.g. 'rsicraft-workflow', 'rsicraft-ergonomics') or list all bundled skills.",
+            json!({
+                "name": {
+                    "type": "string",
+                    "description": "Skill name or skill:// URI (omit or pass 'list' to list available bundled skills)."
+                }
+            }),
+            &[],
         ),
     ]
 }
@@ -1658,6 +1676,7 @@ pub fn dispatch(ctx: &mut Ctx, cmd: Command) -> Result<Value, String> {
             }))
         }
         Command::Help { tab, search } => help::query_help(tab.as_deref(), search.as_deref()),
+        Command::SkillRead { name } => skills::read_skill_json(name.as_deref()),
         Command::Diff {
             card_a_id,
             card_b_id,

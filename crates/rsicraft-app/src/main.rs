@@ -92,6 +92,41 @@ pub enum StudioDialog {
     About,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HelpCenterTab {
+    GetStarted,
+    Usage,
+    TipsTricks,
+    PitfallsSafety,
+    PlannedExtensions,
+    BundledSkills,
+    ProjectDocs,
+}
+
+impl HelpCenterTab {
+    const ALL: [Self; 7] = [
+        Self::GetStarted,
+        Self::Usage,
+        Self::TipsTricks,
+        Self::PitfallsSafety,
+        Self::PlannedExtensions,
+        Self::BundledSkills,
+        Self::ProjectDocs,
+    ];
+
+    const fn label(self) -> &'static str {
+        match self {
+            Self::GetStarted => "Get Started",
+            Self::Usage => "Usage (GUI/CLI/MCP)",
+            Self::TipsTricks => "Tips & Tricks",
+            Self::PitfallsSafety => "Pitfalls & Safety",
+            Self::PlannedExtensions => "Planned Extensions",
+            Self::BundledSkills => "Bundled Skills",
+            Self::ProjectDocs => "Project Files & Docs",
+        }
+    }
+}
+
 /// Menu and command-palette entries. `id` is what `menu_action` accepts.
 const MENU_CATALOG: &[(&str, &str, &str)] = &[
     ("new_task", "New Task...", "Ctrl+N"),
@@ -128,8 +163,15 @@ const MENU_CATALOG: &[(&str, &str, &str)] = &[
     ("probe", "Probe LLM Endpoint", ""),
     ("frontier", "Calculate Pareto Frontier", ""),
     ("reset_layout", "Reset Panel Layout", ""),
+    ("chat_dock", "AI Chat Dock", "Ctrl+J"),
     ("palette", "Command Palette...", "Ctrl+K"),
     ("shortcuts", "Keyboard Shortcuts...", "F1"),
+    ("help_getting_started", "Getting Started...", ""),
+    ("help_usage", "Usage (GUI, CLI & MCP)...", ""),
+    ("help_tips", "Tips & Tricks...", ""),
+    ("help_pitfalls", "Common Pitfalls & Safety...", ""),
+    ("help_planned", "Planned Extensions...", ""),
+    ("help_skills", "Bundled Skills...", ""),
     ("docs", "Project Files and Docs...", ""),
     ("licenses", "Licenses and Notices...", ""),
     ("about", "About RSICraft", ""),
@@ -195,6 +237,13 @@ pub struct RsiCraftApp {
     pub status_banner: String,
     pub repo_root: PathBuf,
     pub active_dialog: Option<StudioDialog>,
+    pub help_center_tab: HelpCenterTab,
+    pub help_skill_selected: usize,
+    pub chat_dock_open: bool,
+    pub chat_input: String,
+    pub chat_messages: Vec<(String, String)>,
+    pub chat_rx: Option<Receiver<Result<String, String>>>,
+    pub chat_in_flight: bool,
     pub palette_query: String,
     pub theme_dirty: bool,
     pub quit_requested: bool,
@@ -349,6 +398,16 @@ impl RsiCraftApp {
             ),
             repo_root: default_repo_root(),
             active_dialog: None,
+            help_center_tab: HelpCenterTab::GetStarted,
+            help_skill_selected: 0,
+            chat_dock_open: false,
+            chat_input: String::new(),
+            chat_messages: vec![(
+                "assistant".into(),
+                "Local-first RSICraft assistant ready. Ask a question or type /status, /frontier, /probe, /skills, or /help <query>.".into(),
+            )],
+            chat_rx: None,
+            chat_in_flight: false,
             palette_query: String::new(),
             theme_dirty: false,
             quit_requested: false,
@@ -1503,8 +1562,13 @@ impl RsiCraftApp {
                 self.page = StudioPage::EvolutionaryStudio;
                 self.view_mode = ViewMode::Cards;
                 self.show_quick_help_modal = false;
+                self.chat_dock_open = false;
                 self.status_banner = "Layout reset to the evolutionary studio".into();
                 Ok(json!({ "layout": "default" }))
+            }
+            "chat_dock" => {
+                self.chat_dock_open = !self.chat_dock_open;
+                Ok(json!({ "chat_dock_open": self.chat_dock_open }))
             }
             "palette" => {
                 self.active_dialog = Some(StudioDialog::CommandPalette);
@@ -1514,9 +1578,40 @@ impl RsiCraftApp {
                 self.active_dialog = Some(StudioDialog::Shortcuts);
                 Ok(json!({ "dialog": "shortcuts" }))
             }
-            "docs" => {
+            "help_getting_started" => {
+                self.help_center_tab = HelpCenterTab::GetStarted;
                 self.active_dialog = Some(StudioDialog::Docs);
-                Ok(json!({ "dialog": "docs" }))
+                Ok(json!({ "dialog": "docs", "tab": "get_started" }))
+            }
+            "help_usage" => {
+                self.help_center_tab = HelpCenterTab::Usage;
+                self.active_dialog = Some(StudioDialog::Docs);
+                Ok(json!({ "dialog": "docs", "tab": "usage" }))
+            }
+            "help_tips" => {
+                self.help_center_tab = HelpCenterTab::TipsTricks;
+                self.active_dialog = Some(StudioDialog::Docs);
+                Ok(json!({ "dialog": "docs", "tab": "tips" }))
+            }
+            "help_pitfalls" => {
+                self.help_center_tab = HelpCenterTab::PitfallsSafety;
+                self.active_dialog = Some(StudioDialog::Docs);
+                Ok(json!({ "dialog": "docs", "tab": "pitfalls" }))
+            }
+            "help_planned" => {
+                self.help_center_tab = HelpCenterTab::PlannedExtensions;
+                self.active_dialog = Some(StudioDialog::Docs);
+                Ok(json!({ "dialog": "docs", "tab": "planned" }))
+            }
+            "help_skills" => {
+                self.help_center_tab = HelpCenterTab::BundledSkills;
+                self.active_dialog = Some(StudioDialog::Docs);
+                Ok(json!({ "dialog": "docs", "tab": "skills" }))
+            }
+            "docs" => {
+                self.help_center_tab = HelpCenterTab::ProjectDocs;
+                self.active_dialog = Some(StudioDialog::Docs);
+                Ok(json!({ "dialog": "docs", "tab": "project_docs" }))
             }
             "licenses" => {
                 self.active_dialog = Some(StudioDialog::Licenses);
@@ -1629,15 +1724,23 @@ impl RsiCraftApp {
                         self.menu_item(ui, "view_lineage", "Lineage DAG Viewport");
                         self.menu_item(ui, "view_cards", "Candidate Diff Inspector");
                         self.menu_item(ui, "view_studio", "Live Run");
+                        self.menu_item(ui, "chat_dock", "AI Chat Dock (Ctrl+J)");
                     })
                     .response;
                 let help = ui
                     .menu_button("Help", |ui| {
                         self.menu_item(ui, "palette", "Command Palette... (Ctrl+K)");
                         self.menu_item(ui, "shortcuts", "Keyboard Shortcuts... (F1)");
-                        self.menu_item(ui, "docs", "Project Files and Docs...");
-                        self.menu_item(ui, "licenses", "Licenses and Notices...");
                         ui.separator();
+                        self.menu_item(ui, "help_getting_started", "Getting Started...");
+                        self.menu_item(ui, "help_usage", "Usage (GUI, CLI & MCP)...");
+                        self.menu_item(ui, "help_tips", "Tips & Tricks...");
+                        self.menu_item(ui, "help_pitfalls", "Common Pitfalls & Safety...");
+                        self.menu_item(ui, "help_planned", "Planned Extensions...");
+                        self.menu_item(ui, "help_skills", "Bundled Skills...");
+                        self.menu_item(ui, "docs", "Project Files & Docs...");
+                        ui.separator();
+                        self.menu_item(ui, "licenses", "Licenses & Notices...");
                         self.menu_item(ui, "about", "About RSICraft");
                     })
                     .response;
@@ -1686,7 +1789,17 @@ impl RsiCraftApp {
                             }
                             let opens_dialog = matches!(
                                 *id,
-                                "palette" | "shortcuts" | "docs" | "licenses" | "about"
+                                "palette"
+                                    | "shortcuts"
+                                    | "help_getting_started"
+                                    | "help_usage"
+                                    | "help_tips"
+                                    | "help_pitfalls"
+                                    | "help_planned"
+                                    | "help_skills"
+                                    | "docs"
+                                    | "licenses"
+                                    | "about"
                             );
                             if !opens_dialog {
                                 self.active_dialog = None;
@@ -1703,18 +1816,106 @@ impl RsiCraftApp {
                     }
                 }
                 StudioDialog::Docs => {
-                    ui.label("Opens the file with the system handler.");
-                    for rel in [
-                        "docs/PRD.md",
-                        "docs/ARCHITECTURE.md",
-                        "docs/TIERED_PLAN.md",
-                        "HANDOVER.md",
-                        "README.md",
-                    ] {
-                        if ui.button(rel).clicked() {
-                            self.open_external(rel);
+                    ui.horizontal_wrapped(|ui| {
+                        for tab in HelpCenterTab::ALL {
+                            if ui
+                                .selectable_label(self.help_center_tab == tab, tab.label())
+                                .clicked()
+                            {
+                                self.help_center_tab = tab;
+                            }
                         }
-                    }
+                    });
+                    ui.separator();
+                    egui::ScrollArea::vertical()
+                        .max_height(420.0)
+                        .show(ui, |ui| match self.help_center_tab {
+                            HelpCenterTab::GetStarted => {
+                                ui.heading("Get Started (5-Step First-Run Tour)");
+                                ui.label("RSICraft is a local-first Recursive Self-Improvement (RSI) and evolutionary program search studio.");
+                                ui.separator();
+                                ui.label("1. Seed demo data: run `rsicraft demo-seed` or use Insert -> Add Seed Candidate.");
+                                ui.label("2. Run a demo campaign: run 4 steps with provider=demo, sandbox=demo to watch DRAFT, IMPROVE, DEBUG, and CROSSOVER.");
+                                ui.label("3. Connect a local LLM: set RSICRAFT_LLM_URL (Ollama :11434, LM Studio :1234, llama-server :8080/8081) and RSICRAFT_MODEL, then run Probe LLM Endpoint.");
+                                ui.label("4. Register a real task: provide a problem description and Python/Rust evaluator printing RSI_METRIC_JSON={\"status\":\"SUCCESS\",\"score\":...}.");
+                                ui.label("5. Inspect lineage & diffs: explore the Lineage DAG Canvas, compare parent/child diffs, or export portable JSON / SFT+DPO datasets.");
+                            }
+                            HelpCenterTab::Usage => {
+                                ui.heading("Usage (GUI, CLI & MCP)");
+                                ui.label("Desktop Studio (rsicraft-app): 7 views, 8-menu bar, Command Palette (Ctrl+K), AI Chat Dock (Ctrl+J), and interactive Bezier Lineage DAG.");
+                                ui.separator();
+                                ui.label("CLI (rsicraft): every verb accepts --json and routes through the same Command::dispatch bus:");
+                                ui.monospace("rsicraft --json status\nrsicraft probe\nrsicraft campaign --task-id primes --steps 8 --provider llama --sandbox-mode local\nrsicraft frontier --task-id primes\nrsicraft help-tabs --tab troubleshoot");
+                                ui.separator();
+                                ui.label("MCP Server (rsicraft mcp): pure-Rust MCP 2024-11-05 stdio server with 27 tools (rsi_* / rsi.* + rsicraft_skill_read) and resources/list + resources/read.");
+                            }
+                            HelpCenterTab::TipsTricks => {
+                                ui.heading("Tips & Tricks");
+                                ui.label("- Dry-run new tasks with provider=demo and sandbox=demo before spending GPU minutes.");
+                                ui.label("- Size num_ctx (8192-16384) to fit 24 GB VRAM; avoid 262k context defaults on 9B-35B models.");
+                                ui.label("- Run `rsicraft probe` with no URL to auto-scan Ollama, LM Studio, llama-server, and vLLM ports.");
+                                ui.label("- Tune w_score, w_delta, and w_novelty (Modify -> Show Utility Weights) to escape local optima.");
+                                ui.label("- Use `rsi_cards_prune` after `rsi_export` to keep large SQLite stores fast.");
+                            }
+                            HelpCenterTab::PitfallsSafety => {
+                                ui.heading("Common Pitfalls & Safety");
+                                ui.label("- LOCAL SANDBOX RISK: --sandbox-mode local runs model-written code directly as your OS user. Use --sandbox-mode docker for untrusted tasks.");
+                                ui.label("- RUNG 1 VS RUNG 2: Search campaigns grow the SQLite card archive, not model weights. Weights only change via rsi_train_step + rsi_promote_gate.");
+                                ui.label("- BUDGET EXHAUSTED: Reasoning models can burn max_tokens in thought preambles. Raise RSICRAFT_MAX_TOKENS or set RSICRAFT_REASONING_EFFORT=low.");
+                                ui.label("- CASCADE DELETE: rsi_task_delete removes all cards and frontier records; export first with rsi_export.");
+                                ui.label("- URL PATH: Pass the server root (http://127.0.0.1:11434), not /v1/chat/completions.");
+                            }
+                            HelpCenterTab::PlannedExtensions => {
+                                ui.heading("Planned Extensions");
+                                ui.label("Current status follows docs/FRONTIS_PARITY_PLAN.md:");
+                                ui.label("1. Complete end-to-end Rung 2 LoRA post-training (rsi_train_step) + Welch t >= 2 A/B gate (rsi_promote_gate) validation on consumer 24 GB GPUs.");
+                                ui.label("2. Wire Beta-posterior Thompson sampling from bandit.rs into adaptive campaign scheduling (currently advisory via rsi_bandit_status).");
+                                ui.label("3. Expand multi-language Rust candidate synthesis and Cargo-backed evaluators alongside Python.");
+                            }
+                            HelpCenterTab::BundledSkills => {
+                                ui.heading("Bundled Skills (Embedded SKILL.md)");
+                                let skills = rsicraft_core::skills::bundled_skills();
+                                ui.horizontal_wrapped(|ui| {
+                                    for (idx, skill) in skills.iter().enumerate() {
+                                        if ui
+                                            .selectable_label(self.help_skill_selected == idx, skill.name)
+                                            .clicked()
+                                        {
+                                            self.help_skill_selected = idx;
+                                        }
+                                    }
+                                });
+                                if let Some(skill) = skills.get(self.help_skill_selected) {
+                                    ui.separator();
+                                    ui.label(RichText::new(format!("{} ({})", skill.title, skill.uri)).strong());
+                                    ui.label(RichText::new(skill.description).weak());
+                                    ui.separator();
+                                    ui.monospace(skill.content);
+                                }
+                            }
+                            HelpCenterTab::ProjectDocs => {
+                                ui.heading("Project Files & Docs");
+                                ui.label("Opens the file with the system handler, or open the in-app 10-tab Help page.");
+                                for rel in [
+                                    "HELP.md",
+                                    "README.md",
+                                    "docs/GUIDE.md",
+                                    "docs/PRD.md",
+                                    "docs/ARCHITECTURE.md",
+                                    "docs/FRONTIS_PARITY_PLAN.md",
+                                    "HANDOVER.md",
+                                ] {
+                                    if ui.button(rel).clicked() {
+                                        self.open_external(rel);
+                                    }
+                                }
+                                ui.separator();
+                                if ui.button("Open Full 10-Tab Help & Tools Page").clicked() {
+                                    self.page = StudioPage::MultitabHelpAndTools;
+                                    self.active_dialog = None;
+                                }
+                            }
+                        });
                 }
                 StudioDialog::Licenses => {
                     ui.label("RSICraft is MIT OR Apache-2.0.");
@@ -1727,7 +1928,7 @@ impl RsiCraftApp {
                 }
                 StudioDialog::About => {
                     ui.heading(format!("RSICraft {VERSION}"));
-                    ui.label("Core engine, 26-tool CLI and MCP server, egui studio.");
+                    ui.label("Core engine, 27-tool CLI and MCP server, egui studio.");
                     ui.label(
                         "Search is measured. No generation has been trained. The menu bar is this window's tier-4 shell.",
                     );
@@ -4048,6 +4249,195 @@ fn render_provider_report(ui: &mut egui::Ui, r: &Value) {
     }
 }
 
+impl RsiCraftApp {
+    fn poll_chat(&mut self) {
+        let done = match self.chat_rx.as_ref().map(Receiver::try_recv) {
+            Some(Ok(res)) => Some(res),
+            Some(Err(TryRecvError::Disconnected)) => {
+                Some(Err("chat worker disconnected".to_string()))
+            }
+            Some(Err(TryRecvError::Empty)) | None => None,
+        };
+        if let Some(res) = done {
+            self.chat_rx = None;
+            self.chat_in_flight = false;
+            match res {
+                Ok(reply) => self.chat_messages.push(("assistant".into(), reply)),
+                Err(err) => self
+                    .chat_messages
+                    .push(("assistant".into(), format!("[local fallback] {err}"))),
+            }
+        }
+    }
+
+    fn send_chat_message(&mut self, raw: String) {
+        let prompt = raw.trim().to_string();
+        if prompt.is_empty() || self.chat_in_flight {
+            return;
+        }
+        self.chat_messages.push(("user".into(), prompt.clone()));
+
+        if let Some(local_reply) = self.handle_local_chat_command(&prompt) {
+            self.chat_messages.push(("assistant".into(), local_reply));
+            return;
+        }
+
+        let url = self.llama_url_edit.trim().to_string();
+        let model = self.model_alias_edit.trim().to_string();
+        let task_id = self.active_task_id.clone();
+        let cards_count = self
+            .status_json
+            .get("cards_count")
+            .and_then(Value::as_u64)
+            .unwrap_or(0);
+        let top_score = self
+            .frontier_json
+            .get("frontier")
+            .and_then(Value::as_array)
+            .and_then(|arr| arr.first())
+            .and_then(|c| c.get("primary_score"))
+            .and_then(Value::as_f64);
+        let sys_prompt = format!(
+            "You are the local-first RSICraft Studio assistant. Active task: {task_id}, cards: {cards_count}, best_score: {:?}. Answer concisely about evolutionary program search, operators (DRAFT, IMPROVE, DEBUG, CROSSOVER), sandboxes, and rsicraft CLI/MCP tools.",
+            top_score
+        );
+
+        let (tx, rx) = channel();
+        self.chat_rx = Some(rx);
+        self.chat_in_flight = true;
+        let repaint = self.repaint_ctx.clone();
+        std::thread::spawn(move || {
+            let client = rsicraft_core::llm::LlamaClient::new(url, model);
+            let res = client
+                .complete(&sys_prompt, &prompt, 0.3)
+                .map_err(|e| e.to_string());
+            let _ = tx.send(res);
+            if let Some(ctx) = repaint {
+                ctx.request_repaint();
+            }
+        });
+    }
+
+    fn handle_local_chat_command(&mut self, prompt: &str) -> Option<String> {
+        let lower = prompt.to_ascii_lowercase();
+        if lower == "/status" {
+            return Some(
+                self.exec(Command::Status)
+                    .map(|v| serde_json::to_string_pretty(&v).unwrap_or_default())
+                    .unwrap_or_else(|e| format!("error: {e}")),
+            );
+        }
+        if lower == "/frontier" {
+            return Some(
+                self.exec(Command::GetFrontier {
+                    task_id: self.active_task_id.clone(),
+                    limit: 5,
+                })
+                .map(|v| serde_json::to_string_pretty(&v).unwrap_or_default())
+                .unwrap_or_else(|e| format!("error: {e}")),
+            );
+        }
+        if lower == "/probe" {
+            return Some(
+                self.exec(Command::LlmProbe {
+                    url: Some(self.llama_url_edit.clone()),
+                })
+                .map(|v| serde_json::to_string_pretty(&v).unwrap_or_default())
+                .unwrap_or_else(|e| format!("error: {e}")),
+            );
+        }
+        if lower == "/skills" {
+            return Some(
+                rsicraft_core::skills::read_skill_json(None)
+                    .map(|v| serde_json::to_string_pretty(&v).unwrap_or_default())
+                    .unwrap_or_else(|e| format!("error: {e}")),
+            );
+        }
+        if let Some(q) = prompt.strip_prefix("/help") {
+            let query = q.trim();
+            return Some(
+                self.exec(Command::Help {
+                    tab: None,
+                    search: (!query.is_empty()).then(|| query.to_string()),
+                })
+                .map(|v| {
+                    let count = v
+                        .get("matched_tabs_count")
+                        .and_then(Value::as_u64)
+                        .unwrap_or(0);
+                    format!("Matched {count} help tab(s). Open Help -> Project Files & Docs... for full text.")
+                })
+                .unwrap_or_else(|e| format!("error: {e}")),
+            );
+        }
+        None
+    }
+
+    fn render_chat_dock(&mut self, ui: &mut egui::Ui) {
+        if !self.chat_dock_open {
+            return;
+        }
+        let mut open = self.chat_dock_open;
+        egui::Panel::right("ai_chat_dock")
+            .resizable(true)
+            .default_size(340.0)
+            .min_size(260.0)
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.heading(RichText::new("AI Chat Dock").color(ACCENT_CYAN));
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui.small_button("x").clicked() {
+                            open = false;
+                        }
+                    });
+                });
+                ui.label(
+                    RichText::new(format!("Local-first ({}) | Ctrl+J", self.model_alias_edit))
+                        .weak()
+                        .small(),
+                );
+                ui.separator();
+
+                let avail_h = (ui.available_height() - 68.0).max(120.0);
+                egui::ScrollArea::vertical()
+                    .max_height(avail_h)
+                    .stick_to_bottom(true)
+                    .show(ui, |ui| {
+                        for (role, text) in &self.chat_messages {
+                            let is_user = role == "user";
+                            let header = if is_user { "You" } else { "RSICraft" };
+                            let color = if is_user {
+                                ACCENT_AMBER
+                            } else {
+                                ACCENT_EMERALD
+                            };
+                            ui.label(RichText::new(header).color(color).strong().small());
+                            ui.add(egui::Label::new(text).wrap());
+                            ui.add_space(6.0);
+                        }
+                        if self.chat_in_flight {
+                            ui.label(RichText::new("Thinking locally...").weak().italics());
+                        }
+                    });
+
+                ui.separator();
+                ui.horizontal(|ui| {
+                    let resp = ui.add(
+                        egui::TextEdit::singleline(&mut self.chat_input)
+                            .hint_text("Ask local LLM or /status /frontier /probe /skills")
+                            .desired_width(ui.available_width() - 60.0),
+                    );
+                    let enter = resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
+                    if (ui.button("Send").clicked() || enter) && !self.chat_in_flight {
+                        let msg = std::mem::take(&mut self.chat_input);
+                        self.send_chat_message(msg);
+                    }
+                });
+            });
+        self.chat_dock_open = open;
+    }
+}
+
 impl eframe::App for RsiCraftApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         if !self.style_initialized {
@@ -4077,6 +4467,8 @@ impl eframe::App for RsiCraftApp {
         }
         self.render_menu_bar(ui);
         self.apply_file_picks();
+        self.poll_chat();
+        self.render_chat_dock(ui);
         self.render_active_dialog(ui.ctx());
         let typing = ui.ctx().egui_wants_keyboard_input();
         let mut hotkey: Option<&'static str> = None;
@@ -4085,6 +4477,8 @@ impl eframe::App for RsiCraftApp {
                 hotkey = Some("shortcuts");
             } else if i.modifiers.command && i.key_pressed(egui::Key::K) {
                 hotkey = Some("palette");
+            } else if i.modifiers.command && i.key_pressed(egui::Key::J) {
+                hotkey = Some("chat_dock");
             } else if !typing && i.modifiers.command && i.key_pressed(egui::Key::N) {
                 hotkey = Some("new_task");
             } else if !typing && i.modifiers.command && i.key_pressed(egui::Key::O) {
@@ -4230,13 +4624,13 @@ fn main() {
                 })
                 .is_ok()
             && app.view_mode == ViewMode::Cards
-            && tools().len() == 26
+            && tools().len() == 27
             && app.menu_action("frontier").is_ok()
             && app.menu_action("about").is_ok()
             && app.active_dialog == Some(StudioDialog::About);
         if ok {
             println!(
-                "smoke: ok (rsicraft-app {VERSION}, default_view=cards, tools=26, help_tabs={}, menu=8)",
+                "smoke: ok (rsicraft-app {VERSION}, default_view=cards, tools=27, help_tabs={}, menu=8)",
                 rsicraft_core::help::tab_ids().len()
             );
             std::process::exit(0);
@@ -4274,7 +4668,26 @@ mod tests {
         assert_eq!(app.view_mode, ViewMode::Cards);
         let st = app.exec(Command::Status).unwrap();
         assert_eq!(st["cards_count"], 4);
-        assert_eq!(tools().len(), 26);
+        assert_eq!(tools().len(), 27);
+    }
+
+    #[test]
+    fn help_menu_tabs_and_chat_dock_work() {
+        let mut app = RsiCraftApp::new(None).unwrap();
+        assert!(!app.chat_dock_open);
+        app.menu_action("chat_dock").unwrap();
+        assert!(app.chat_dock_open);
+
+        app.menu_action("help_skills").unwrap();
+        assert_eq!(app.active_dialog, Some(StudioDialog::Docs));
+        assert_eq!(app.help_center_tab, HelpCenterTab::BundledSkills);
+
+        app.menu_action("help_pitfalls").unwrap();
+        assert_eq!(app.help_center_tab, HelpCenterTab::PitfallsSafety);
+
+        let reply = app.handle_local_chat_command("/skills").unwrap();
+        assert!(reply.contains("rsicraft-workflow"));
+        assert!(reply.contains("rsicraft-ergonomics"));
     }
 
     #[test]

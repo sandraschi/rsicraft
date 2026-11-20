@@ -517,6 +517,31 @@ impl ToolHost for Host {
         let cmd = Command::from_tool(name, args)?;
         dispatch(&mut self.ctx, cmd)
     }
+    fn resources(&self) -> Vec<Value> {
+        rsicraft_core::skills::bundled_skills()
+            .iter()
+            .map(|s| {
+                json!({
+                    "uri": s.uri,
+                    "name": s.name,
+                    "title": s.title,
+                    "description": s.description,
+                    "mimeType": "text/markdown",
+                })
+            })
+            .collect()
+    }
+    fn read_resource(&self, uri: &str) -> Result<Value, String> {
+        let skill = rsicraft_core::skills::get_skill(uri)
+            .ok_or_else(|| format!("unknown resource '{uri}'"))?;
+        Ok(json!({
+            "contents": [{
+                "uri": skill.uri,
+                "mimeType": "text/markdown",
+                "text": skill.content,
+            }]
+        }))
+    }
 }
 
 fn scalar(v: &Value) -> String {
@@ -702,10 +727,10 @@ fn run_cli_smoke(db: Option<PathBuf>) -> Result<(), String> {
         },
     )?;
     let n = tools().len();
-    if n != 26 {
-        return Err(format!("expected 26 tools, found {n}"));
+    if n != 27 {
+        return Err(format!("expected 27 tools, found {n}"));
     }
-    println!("smoke: ok (rsicraft {VERSION}, tools=26)");
+    println!("smoke: ok (rsicraft {VERSION}, tools=27)");
     Ok(())
 }
 
@@ -952,7 +977,32 @@ mod tests {
 
         let list =
             handle_line(&mut h, r#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#).unwrap();
-        assert_eq!(list["result"]["tools"].as_array().map(Vec::len), Some(26));
+        assert_eq!(list["result"]["tools"].as_array().map(Vec::len), Some(27));
+
+        let res_list = handle_line(
+            &mut h,
+            r#"{"jsonrpc":"2.0","id":21,"method":"resources/list"}"#,
+        )
+        .unwrap();
+        let resources = res_list["result"]["resources"].as_array().unwrap();
+        assert_eq!(resources.len(), 2);
+
+        let res_read = handle_line(
+            &mut h,
+            r#"{"jsonrpc":"2.0","id":22,"method":"resources/read","params":{"uri":"skill://rsicraft-workflow"}}"#,
+        )
+        .unwrap();
+        let res_text = res_read["result"]["contents"][0]["text"].as_str().unwrap();
+        assert!(res_text.contains("rsi_llm_probe"));
+
+        let skill_call = handle_line(
+            &mut h,
+            r#"{"jsonrpc":"2.0","id":23,"method":"tools/call","params":{"name":"rsicraft_skill_read","arguments":{"name":"rsicraft-ergonomics"}}}"#,
+        )
+        .unwrap();
+        assert_eq!(skill_call["result"]["isError"], false, "{skill_call}");
+        let skill_text = skill_call["result"]["content"][0]["text"].as_str().unwrap();
+        assert!(skill_text.contains("rsi_hyperparams_set"));
 
         let seed = handle_line(
             &mut h,

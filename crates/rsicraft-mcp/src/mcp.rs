@@ -17,6 +17,12 @@ pub trait ToolHost {
     fn server_version(&self) -> &str;
     fn tools(&self) -> Vec<Value>;
     fn call(&mut self, name: &str, args: &Value) -> Result<Value, String>;
+    fn resources(&self) -> Vec<Value> {
+        Vec::new()
+    }
+    fn read_resource(&self, uri: &str) -> Result<Value, String> {
+        Err(format!("unknown resource {uri}"))
+    }
 }
 
 #[must_use]
@@ -71,7 +77,10 @@ pub fn handle_line<H: ToolHost>(host: &mut H, line: &str) -> Option<Value> {
             id,
             json!({
                 "protocolVersion": PROTOCOL_VERSION,
-                "capabilities": { "tools": { "listChanged": false } },
+                "capabilities": {
+                    "tools": { "listChanged": false },
+                    "resources": { "listChanged": false }
+                },
                 "serverInfo": {
                     "name": host.server_name(),
                     "version": host.server_version()
@@ -80,6 +89,20 @@ pub fn handle_line<H: ToolHost>(host: &mut H, line: &str) -> Option<Value> {
         ),
         "ping" => ok_response(id, json!({})),
         "tools/list" => ok_response(id, json!({ "tools": host.tools() })),
+        "resources/list" => ok_response(id, json!({ "resources": host.resources() })),
+        "resources/read" => {
+            let Some(uri) = params.get("uri").and_then(Value::as_str) else {
+                return Some(error_response(
+                    id,
+                    -32602,
+                    "resources/read requires params.uri",
+                ));
+            };
+            match host.read_resource(uri) {
+                Ok(v) => ok_response(id, v),
+                Err(e) => error_response(id, -32602, &e),
+            }
+        }
         "tools/call" => {
             let Some(raw_name) = params.get("name").and_then(Value::as_str) else {
                 return Some(error_response(
