@@ -1,120 +1,88 @@
 # rsicraft
 
+rsicraft is a local-first evolutionary program search studio that lets an LLM on your machine write, evaluate, repair, and improve small programs in a closed loop while tracking every attempt's lineage.
+
+## What You Can Do
+
+- **Run evolutionary code search (Rung 1)**: Define a task and an evaluator script, then let a local or OpenAI-compatible model iterate using four operators:
+  - `DRAFT` — synthesize a fresh candidate from the task specification.
+  - `IMPROVE` — mutate a high-utility working parent to optimize score or runtime.
+  - `DEBUG` — repair a failed parent (`COMPILE_ERROR`, `RUNTIME_ERROR`, `TIMEOUT`, `METRIC_PARSE_ERROR`) using its sandbox log tail.
+  - `CROSSOVER` — combine ideas from two distinct high-utility parents into a stronger child.
+- **Inspect candidate lineage in the Desktop Studio**: Watch live runs, compare candidate code and diffs side by side, and explore the interactive Bezier lineage DAG across 7 views in `rsicraft-app`.
+- **Chat and get help in-app**: Press `Ctrl+J` to open the **AI Chat Dock**, press `Ctrl+K` for the Command Palette, or open the **10-item Help menu** (including **Bundled Skills** and the built-in 10-tab manual).
+- **Use bundled MCP skills and 26 tools**: Connect Claude Desktop or any MCP client via `rsicraft mcp` to drive searches, inspect frontiers, and read `skill://` resources.
+- **Run safely in local or Docker sandboxes**: Execute model-written candidates locally for speed or isolate untrusted code in `--sandbox-mode docker` (no network, read-only root, CPU and memory limits).
+- **Persist everything offline**: Store all tasks, experience cards, and execution logs in a local SQLite WAL database (`%LOCALAPPDATA%\rsicraft\rsicraft.db`) backed by a BLAKE3 + Zstd content-addressable store.
+- **Connect any local LLM server**: Works with Ollama (`:11434`), LM Studio (`:1234`), `llama-server`, or any OpenAI-compatible endpoint, with structured `[llm:<class>]` diagnostics via `rsicraft probe`.
+- **Export Rung 2 training traces**: Export SFT/DPO datasets from search archives (`rsi_dataset_export`) and run the LoRA / A/B promotion gate harness (experimental; weights do not update during search).
+
 ## Install
 
-Tell Cursor, Claude, Antigravity, or OpenCode: **Install this.**
+1. Download **`rsicraft-0.3.1-setup.exe`** from the [latest release](https://github.com/sandraschi/rsicraft/releases/latest).
+2. Run it. Windows may show a SmartScreen warning because the installer is unsigned: choose **More info > Run anyway**.
+3. Open **rsicraft** from the Start menu.
+
+**Only want the tools inside Claude?** The `.mcpb` bundle registers the MCP server in Claude Desktop but does **not** install the desktop studio. Paste this to Claude:
+
+> Install the rsicraft MCP extension: download `rsicraft-0.3.1.mcpb` from https://github.com/sandraschi/rsicraft/releases/latest and open it with Claude Desktop.
+
+**From a local checkout (Windows):**
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install-craft.ps1
 ```
 
-Installs the Windows app, the CLI, and the MCP bundle.
+Installs the Windows app, the CLI, and the MCP bundle. See [INSTALL.md](INSTALL.md) for manual MCP client config and [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for building from source.
 
-rsicraft lets a language model running on your own machine write, test and improve small programs in a loop, and records every attempt with its parents. It is a single Rust program with a desktop studio, a command line and an MCP server, built to test the "self-improvement ladder" of the Frontis-MA1 paper on one consumer GPU.
+## Example Prompts
 
-**New here?** Read [docs/GUIDE.md](docs/GUIDE.md) (or the Help page in the studio, or `rsicraft help-tabs`). It explains what this is, what recursive self-improvement means, what the project is based on, how to connect Ollama or LM Studio, how to write a task, and every error message.
+> "Seed the demo database and run a 4-step search campaign on `opt-synth`, then show the lineage."
 
-## What it does
+> "Probe my local Ollama server on port 11434 and check if `qwen2.5-coder:7b` is ready."
 
-You give rsicraft a **task**: a description such as "write `solve(n)` that counts the primes below n, as fast as possible", and an **evaluator**, a small script that runs a candidate and prints a score.
+> "Create a `primes` task using `tasks/pack-v1/primes.py` and run 8 search steps in the local sandbox."
 
-rsicraft asks a model (Ollama, LM Studio, llama-server or any OpenAI-compatible server) to write a candidate, runs it in a sandbox, and stores the result as an **experience card**. Then it repeats with four operators: DRAFT (new), IMPROVE (make a working parent better), DEBUG (repair a failed one) and CROSSOVER (combine two). Parents are chosen by score, gain over their own parent, and novelty. You can follow the lineage of the best solution step by step.
+## Three Ways to Use It
 
-## What it is not
+| Surface | Start With | Best For |
+|---|---|---|
+| **Desktop Studio** | `rsicraft-app` | Watching live runs, lineage graphs, candidate code, and diffs |
+| **Command Line** | `rsicraft --help` | Scripts and benchmarks; every verb supports `--json` |
+| **MCP Server** | `rsicraft mcp` | Driving searches from Claude Desktop or agentic IDEs (26 tools) |
 
-The model does not change during a search; only the archive of programs grows. Training a next model generation from search results (rung 2 of the ladder) has tools in this repository (trace export, a LoRA harness, an A/B promotion gate) but has not been run, and no improvement from it has been measured. See [What is RSI?](docs/GUIDE.md#2-what-is-rsi) and the dated status in [docs/FRONTIS_PARITY_PLAN.md](docs/FRONTIS_PARITY_PLAN.md).
+## Keyboard Shortcuts (Desktop Studio)
 
-## Status (2026-11-14)
+| Shortcut | Action |
+|---|---|
+| `Ctrl+J` | Toggle the **AI Chat Dock** |
+| `Ctrl+K` | Open the Command Palette |
+| `F1` | Open the built-in Help Center |
 
-- The search loop works with live local models, in local and Docker sandboxes.
-- Benchmark pack-v1 (six algorithm tasks, 35B models): Frontis-MA1-35B showed no advantage over its base model, and search added little (median amplification 1.18). [docs/BENCH_MODELSWAP_V2.md](docs/BENCH_MODELSWAP_V2.md)
-- Benchmark pack-v2 (9B model, finished 2026-11-12): 13 of 15 runs have zero success cards. The amplification gate was not met. The recorded failures are the completion budget and Ollama HTTP 500. [docs/BENCH_AMP_V2.md](docs/BENCH_AMP_V2.md)
-- Model server failures are classified and reported with a fix; campaigns check the server first and stop on setup problems.
+## Honest Status
 
-## Quickstart
-
-```powershell
-# Build
-cargo build --release
-
-# 1. Try it without a model (scores are invented in demo mode)
-.\target\release\rsicraft --db demo.db demo-seed
-.\target\release\rsicraft --db demo.db campaign --task-id opt-synth --steps 4 --provider demo --sandbox-mode demo
-.\target\release\rsicraft --db demo.db lineage --task-id opt-synth
-
-# 2. Connect a model and check it (must say OK)
-$env:RSICRAFT_LLM_URL = 'http://127.0.0.1:11434'   # Ollama; LM Studio is :1234
-$env:RSICRAFT_MODEL   = 'qwen2.5-coder:7b'
-.\target\release\rsicraft probe
-
-# 3. A real search
-.\target\release\rsicraft task upsert --task-id primes --name "Prime count" `
-  --description "Write solve(n) returning the number of primes below n, as fast as possible. Standard library only." `
-  --evaluator-file tasks\pack-v1\primes.py
-.\target\release\rsicraft campaign --task-id primes --steps 8 --provider llama --sandbox-mode local
-.\target\release\rsicraft frontier --task-id primes
-
-# 4. The desktop studio
-.\target\release\rsicraft-app
-```
-
-The local sandbox runs model-written code as you. For anything you would not run yourself, build the Docker image and use `--sandbox-mode docker` (no network, read-only, no privileges, memory and CPU limits). Details: [Quickstart](docs/GUIDE.md#4-quickstart), [Connecting a model](docs/GUIDE.md#5-connecting-a-model).
-
-## When something fails
-
-Every model server problem is printed as `[llm:<class>] what happened | fix: what to do`, for example:
-
-```text
-rsicraft: [llm:model_not_found] Ollama at http://127.0.0.1:11434 does not serve 'qwen2.5-coder:7b'; served models: ... | fix: ... `ollama list`, then `ollama pull <name>` ...
-```
-
-`rsicraft probe` checks the server, lists its models, warns about context windows that are too small, and finds servers on the usual local ports when nothing answers at the configured address. Campaigns stop at once on setup problems (unreachable, unknown model, missing API key, bad address); per-step problems are recorded with their class. The studio shows the last problem and its fix in the Live Run panel. All classes: [Troubleshooting](docs/GUIDE.md#9-troubleshooting).
-
-## What it is based on
-
-- **Frontis-MA1 / OpenRSI** (arXiv:2607.28568, July 2026; Horizon Research, Frontis.AI, Tsinghua University; [github.com/FrontisAI/OpenRSI](https://github.com/FrontisAI/OpenRSI)): trained Draft, Improve, Debug and Crossover operators and a long-horizon search harness for machine-learning engineering. rsicraft reimplements the operator set, temperatures, experience cards and utility-based parent selection in Rust. It does not contain OpenRSI code (that code is CC BY-NC 4.0; rsicraft is MIT or Apache-2.0).
-- **LLM-guided program search**: FunSearch (2023) and AlphaEvolve (2025) from Google DeepMind, AIDE and similar agents.
-
-More, including what the paper does and does not claim: [What this is based on](docs/GUIDE.md#3-what-this-is-based-on).
-
-## Three ways to use it
-
-| | Start with | For |
-| :--- | :--- | :--- |
-| Desktop studio | `rsicraft-app` | Watching runs, the lineage graph, code and diffs of every candidate |
-| Command line | `rsicraft --help`, `rsicraft help-tabs` | Scripts and benchmarks; every verb accepts `--json` |
-| MCP server | `rsicraft mcp` | Letting Claude or another agent drive searches (26 tools) |
-
-All three use the same engine and the same SQLite database (`%LOCALAPPDATA%\rsicraft\rsicraft.db` by default, or `--db` / `RSICRAFT_DB`).
-
-## Repository layout
-
-```text
-crates/rsicraft-core   engine: store, operators, selection, LLM client, sandboxes, help text
-crates/rsicraft-mcp    the rsicraft binary: CLI and MCP stdio server
-crates/rsicraft-app    the rsicraft-app desktop studio (egui)
-sandboxes/             Docker evaluator image, LoRA training harness
-tasks/                 task packs (pack-v1 algorithms, pack-v2 heuristics)
-scripts/               benchmark runner and analysis, help document generator
-docs/                  guide, plans, benchmark reports, configuration, troubleshooting
-```
+During a search, model weights do not change — only the archive of experience cards grows. Rung 2 training tools (`rsi_dataset_export`, `rsi_train_step`, `rsi_promote_gate`) exist in the repository, but measured model weight improvement has not yet been demonstrated. Benchmark notes are in [docs/BENCH_MODELSWAP_V2.md](docs/BENCH_MODELSWAP_V2.md) and [docs/BENCH_AMP_V2.md](docs/BENCH_AMP_V2.md).
 
 ## Documentation
 
 | Document | Contents |
-| :--- | :--- |
-| [docs/GUIDE.md](docs/GUIDE.md) | The manual, generated from the built-in help |
-| [docs/help/index.html](docs/help/index.html) | The same, as a searchable page |
-| [INSTALL.md](INSTALL.md) | Installation and MCP client setup |
-| [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | Environment variables and flags |
-| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Error classes and incident notes |
-| [docs/TOOLS.md](docs/TOOLS.md) | MCP tool schemas |
-| [docs/FRONTIS_PARITY_PLAN.md](docs/FRONTIS_PARITY_PLAN.md) | Ladder status, plan, gates |
-| [docs/PRD.md](docs/PRD.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Requirements, design, build and release |
-| [docs/BENCH_MODELSWAP_V2.md](docs/BENCH_MODELSWAP_V2.md), [docs/BENCH_AMP_V2.md](docs/BENCH_AMP_V2.md) | Benchmark reports |
+|---|---|
+| [HELP.md](HELP.md) | Complete operator manual and ecosystem reference |
+| [docs/GUIDE.md](docs/GUIDE.md) | User guide generated from the built-in 10-tab help |
+| [docs/help/index.html](docs/help/index.html) | Searchable HTML version of the manual |
+| [INSTALL.md](INSTALL.md) | All installation paths and MCP client setup |
+| [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | Environment variables (`RSICRAFT_LLM_URL`, `RSICRAFT_MODEL`, `RSICRAFT_DB`) |
+| [docs/TOOLS.md](docs/TOOLS.md) | Full reference for all 26 MCP tools |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Crate layout, SQLite WAL + CAS storage, sandbox design |
+| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Building from source, tests, and release packaging |
+| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | `[llm:<class>]` error codes and fixes |
 
-Opinion and outreach pieces, not documentation: [docs/BOSTROM_YUDKOWSKY_AND_RSI_REALITY.md](docs/BOSTROM_YUDKOWSKY_AND_RSI_REALITY.md), [docs/RSI_LANDSCAPE_AND_SKYNET_MYTH.md](docs/RSI_LANDSCAPE_AND_SKYNET_MYTH.md), [docs/TSINGHUA_OPENRSI_TEAM.md](docs/TSINGHUA_OPENRSI_TEAM.md), [docs/LITTLE_TIMMY_EXPLAINS_RSI.md](docs/LITTLE_TIMMY_EXPLAINS_RSI.md) (cartoon), [docs/brochure/](docs/brochure/). Some of their numbers are illustrative, not measured.
+## Requirements
+
+- **OS**: Windows 10/11 (x64) for the installer; Linux/macOS supported from source
+- **LLM (optional for demo mode)**: Ollama, LM Studio, or any OpenAI-compatible server
+- **Docker (optional)**: Required only for `--sandbox-mode docker`
 
 ## License
 
-MIT or Apache-2.0, at your option. The Frontis-MA1 model weights, if you use them, are under their own CC BY-NC 4.0 licence.
+MIT or Apache-2.0, at your option. Frontis-MA1 model weights, if you use them, carry their own CC BY-NC 4.0 license.
