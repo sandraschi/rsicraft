@@ -33,7 +33,7 @@ rsicraft is a local-first evolutionary program search studio that lets an LLM on
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install-craft.ps1
 ```
 
-Installs the Windows app, the CLI, and the MCP bundle. See [INSTALL.md](INSTALL.md) for manual MCP client config and [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for building from source.
+Installs the Windows app and the CLI (Start Menu shortcut, CLI on the user PATH). `-RegisterClients` also registers the MCP exe with the IDEs that are installed. `-Clients cursor,claude-desktop` limits that list. `-Mcpb` installs the Claude Desktop extension bundle. See [INSTALL.md](INSTALL.md) for manual MCP client config and [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for building from source.
 
 ## Example Prompts
 
