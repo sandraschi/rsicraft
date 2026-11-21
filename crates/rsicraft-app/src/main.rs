@@ -64,6 +64,21 @@ impl StudioPage {
         ]
     }
 
+    /// Page for a short command-line name (`--page lineage`).
+    #[must_use]
+    pub fn from_slug(slug: &str) -> Option<Self> {
+        Some(match slug {
+            "studio" => Self::EvolutionaryStudio,
+            "lineage" => Self::LineageDagCanvas,
+            "cards" => Self::ExperienceCards,
+            "lab" => Self::TaskAndSandboxLab,
+            "llm" => Self::Goliath4090AndLlm,
+            "rsi" => Self::RsiAndTsinghuaDossier,
+            "help" => Self::MultitabHelpAndTools,
+            _ => return None,
+        })
+    }
+
     #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
@@ -2962,7 +2977,7 @@ impl RsiCraftApp {
         ui.columns(4, |cols| {
             accent_card(&mut cols[0], ACCENT_CYAN, |ui| {
                 ui.label(
-                    RichText::new("PARETO FRONTIER LEADER")
+                    RichText::new("BEST SCORE")
                         .size(11.5)
                         .color(ACCENT_CYAN)
                         .strong(),
@@ -2972,11 +2987,13 @@ impl RsiCraftApp {
                         .size(18.0)
                         .strong(),
                 );
-                ui.label(RichText::new("Verified 4090 Peak: 96.6028 (1.359 ms)").size(12.0));
+                ui.label(
+                    RichText::new(format!("best of {succ_cnt} working candidates")).size(12.0),
+                );
             });
             accent_card(&mut cols[1], ACCENT_EMERALD, |ui| {
                 ui.label(
-                    RichText::new("STIGMERGIC WAL + BLAKE3/ZSTD CAS")
+                    RichText::new("ARCHIVE")
                         .size(11.5)
                         .color(ACCENT_EMERALD)
                         .strong(),
@@ -2989,28 +3006,37 @@ impl RsiCraftApp {
                     .strong(),
                 );
                 ui.label(
-                    RichText::new(format!("{tasks_cnt} Tasks in SQLite WAL Store")).size(12.0),
+                    RichText::new(format!("{tasks_cnt} tasks, {hashes_cnt} distinct programs"))
+                        .size(12.0),
                 );
             });
             accent_card(&mut cols[2], ACCENT_AMBER, |ui| {
                 ui.label(
-                    RichText::new("GOLIATH RTX 4090 (24 GB VRAM)")
+                    RichText::new("MODEL SERVER")
                         .size(11.5)
                         .color(ACCENT_AMBER)
                         .strong(),
                 );
                 ui.label(
-                    RichText::new("Frontis-MA1 30B/35B MoE (~3B Active)")
+                    RichText::new(self.ctx.llm.model_alias.as_str())
                         .size(15.5)
                         .strong(),
                 );
-                ui.label(
-                    RichText::new("18.0-19.5 GB Bounded | 16k q4_0 KV | ~120 tok/s").size(12.0),
-                );
+                let check = match self
+                    .provider_report
+                    .as_ref()
+                    .and_then(|r| r.get("ok"))
+                    .and_then(Value::as_bool)
+                {
+                    Some(true) => "checked: OK",
+                    Some(false) => "checked: problem (see LLM page)",
+                    None => "not checked yet",
+                };
+                ui.label(RichText::new(format!("{} | {check}", self.ctx.llm.base_url)).size(12.0));
             });
             accent_card(&mut cols[3], ACCENT_PURPLE, |ui| {
                 ui.label(
-                    RichText::new("TSINGHUA / OPENRSI UTILITY MATH")
+                    RichText::new("PARENT SELECTION")
                         .size(11.5)
                         .color(ACCENT_PURPLE)
                         .strong(),
@@ -3021,7 +3047,9 @@ impl RsiCraftApp {
                         .size(15.0)
                         .strong(),
                 );
-                ui.label(RichText::new("arXiv:2607.28568 | FrontisAI/OpenRSI").size(12.0));
+                ui.label(
+                    RichText::new("score, gain over parent, novelty (Frontis-MA1)").size(12.0),
+                );
             });
         });
     }
@@ -4557,7 +4585,7 @@ impl eframe::App for RsiCraftApp {
         ui.horizontal_wrapped(|ui| {
             paint_status_dot(ui, ACCENT_EMERALD);
             ui.heading(
-                RichText::new(format!("RSICraft v{VERSION} Sovereign Studio"))
+                RichText::new(format!("rsicraft v{VERSION}"))
                     .color(ACCENT_CYAN)
                     .strong(),
             );
@@ -4671,14 +4699,50 @@ fn main() {
     }
 
     let db_path = std::env::var("RSICRAFT_DB").ok().map(PathBuf::from);
-    let Ok(app) = RsiCraftApp::new(db_path.as_deref()) else {
+    let Ok(mut app) = RsiCraftApp::new(db_path.as_deref()) else {
         eprintln!("rsicraft-app: failed to open database");
         std::process::exit(1);
     };
+    // Optional start state, e.g. `rsicraft-app --task primes --page lineage`.
+    // Used by scripts/capture-screenshots.ps1 and handy for jumping straight in.
+    let arg_after = |flag: &str| {
+        args.iter()
+            .position(|a| a == flag)
+            .and_then(|i| args.get(i + 1))
+            .cloned()
+    };
+    if let Some(task) = arg_after("--task") {
+        app.active_task_id = task;
+        app.refresh_all();
+    }
+    if let Some(p) = arg_after("--provider") {
+        app.provider_pick = p;
+    }
+    if let Some(s) = arg_after("--sandbox") {
+        app.sandbox_pick = s;
+    }
+    if args.iter().any(|a| a == "--check-provider") {
+        app.check_provider();
+    }
+    if let Some(page) = arg_after("--page") {
+        match StudioPage::from_slug(&page) {
+            Some(p) => {
+                app.page = p;
+                app.welcome.open = false;
+            }
+            None if page == "welcome" => app.welcome.open = true,
+            None => {
+                eprintln!(
+                    "rsicraft-app: unknown page '{page}'; use studio, lineage, cards, lab, llm, rsi, help or welcome"
+                );
+                std::process::exit(2);
+            }
+        }
+    }
 
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_title("RSICraft - Sovereign Recursive Self-Improvement Studio (RTX 4090 / Frontis-MA1 / OpenRSI)")
+            .with_title("rsicraft studio - LLM-guided evolutionary program search")
             .with_inner_size([1360.0, 860.0]),
         ..Default::default()
     };

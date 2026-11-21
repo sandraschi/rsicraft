@@ -2,6 +2,16 @@
 
 rsicraft is a local-first evolutionary program search studio that lets an LLM on your machine write, evaluate, repair, and improve small programs in a closed loop while tracking every attempt's lineage.
 
+![Lineage view: every candidate of a 12-step search with its parents. The best program (CROSSOVER, score 27.38) came from combining two earlier working candidates.](docs/screenshots/lineage.png)
+
+| Evolutionary Studio | Experience cards |
+| :---: | :---: |
+| [![Studio page: best score, archive, model server, operator buttons and the score trajectory](docs/screenshots/studio.png)](docs/screenshots/studio.png) | [![Cards page: each candidate with operator, status, score, gain over its parent and code hash](docs/screenshots/cards.png)](docs/screenshots/cards.png) |
+| **Built-in help** | |
+| [![Help page: the 10-tab manual, starting with Start here](docs/screenshots/help.png)](docs/screenshots/help.png) | |
+
+All screenshots show a real search, not demo data: 12 steps on the `primes` task with `llama3.2:3b` on Ollama in the local sandbox (11 cards, one skipped step). A 3B model writes broken code often, which is why most cards are `RUNTIME_ERROR`; the search kept the three that worked and built on them. Regenerate them with `scripts\capture-screenshots.ps1`.
+
 ## What You Can Do
 
 - **Run evolutionary code search (Rung 1)**: Define a task and an evaluator script, then let a local or OpenAI-compatible model iterate using four operators:
