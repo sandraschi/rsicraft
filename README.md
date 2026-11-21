@@ -5,10 +5,10 @@ rsicraft is a local-first evolutionary program search studio that lets an LLM on
 ## What You Can Do
 
 - **Run evolutionary code search (Rung 1)**: Define a task and an evaluator script, then let a local or OpenAI-compatible model iterate using four operators:
-  - `DRAFT` — synthesize a fresh candidate from the task specification.
-  - `IMPROVE` — mutate a high-utility working parent to optimize score or runtime.
-  - `DEBUG` — repair a failed parent (`COMPILE_ERROR`, `RUNTIME_ERROR`, `TIMEOUT`, `METRIC_PARSE_ERROR`) using its sandbox log tail.
-  - `CROSSOVER` — combine ideas from two distinct high-utility parents into a stronger child.
+  - `DRAFT`: synthesize a fresh candidate from the task specification.
+  - `IMPROVE`: mutate a high-utility working parent to optimize score or runtime.
+  - `DEBUG`: repair a failed parent (`COMPILE_ERROR`, `RUNTIME_ERROR`, `TIMEOUT`, `METRIC_PARSE_ERROR`) using its sandbox log tail.
+  - `CROSSOVER`: combine ideas from two distinct high-utility parents into a stronger child.
 - **Inspect candidate lineage in the Desktop Studio**: Watch live runs, compare candidate code and diffs side by side, and explore the interactive Bezier lineage DAG across 7 views in `rsicraft-app`.
 - **Chat and get help in-app**: Press `Ctrl+J` to open the **AI Chat Dock**, press `Ctrl+K` for the Command Palette, or open the **10-item Help menu** (including **Bundled Skills** and the built-in 10-tab manual).
 - **Use bundled MCP skills and 26 tools**: Connect Claude Desktop or any MCP client via `rsicraft mcp` to drive searches, inspect frontiers, and read `skill://` resources.
@@ -33,7 +33,7 @@ rsicraft is a local-first evolutionary program search studio that lets an LLM on
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install-craft.ps1
 ```
 
-Installs the Windows app, the CLI, and the MCP bundle. See [INSTALL.md](INSTALL.md) for manual MCP client config and [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for building from source.
+Installs the Windows app and the CLI (Start Menu shortcut, CLI on the user PATH). `-RegisterClients` also registers the MCP exe with the IDEs that are installed. `-Clients cursor,claude-desktop` limits that list. `-Mcpb` installs the Claude Desktop extension bundle. See [INSTALL.md](INSTALL.md) for manual MCP client config and [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for building from source.
 
 ## Example Prompts
 
@@ -61,7 +61,7 @@ Installs the Windows app, the CLI, and the MCP bundle. See [INSTALL.md](INSTALL.
 
 ## Honest Status
 
-During a search, model weights do not change — only the archive of experience cards grows. Rung 2 training tools (`rsi_dataset_export`, `rsi_train_step`, `rsi_promote_gate`) exist in the repository, but measured model weight improvement has not yet been demonstrated. Benchmark notes are in [docs/BENCH_MODELSWAP_V2.md](docs/BENCH_MODELSWAP_V2.md) and [docs/BENCH_AMP_V2.md](docs/BENCH_AMP_V2.md).
+During a search, model weights do not change; only the archive of experience cards grows. Rung 2 training tools (`rsi_dataset_export`, `rsi_train_step`, `rsi_promote_gate`) exist in the repository, but measured model weight improvement has not yet been demonstrated. Benchmark notes are in [docs/BENCH_MODELSWAP_V2.md](docs/BENCH_MODELSWAP_V2.md) and [docs/BENCH_AMP_V2.md](docs/BENCH_AMP_V2.md).
 
 ## Documentation
 
