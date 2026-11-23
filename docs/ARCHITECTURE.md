@@ -16,7 +16,7 @@ flowchart TD
 
     subgraph L2["L2: crates/rsicraft-mcp (CLI & MCP Stdio Server)"]
         CLI["Clap CLI (--json / tabular)"]
-        MCP["MCP 2024-11-05 Stdio Server (26 Tools)"]
+        MCP["MCP 2026-07-28 Stdio Server (26 Tools)"]
     end
 
         subgraph L1["L1: crates/rsicraft-core (Engine and Store)"]

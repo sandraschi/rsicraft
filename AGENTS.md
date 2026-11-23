@@ -13,7 +13,7 @@
 | Path | Role |
 | :--- | :--- |
 | `crates/rsicraft-core/` | `L1 Core + Store`: 4-operator action space and language-aware prompts (`operators.rs`), `LlamaClient` (`llm.rs`), `SandboxRunner` (`sandbox.rs`), 10-tab help (`help.rs`), 26-tool `Command::dispatch` bus (`lib.rs`), and the store module (`store/mod.rs` SQLite `WAL` registry, `store/cas.rs` BLAKE3 + Zstd CAS, `store/utility.rs` composite utility). |
-| `crates/rsicraft-mcp/` | `L2 CLI + MCP`: `clap` CLI (`--json` + table/help renderer) and pure-Rust MCP `2024-11-05` stdio loop (`mcp.rs`). |
+| `crates/rsicraft-mcp/` | `L2 CLI + MCP`: `clap` CLI (`--json` + table/help renderer) and pure-Rust MCP `2026-07-28` stdio loop (`mcp.rs`). |
 | `crates/rsicraft-app/` | `L3 Desktop Studio`: `eframe`/`egui 0.37` app calling `rsicraft_core::dispatch` in-process (single `main.rs`). |
 | `schema.sql` | Store schema, embedded into `rsicraft-core` with `include_str!`. Additive changes only (`CREATE TABLE IF NOT EXISTS`); it runs on every open. |
 | `sandboxes/Dockerfile.evaluator` | Non-root Python + NumPy/SciPy evaluator image for `sandbox_mode = "docker"`. |

@@ -221,7 +221,7 @@ enum Cmd {
     },
     /// Print the MCP tool catalog as JSON.
     Tools,
-    /// Run the MCP 2024-11-05 stdio server.
+    /// Run the MCP 2026-07-28 stdio server.
     Mcp,
 }
 

@@ -129,7 +129,7 @@ rsicraft --smoke
 
 ### MCP Server (`rsicraft mcp`)
 
-Starts a pure-Rust MCP `2024-11-05` `stdio` server (JSON-RPC on `stdout`, diagnostics on `stderr`). Exposes 27 tools (`rsi_*` or dotted `rsi.*` aliases plus `rsicraft_skill_read`) and MCP `resources/list` + `resources/read` for bundled skills (`skill://rsicraft-workflow`, `skill://rsicraft-ergonomics`).
+Starts a pure-Rust MCP `2026-07-28` `stdio` server (JSON-RPC on `stdout`, diagnostics on `stderr`). Exposes 27 tools (`rsi_*` or dotted `rsi.*` aliases plus `rsicraft_skill_read`) and MCP `resources/list` + `resources/read` for bundled skills (`skill://rsicraft-workflow`, `skill://rsicraft-ergonomics`).
 
 ---
 

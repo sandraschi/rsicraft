@@ -11,7 +11,7 @@ Build **`rsicraft`**, a pure-Rust, zero-panic studio, CLI, and MCP server for **
 **What the product is today:** all three crates. `rsicraft-core` holds the store, the four operators, the sandboxes, trace export, operator statistics, the LoRA harness, the promotion gate, and classified LLM errors (a campaign preflights the provider, and a step with no top-level function is `no_code`). `rsicraft-mcp` is the 26-tool CLI and MCP server. `rsicraft-app` is the egui studio (lineage DAG, live run, seven pages, the same 10-tab manual as `rsicraft help-tabs`). **What has not happened:** no generation has been trained, and campaigns still use a fixed operator cycle. The studio has the 8-menu bar, store undo and redo, and file dialogs for Open Database and Save As. Cut, paste, and select all have no selection. Recursive self-improvement is the bench question. The paper itself claims meta-evolution with one generation and disclaims general RSI. Status and measurements: [FRONTIS_PARITY_PLAN.md](FRONTIS_PARITY_PLAN.md), [BENCH_MODELSWAP_V2.md](BENCH_MODELSWAP_V2.md), [BENCH_AMP_V2.md](BENCH_AMP_V2.md).
 The system manages an open-ended evolutionary search loop over executable code candidate spaces on a single consumer 24 GB GPU (**Goliath**: AMD Ryzen 9 7900X, 64 GB DDR5, NVIDIA GeForce RTX 4090 24 GB VRAM), maintaining persistent stigmergic state in SQLite `WAL` with BLAKE3+Zstd Content-Addressable Storage (CAS), running isolated execution evaluations in sandboxed containers or local Python 3.12 environments, and exposing control via:
 1. **`rsicraft-app` (`L3`)**: A native GPU-rendered `eframe`/`egui 0.37` Desktop Studio with an interactive Bézier Lineage DAG Canvas, 4-operator launchpad, score spark charts, and the 10-tab manual (Help page) plus a "What is RSI?" page.
-2. **`rsicraft-mcp` (`L2`)**: A unified CLI (`--json` + formatted tables) and MCP `2024-11-05` stdio server exposing 26 tools.
+2. **`rsicraft-mcp` (`L2`)**: A unified CLI (`--json` + formatted tables) and MCP `2026-07-28` stdio server exposing 26 tools.
 3. **`rsicraft-core` (`L1`)**: The deterministic evolutionary state machine, composite utility selector, and store.
 
 ---
@@ -51,7 +51,7 @@ The system manages an open-ended evolutionary search loop over executable code c
    - Gate 1: `cargo clippy --workspace --all-targets --all-features -- -D warnings` (0 warnings, 0 `unwrap`/`expect`/`panic`/`todo`).
    - Gate 2: `cargo test --workspace` (100% green including `glyph_allowlist_no_tofu_chars`).
    - Gate 3: `cargo fmt --all --check`.
-   - Gate 4: MCP `2024-11-05` stdio probe (`initialize`, `tools/list` = 26 tools, `tools/call`).
+   - Gate 4: MCP `2026-07-28` stdio probe (`initialize`, `tools/list` = 26 tools, `tools/call`).
    - Gate 5: Committed `Cargo.lock`.
    - Gate 6: Complete README stack, 10-tab help, and `BookCraft` brochure (`HTML`, `EPUB`, `PDF`).
 

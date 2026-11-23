@@ -1,4 +1,4 @@
-# Complete 26-Tool Reference: RSICraft (`MCP 2024-11-05` & CLI)
+# Complete 26-Tool Reference: RSICraft (`MCP 2026-07-28` & CLI)
 
 **Navigation:** [README](../README.md) · [Architecture](ARCHITECTURE.md) · [Configuration](CONFIGURATION.md) · [10-tab manual](../HELP.md) · [RSI Limits & Benchmarking](RSI_ENGINEERING_LIMITS_AND_BENCHMARKING.md) · [Bostrom & Yudkowsky Analysis](BOSTROM_YUDKOWSKY_AND_RSI_REALITY.md)
 

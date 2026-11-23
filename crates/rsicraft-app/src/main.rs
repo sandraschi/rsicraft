@@ -1873,7 +1873,7 @@ impl RsiCraftApp {
                                 ui.label("CLI (rsicraft): every verb accepts --json and routes through the same Command::dispatch bus:");
                                 ui.monospace("rsicraft --json status\nrsicraft probe\nrsicraft campaign --task-id primes --steps 8 --provider llama --sandbox-mode local\nrsicraft frontier --task-id primes\nrsicraft help-tabs --tab troubleshoot");
                                 ui.separator();
-                                ui.label("MCP Server (rsicraft mcp): pure-Rust MCP 2024-11-05 stdio server with 27 tools (rsi_* / rsi.* + rsicraft_skill_read) and resources/list + resources/read.");
+                                ui.label("MCP Server (rsicraft mcp): pure-Rust MCP 2026-07-28 stdio server with 27 tools (rsi_* / rsi.* + rsicraft_skill_read) and resources/list + resources/read.");
                             }
                             HelpCenterTab::TipsTricks => {
                                 ui.heading("Tips & Tricks");

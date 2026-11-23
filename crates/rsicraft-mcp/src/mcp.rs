@@ -1,4 +1,4 @@
-//! Pure-Rust MCP `2024-11-05` stdio loop for `rsicraft`.
+//! Pure-Rust MCP `2026-07-28` stdio loop for `rsicraft`.
 //!
 //! Invariants (`RUST_ARTCRAFT_STANDARD.md` Gate 4):
 //! - `stdout` carries 100% pure line-delimited JSON-RPC; diagnostics go to `stderr`.
@@ -9,7 +9,7 @@
 use serde_json::{json, Value};
 use std::io::{BufRead, Write};
 
-pub const PROTOCOL_VERSION: &str = "2024-11-05";
+pub const PROTOCOL_VERSION: &str = "2026-07-28";
 pub const MAX_LINE_BYTES: usize = 4 * 1024 * 1024;
 
 pub trait ToolHost {

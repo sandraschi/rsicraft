@@ -28,7 +28,7 @@ BUILT rsicraft-core     BUILT rsicraft         BUILT rsicraft-app     BUILT (Fil
 
 ### Tier 2 - Headless Driver (`rsicraft-mcp`)
 - [x] Unified CLI binary `rsicraft` with `--json` output.
-- [x] Hand-rolled MCP `2024-11-05` stdio server (26 tools). This is not a FastMCP server.
+- [x] Hand-rolled MCP `2026-07-28` stdio server (26 tools). This is not a FastMCP server.
 - [x] LLM endpoint reachability and latency probing.
 - [x] Headless `--smoke` on the CLI (`rsicraft --smoke`, or `--db` plus `--smoke`). It checks status, hardware, help, and the 26-tool count. MCP stdio smoke stays the initialize probe in `scripts/release.ps1`.
 

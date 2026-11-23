@@ -1,6 +1,6 @@
 [package]
 name = "rsicraft-mcp"
-description = "rsicraft L2: single binary for the CLI (every verb takes --json) and the MCP 2024-11-05 stdio server."
+description = "rsicraft L2: single binary for the CLI (every verb takes --json) and the MCP 2026-07-28 stdio server."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

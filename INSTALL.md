@@ -29,7 +29,7 @@ The release binary is produced at:
 
 ---
 
-## 2. Connect to MCP Clients (`2024-11-05` Stdio)
+## 2. Connect to MCP Clients (`2026-07-28` Stdio)
 
 ### Claude Desktop / Antigravity / Windsurf (`claude_desktop_config.json`)
 

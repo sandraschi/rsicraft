@@ -15,7 +15,7 @@ Contributions are welcome! Every pull request must satisfy the **6 Pure-Rust Art
    ```powershell
    cargo fmt --all --check
    ```
-4. **100% CLI & MCP `2024-11-05` Parity:**
+4. **100% CLI & MCP `2026-07-28` Parity:**
    Any new `Command` variant in `rsicraft-core` must be exposed in both `rsicraft_core::tools()` and `rsicraft-mcp`'s `Cmd` enum, and verified by `cli_verbs_map_to_known_tools`.
 5. **Headless Desktop Studio Smoke Test:**
    ```powershell
