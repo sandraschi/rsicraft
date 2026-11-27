@@ -4420,13 +4420,46 @@ impl RsiCraftApp {
         egui::Panel::right("ai_chat_dock")
             .resizable(true)
             .default_size(340.0)
-            .min_size(260.0)
+            .size_range(260.0..=640.0)
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
                     ui.heading(RichText::new("AI Chat Dock").color(ACCENT_CYAN));
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if ui.small_button("x").clicked() {
                             open = false;
+                        }
+                        if ui.small_button("Export .md").clicked() {
+                            let mut md = format!(
+                                "# RSICraft AI Chat Transcript\n\n- **Model:** {}\n\n---\n\n",
+                                self.model_alias_edit
+                            );
+                            for (role, text) in &self.chat_messages {
+                                md.push_str(&format!("### {role}\n\n{text}\n\n"));
+                            }
+                            let dir = std::env::var("LOCALAPPDATA")
+                                .map(|d| std::path::PathBuf::from(d).join("RSICraft").join("chats"))
+                                .unwrap_or_else(|_| std::path::PathBuf::from("chats"));
+                            let ts = std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .map(|d| d.as_secs())
+                                .unwrap_or(0);
+                            let path = dir.join(format!("chat_{ts}.md"));
+                            if std::fs::create_dir_all(&dir).is_ok()
+                                && std::fs::write(&path, md).is_ok()
+                            {
+                                self.status_banner = format!("Exported chat: {}", path.display());
+                            }
+                        }
+                        if ui.small_button("Copy MD").clicked() {
+                            let mut md = format!(
+                                "# RSICraft AI Chat Transcript\n\n- **Model:** {}\n\n---\n\n",
+                                self.model_alias_edit
+                            );
+                            for (role, text) in &self.chat_messages {
+                                md.push_str(&format!("### {role}\n\n{text}\n\n"));
+                            }
+                            ui.ctx().copy_text(md);
+                            self.status_banner = "Copied chat Markdown to clipboard".to_string();
                         }
                     });
                 });
